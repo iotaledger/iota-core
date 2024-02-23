@@ -158,15 +158,7 @@ func Test_EventAPI_DelegationTransactionBlocks(t *testing.T) {
 
 	// create an account to issue blocks
 	account := d.CreateAccount()
-
-	fundsAddr, privateKey := d.getAddress(iotago.AddressEd25519)
-	fundsOutputID, fundsUTXOOutput := d.RequestFaucetFunds(ctx, fundsAddr)
-	d.defaultWallet.AddOutput(fundsOutputID, &Output{
-		ID:         fundsOutputID,
-		Output:     fundsUTXOOutput,
-		PrivateKey: privateKey,
-		Address:    fundsAddr,
-	})
+	fundsOutputID := d.RequestFaucetFunds(ctx, iotago.AddressEd25519)
 
 	// prepare data blocks to send
 	delegationId, outputId, blk := d.CreateDelegationBlockFromInput(account.AccountID, d.Node("V2"), fundsOutputID)
@@ -309,15 +301,7 @@ func Test_EventAPI_FoundryTransactionBlocks(t *testing.T) {
 
 	{
 		account := d.CreateAccount()
-
-		fundsAddr, privateKey := d.getAddress(iotago.AddressEd25519)
-		fundsOutputID, fundsUTXOOutput := d.RequestFaucetFunds(ctx, fundsAddr)
-		d.defaultWallet.AddOutput(fundsOutputID, &Output{
-			ID:         fundsOutputID,
-			Output:     fundsUTXOOutput,
-			PrivateKey: privateKey,
-			Address:    fundsAddr,
-		})
+		fundsOutputID := d.RequestFaucetFunds(ctx, iotago.AddressEd25519)
 
 		// prepare foundry output block
 		foundryId, outputId, blk := d.CreateFoundryBlockFromInput(account.AccountID, fundsOutputID, 5_000_000, 10_000_000_000)

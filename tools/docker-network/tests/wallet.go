@@ -119,6 +119,90 @@ func (w *Wallet) AddressSigner(indexes ...uint32) iotago.AddressSigner {
 	return w.keyManager.AddressSigner(indexes...)
 }
 
+func (w *Wallet) AllotManaFromAccount(clt *nodeclient.Client, fromId iotago.AccountID, toId iotago.AccountID, manaToAllot iotago.Mana, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
+	from := w.Account(fromId)
+	to := w.Account(toId)
+	input := w.Output(inputId)
+	fundsAddr := input.Address
+	fundsUTXOOutput := input.Output
+	fundsOutputID := input.ID
+	fundsAddrSigner := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(fundsAddr.(*iotago.Ed25519Address), input.PrivateKey))
+
+	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	apiForSlot := clt.APIForSlot(currentSlot)
+
+	basicOutput, ok := fundsUTXOOutput.(*iotago.BasicOutput)
+	require.True(w.Testing, ok)
+
+	// Subtract stored mana from source outputs to fund Allotment.
+	outputBuilder := builder.NewBasicOutputBuilderFromPrevious(basicOutput)
+	actualAllottedMana := manaToAllot
+	if manaToAllot >= basicOutput.StoredMana() {
+		actualAllottedMana = basicOutput.StoredMana()
+		outputBuilder.Mana(0)
+	} else {
+		outputBuilder.Mana(basicOutput.StoredMana() - manaToAllot)
+	}
+
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+		AddInput(&builder.TxInput{
+			UnlockTarget: fundsAddr,
+			InputID:      fundsOutputID,
+			Input:        fundsUTXOOutput,
+		}).
+		IncreaseAllotment(to.AccountID, actualAllottedMana).
+		AddOutput(basicOutput).
+		SetCreationSlot(currentSlot).
+		AllotAllMana(currentSlot, from.AccountID, 0).
+		Build(fundsAddrSigner)
+	require.NoError(w.Testing, err)
+
+	delegationOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
+	w.AddOutput(delegationOutputId, &Output{
+		ID:         delegationOutputId,
+		Output:     basicOutput,
+		Address:    fundsAddr,
+		PrivateKey: input.PrivateKey,
+	})
+
+	return signedTx
+}
+
+func (w *Wallet) AllotManaFromInput(clt *nodeclient.Client, toId iotago.AccountID, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
+	to := w.Account(toId)
+	input := w.Output(inputId)
+	fundsAddr := input.Address
+	fundsUTXOOutput := input.Output
+	fundsOutputID := input.ID
+	fundsAddrSigner := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(fundsAddr.(*iotago.Ed25519Address), input.PrivateKey))
+
+	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	apiForSlot := clt.APIForSlot(currentSlot)
+
+	basicOutput, err := builder.NewBasicOutputBuilder(fundsAddr, fundsUTXOOutput.BaseTokenAmount()).Build()
+	require.NoError(w.Testing, err)
+
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+		AddInput(&builder.TxInput{
+			UnlockTarget: fundsAddr,
+			InputID:      fundsOutputID,
+			Input:        fundsUTXOOutput,
+		}).
+		AddOutput(basicOutput).
+		AllotAllMana(currentSlot, to.AccountID, 0).
+		Build(fundsAddrSigner)
+
+	delegationOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
+	w.AddOutput(delegationOutputId, &Output{
+		ID:         delegationOutputId,
+		Output:     basicOutput,
+		Address:    fundsAddr,
+		PrivateKey: input.PrivateKey,
+	})
+
+	return signedTx
+}
+
 func (w *Wallet) TransitionImplicitAccountToAccountOutput(clt *nodeclient.Client, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse, opts ...options.Option[builder.AccountOutputBuilder]) (*Account, *iotago.SignedTransaction) {
 	input := w.Output(inputId)
 	implicitAddr := input.Address

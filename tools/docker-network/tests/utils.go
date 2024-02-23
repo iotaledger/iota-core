@@ -5,7 +5,6 @@ package tests
 import (
 	"bytes"
 	"context"
-	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,10 +18,8 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-crypto-demo/pkg/bip32path"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
-	"github.com/iotaledger/iota.go/v4/wallet"
 )
 
 func (d *DockerTestFramework) CheckAccountStatus(ctx context.Context, blkID iotago.BlockID, txID iotago.TransactionID, creationOutputID iotago.OutputID, accountAddress *iotago.AccountAddress, checkIndexer ...bool) {
@@ -290,15 +287,6 @@ func (d *DockerTestFramework) SendFaucetRequest(ctx context.Context, receiveAddr
 	require.Equal(d.Testing, http.StatusAccepted, res.StatusCode)
 }
 
-func (d *DockerTestFramework) getAddress(addressType iotago.AddressType) (iotago.DirectUnlockableAddress, ed25519.PrivateKey) {
-	privateKey, _ := d.defaultWallet.KeyPair()
-	if addressType == iotago.AddressEd25519 {
-		return d.defaultWallet.Address(), privateKey
-	}
-
-	return d.defaultWallet.ImplicitAccountCreationAddress(), privateKey
-}
-
 func createLogDirectory(testName string) string {
 	// make sure logs/ exists
 	err := os.Mkdir("logs", 0755)
@@ -339,18 +327,6 @@ func AwaitEventAPITopics(t *testing.T, duration time.Duration, cancleFunc contex
 			}
 		}
 	}
-}
-
-func BIP32PathForIndex(index uint32) string {
-	path := lo.PanicOnErr(bip32path.ParsePath(wallet.DefaultIOTAPath))
-	if len(path) != 5 {
-		panic("invalid path length")
-	}
-
-	// Set the index
-	path[4] = index | (1 << 31)
-
-	return path.String()
 }
 
 func getDelegationStartEpoch(api iotago.API, commitmentSlot iotago.SlotIndex) iotago.EpochIndex {

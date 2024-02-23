@@ -485,14 +485,7 @@ func (d *DockerTestFramework) CreateAccountBlockFromInput(inputId iotago.OutputI
 
 // CreateImplicitAccount requests faucet funds and creates an implicit account. It already wait until the transaction is committed and the created account is useable.
 func (d *DockerTestFramework) CreateImplicitAccount(ctx context.Context) *Account {
-	fundsAddr, privateKey := d.getAddress(iotago.AddressImplicitAccountCreation)
-	fundsOutputID, fundsUTXOOutput := d.RequestFaucetFunds(ctx, fundsAddr)
-	d.defaultWallet.AddOutput(fundsOutputID, &Output{
-		ID:         fundsOutputID,
-		Output:     fundsUTXOOutput,
-		PrivateKey: privateKey,
-		Address:    fundsAddr,
-	})
+	fundsOutputID := d.RequestFaucetFunds(ctx, iotago.AddressImplicitAccountCreation)
 
 	accountID := iotago.AccountIDFromOutputID(fundsOutputID)
 	accountAddress, ok := accountID.ToAddress().(*iotago.AccountAddress)
@@ -501,7 +494,7 @@ func (d *DockerTestFramework) CreateImplicitAccount(ctx context.Context) *Accoun
 	accountInfo := &Account{
 		AccountID:      accountID,
 		AccountAddress: accountAddress,
-		BlockIssuerKey: privateKey,
+		BlockIssuerKey: d.defaultWallet.Output(fundsOutputID).PrivateKey,
 		OutputID:       fundsOutputID,
 	}
 
@@ -549,14 +542,7 @@ func (d *DockerTestFramework) DelegateToValidator(fromId iotago.AccountID, valid
 
 	// requesting faucet funds as delegation input
 	ctx := context.TODO()
-	fundsAddr, privateKey := d.getAddress(iotago.AddressEd25519)
-	fundsOutputID, fundsUTXOOutput := d.RequestFaucetFunds(ctx, fundsAddr)
-	d.defaultWallet.AddOutput(fundsOutputID, &Output{
-		ID:         fundsOutputID,
-		Address:    fundsAddr,
-		PrivateKey: privateKey,
-		Output:     fundsUTXOOutput,
-	})
+	fundsOutputID := d.RequestFaucetFunds(ctx, iotago.AddressEd25519)
 
 	clt := validator.Client
 
@@ -583,13 +569,8 @@ func (d *DockerTestFramework) IncreaseBIC(toId iotago.AccountID) {
 
 	// requesting faucet funds for allotment
 	ctx := context.TODO()
-	fundsAddr, privateKey := d.getAddress(iotago.AddressEd25519)
-	fundsOutputID, fundsUTXOOutput := d.RequestFaucetFunds(ctx, fundsAddr)
-	fundsAddrSigner := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(fundsAddr.(*iotago.Ed25519Address), privateKey))
-
+	fundsOutputID := d.RequestFaucetFunds(ctx, iotago.AddressEd25519)
 	clt := d.Node("V1").Client
-	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
-	apiForSlot := clt.APIForSlot(currentSlot)
 
 	issuerResp, err := clt.BlockIssuance(ctx)
 	require.NoError(d.Testing, err)
@@ -597,18 +578,7 @@ func (d *DockerTestFramework) IncreaseBIC(toId iotago.AccountID) {
 	congestionResp, err := clt.Congestion(ctx, to.AccountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
 	require.NoError(d.Testing, err)
 
-	basicOutput, err := builder.NewBasicOutputBuilder(fundsAddr, fundsUTXOOutput.BaseTokenAmount()).Build()
-	require.NoError(d.Testing, err)
-
-	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
-		AddInput(&builder.TxInput{
-			UnlockTarget: fundsAddr,
-			InputID:      fundsOutputID,
-			Input:        fundsUTXOOutput,
-		}).
-		AddOutput(basicOutput).
-		AllotAllMana(currentSlot, to.AccountID, 0).
-		Build(fundsAddrSigner)
+	signedTx := d.defaultWallet.AllotManaFromInput(clt, toId, fundsOutputID, issuerResp)
 
 	blkID := d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(to.AccountID, to.BlockIssuerKey), congestionResp, issuerResp)
 
@@ -623,29 +593,10 @@ func (d *DockerTestFramework) IncreaseBIC(toId iotago.AccountID) {
 // AllotManaTo requests faucet funds then uses it to allots mana from one account to another.
 func (d *DockerTestFramework) AllotManaTo(fromId iotago.AccountID, toId iotago.AccountID, manaToAllot iotago.Mana) {
 	from := d.defaultWallet.Account(fromId)
-	to := d.defaultWallet.Account(toId)
 	// requesting faucet funds for allotment
 	ctx := context.TODO()
-	fundsAddr, privateKey := d.getAddress(iotago.AddressEd25519)
-	fundsOutputID, fundsUTXOOutput := d.RequestFaucetFunds(ctx, fundsAddr)
-	fundsAddrSigner := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(fundsAddr.(*iotago.Ed25519Address), privateKey))
-
+	fundsOutputID := d.RequestFaucetFunds(ctx, iotago.AddressEd25519)
 	clt := d.Node("V1").Client
-	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
-	apiForSlot := clt.APIForSlot(currentSlot)
-
-	basicOutput, ok := fundsUTXOOutput.(*iotago.BasicOutput)
-	require.True(d.Testing, ok)
-
-	// Subtract stored mana from source outputs to fund Allotment.
-	outputBuilder := builder.NewBasicOutputBuilderFromPrevious(basicOutput)
-	actualAllottedMana := manaToAllot
-	if manaToAllot >= basicOutput.StoredMana() {
-		actualAllottedMana = basicOutput.StoredMana()
-		outputBuilder.Mana(0)
-	} else {
-		outputBuilder.Mana(basicOutput.StoredMana() - manaToAllot)
-	}
 
 	issuerResp, err := clt.BlockIssuance(ctx)
 	require.NoError(d.Testing, err)
@@ -653,18 +604,7 @@ func (d *DockerTestFramework) AllotManaTo(fromId iotago.AccountID, toId iotago.A
 	congestionResp, err := clt.Congestion(ctx, from.AccountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
 	require.NoError(d.Testing, err)
 
-	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
-		AddInput(&builder.TxInput{
-			UnlockTarget: fundsAddr,
-			InputID:      fundsOutputID,
-			Input:        fundsUTXOOutput,
-		}).
-		IncreaseAllotment(to.AccountID, actualAllottedMana).
-		AddOutput(basicOutput).
-		SetCreationSlot(currentSlot).
-		AllotAllMana(currentSlot, from.AccountID, 0).
-		Build(fundsAddrSigner)
-	require.NoError(d.Testing, err)
+	signedTx := d.defaultWallet.AllotManaFromAccount(clt, fromId, toId, manaToAllot, fundsOutputID, issuerResp)
 
 	blkID := d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(from.AccountID, from.BlockIssuerKey), congestionResp, issuerResp)
 
@@ -680,14 +620,7 @@ func (d *DockerTestFramework) CreateNativeToken(fromId iotago.AccountID, mintedA
 
 	// requesting faucet funds for native token creation
 	ctx := context.TODO()
-	fundsAddr, privateKey := d.getAddress(iotago.AddressEd25519)
-	fundsOutputID, fundsUTXOOutput := d.RequestFaucetFunds(ctx, fundsAddr)
-	d.defaultWallet.AddOutput(fundsOutputID, &Output{
-		ID:         fundsOutputID,
-		Address:    fundsAddr,
-		PrivateKey: privateKey,
-		Output:     fundsUTXOOutput,
-	})
+	fundsOutputID := d.RequestFaucetFunds(ctx, iotago.AddressEd25519)
 
 	clt := d.Node("V1").Client
 
@@ -713,15 +646,30 @@ func (d *DockerTestFramework) CreateNativeToken(fromId iotago.AccountID, mintedA
 	d.AssertIndexerFoundry(signedTx.Transaction.Outputs[1].(*iotago.FoundryOutput).MustFoundryID())
 }
 
-func (d *DockerTestFramework) RequestFaucetFunds(ctx context.Context, receiveAddr iotago.Address) (iotago.OutputID, iotago.Output) {
-	d.SendFaucetRequest(ctx, receiveAddr)
+func (d *DockerTestFramework) RequestFaucetFunds(ctx context.Context, addressType iotago.AddressType) iotago.OutputID {
+	privateKey, _ := d.defaultWallet.KeyPair()
+	var address iotago.Address
+	if addressType == iotago.AddressImplicitAccountCreation {
+		address = d.defaultWallet.ImplicitAccountCreationAddress()
+	} else {
+		address = d.defaultWallet.Address()
+	}
 
-	outputID, output, err := d.AwaitAddressUnspentOutputAccepted(ctx, receiveAddr)
+	d.SendFaucetRequest(ctx, address)
+
+	outputID, output, err := d.AwaitAddressUnspentOutputAccepted(ctx, address)
 	require.NoError(d.Testing, err)
+
+	d.defaultWallet.AddOutput(outputID, &Output{
+		ID:         outputID,
+		Address:    address,
+		PrivateKey: privateKey,
+		Output:     output,
+	})
 
 	fmt.Println("Faucet funds received, txID:", outputID.TransactionID().ToHex(), ", amount:", output.BaseTokenAmount(), ", mana:", output.StoredMana())
 
-	return outputID, output
+	return outputID
 }
 
 func (d *DockerTestFramework) Stop() {
