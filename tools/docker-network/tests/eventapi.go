@@ -221,6 +221,48 @@ func (d *DockerTestFramework) AssertOutput(ctx context.Context, eventClt *nodecl
 	}()
 }
 
+func (d *DockerTestFramework) AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx context.Context, eventClt *nodeclient.EventAPIClient, condition api.EventAPIUnlockCondition, addr iotago.Address, finishChan chan struct{}) {
+	blksChan, subInfo := eventClt.OutputsWithMetadataByUnlockConditionAndAddress(condition, addr)
+	require.Nil(d.Testing, subInfo.Error())
+
+	go func() {
+		defer subInfo.Close()
+		d.assertOutputMetadataTopics(ctx, blksChan, func(resp *api.OutputWithMetadataResponse) bool {
+			unlock := resp.Output.UnlockConditionSet()
+			switch condition {
+			case api.EventAPIUnlockConditionAny:
+				return true
+			case api.EventAPIUnlockConditionAddress:
+				if unlock.Address() != nil && addr.Equal(unlock.Address().Address) {
+					return true
+				}
+			case api.EventAPIUnlockConditionStorageReturn:
+				if unlock.HasStorageDepositReturnCondition() && addr.Equal(unlock.StorageDepositReturn().ReturnAddress) {
+					return true
+				}
+			case api.EventAPIUnlockConditionExpiration:
+				if unlock.HasExpirationCondition() && addr.Equal(unlock.Expiration().ReturnAddress) {
+					return true
+				}
+			case api.EventAPIUnlockConditionStateController:
+				if unlock.StateControllerAddress() != nil && addr.Equal(unlock.StateControllerAddress().Address) {
+					return true
+				}
+			case api.EventAPIUnlockConditionGovernor:
+				if unlock.GovernorAddress() != nil && addr.Equal(unlock.GovernorAddress().Address) {
+					return true
+				}
+			case api.EventAPIUnlockConditionImmutableAccount:
+				if unlock.ImmutableAccount() != nil && addr.Equal(unlock.ImmutableAccount().Address) {
+					return true
+				}
+			}
+			return false
+		}, finishChan)
+		fmt.Println("AssertOutputsWithMetadataByUnlockConditionAndAddress finished")
+	}()
+}
+
 func (d *DockerTestFramework) AssertDelegationOutput(ctx context.Context, eventClt *nodeclient.EventAPIClient, delegationId iotago.DelegationID, finishChan chan struct{}) {
 	outputMetadataChan, subInfo := eventClt.OutputsWithMetadataByDelegationID(delegationId)
 	require.Nil(d.Testing, subInfo.Error())

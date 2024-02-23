@@ -9,6 +9,7 @@ import (
 	"time"
 
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/stretchr/testify/require"
 )
 
@@ -173,7 +174,7 @@ func Test_EventAPI_DelegationTransactionBlocks(t *testing.T) {
 		blk.MustID().ToHex(): blk,
 	}
 	finish := make(chan struct{})
-	totalTopics := 6
+	totalTopics := 8
 
 	d.AssertTransactionBlocks(ctx, eventClt, expectedBlocks, finish)
 	d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish)
@@ -185,6 +186,10 @@ func Test_EventAPI_DelegationTransactionBlocks(t *testing.T) {
 
 	d.AssertDelegationOutput(ctx, eventClt, delegationId, finish)
 	d.AssertOutput(ctx, eventClt, outputId, finish)
+
+	delegationOutput := d.defaultWallet.Output(outputId)
+	d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAny, delegationOutput.Address, finish)
+	d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAddress, delegationOutput.Address, finish)
 
 	// wait until all topics starts listening
 	err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
@@ -240,7 +245,7 @@ func Test_EventAPI_AccountTransactionBlocks(t *testing.T) {
 			blk.MustID().ToHex(): blk,
 		}
 		finish := make(chan struct{})
-		totalTopics := 6
+		totalTopics := 8
 
 		d.AssertTransactionBlocks(ctx, eventClt, expectedBlocks, finish)
 		d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish)
@@ -252,6 +257,10 @@ func Test_EventAPI_AccountTransactionBlocks(t *testing.T) {
 
 		d.AssertAccountOutput(ctx, eventClt, account.AccountID, finish)
 		d.AssertOutput(ctx, eventClt, outputId, finish)
+
+		accountOutput := d.defaultWallet.Output(outputId)
+		d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAny, accountOutput.Address, finish)
+		d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAddress, accountOutput.Address, finish)
 
 		// wait until all topics starts listening
 		err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
@@ -316,7 +325,7 @@ func Test_EventAPI_FoundryTransactionBlocks(t *testing.T) {
 			blk.MustID().ToHex(): blk,
 		}
 		finish := make(chan struct{})
-		totalTopics := 8
+		totalTopics := 10
 
 		d.AssertTransactionBlocks(ctx, eventClt, expectedBlocks, finish)
 		d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish)
@@ -330,6 +339,10 @@ func Test_EventAPI_FoundryTransactionBlocks(t *testing.T) {
 		d.AssertFoundryOutput(ctx, eventClt, foundryId, finish)
 		d.AssertOutput(ctx, eventClt, outputId, finish)
 		d.AssertOutput(ctx, eventClt, account.OutputID, finish)
+
+		foundryOutput := d.defaultWallet.Output(outputId)
+		d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAny, foundryOutput.Address, finish)
+		d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionImmutableAccount, foundryOutput.Address, finish)
 
 		// wait until all topics starts listening
 		err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)

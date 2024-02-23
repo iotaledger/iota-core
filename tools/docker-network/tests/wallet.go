@@ -142,12 +142,20 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(clt *nodeclient.Client
 		Build(implicitAddrSigner)
 	require.NoError(w.Testing, err)
 
+	accountOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
+	w.AddOutput(accountOutputId, &Output{
+		ID:         accountOutputId,
+		Output:     accountOutput,
+		Address:    accEd25519Addr,
+		PrivateKey: accPrivateKey,
+	})
+
 	return &Account{
 		AccountID:      accountID,
 		AccountAddress: accountAddress,
 		BlockIssuerKey: accPrivateKey,
 		AccountOutput:  accountOutput,
-		OutputID:       iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0),
+		OutputID:       accountOutputId,
 	}, signedTx
 }
 
@@ -182,6 +190,14 @@ func (w *Wallet) CreateDelegationFromInput(clt *nodeclient.Client, from *Account
 		AllotAllMana(currentSlot, from.AccountID, 0).
 		Build(fundsAddrSigner)
 	require.NoError(w.Testing, err)
+
+	delegationOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
+	w.AddOutput(delegationOutputId, &Output{
+		ID:         delegationOutputId,
+		Output:     delegationOutput,
+		Address:    fundsAddr,
+		PrivateKey: input.PrivateKey,
+	})
 
 	return signedTx
 }
@@ -236,6 +252,13 @@ func (w *Wallet) CreateNativeTokensFromInput(clt *nodeclient.Client, from *Accou
 		AllotAllMana(currentSlot, from.AccountID, 0).
 		Build(signer)
 	require.NoError(w.Testing, err)
+
+	foundryOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 1)
+	w.AddOutput(foundryOutputId, &Output{
+		ID:      foundryOutputId,
+		Output:  foundryOutput,
+		Address: from.AccountAddress,
+	})
 
 	return signedTx
 }
