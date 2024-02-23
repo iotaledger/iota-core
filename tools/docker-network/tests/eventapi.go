@@ -21,6 +21,7 @@ func (d *DockerTestFramework) AssertLatestCommitments(ctx context.Context, event
 	go func() {
 		defer subInfo.Close()
 		d.assertCommitmentsTopics(ctx, commitmentChan, expectedSlots, finishChan)
+		fmt.Println("AssertLatestCommitments finished")
 	}()
 }
 
@@ -31,6 +32,7 @@ func (d *DockerTestFramework) AssertFinalizedCommitments(ctx context.Context, ev
 	go func() {
 		defer subInfo.Close()
 		d.assertCommitmentsTopics(ctx, commitmentChan, expectedSlots, finishChan)
+		fmt.Println("AssertFinalizedCommitments finished")
 	}()
 }
 
@@ -41,6 +43,7 @@ func (d *DockerTestFramework) AssertBlocks(ctx context.Context, eventClt *nodecl
 	go func() {
 		defer subInfo.Close()
 		d.assertBlocksTopics(ctx, blksChan, expectedBlockIDs, finishChan)
+		fmt.Println("AssertBlocks finished")
 	}()
 }
 
@@ -51,6 +54,7 @@ func (d *DockerTestFramework) AssertBasicBlocks(ctx context.Context, eventClt *n
 	go func() {
 		defer subInfo.Close()
 		d.assertBlocksTopics(ctx, blksChan, expectedBlockIDs, finishChan)
+		fmt.Println("AssertBasicBlocks finished")
 	}()
 }
 
@@ -61,6 +65,7 @@ func (d *DockerTestFramework) AssertValidationBlocks(ctx context.Context, eventC
 	go func() {
 		defer subInfo.Close()
 		d.assertBlocksTopics(ctx, blksChan, expectedBlockIDs, finishChan)
+		fmt.Println("AssertValidationBlocks finished")
 	}()
 }
 
@@ -71,6 +76,7 @@ func (d *DockerTestFramework) AssertTaggedDataBlocks(ctx context.Context, eventC
 	go func() {
 		defer subInfo.Close()
 		d.assertBlocksTopics(ctx, blksChan, expectedBlockIDs, finishChan)
+		fmt.Println("AssertTaggedDataBlocks finished")
 	}()
 }
 
@@ -81,6 +87,7 @@ func (d *DockerTestFramework) AssertTaggedDataBlocksByTag(ctx context.Context, e
 	go func() {
 		defer subInfo.Close()
 		d.assertBlocksTopics(ctx, blksChan, expectedBlockIDs, finishChan)
+		fmt.Println("AssertTaggedDataBlocksByTag finished")
 	}()
 }
 
@@ -91,6 +98,7 @@ func (d *DockerTestFramework) AssertTransactionBlocks(ctx context.Context, event
 	go func() {
 		defer subInfo.Close()
 		d.assertBlocksTopics(ctx, blksChan, expectedBlockIDs, finishChan)
+		fmt.Println("AssertTransactionBlocks finished")
 	}()
 }
 
@@ -101,6 +109,7 @@ func (d *DockerTestFramework) AssertTransactionTaggedDataBlocks(ctx context.Cont
 	go func() {
 		defer subInfo.Close()
 		d.assertBlocksTopics(ctx, blksChan, expectedBlockIDs, finishChan)
+		fmt.Println("AssertTransactionTaggedDataBlocks finished")
 	}()
 }
 
@@ -181,6 +190,7 @@ func (d *DockerTestFramework) AssertBlockMetadataAcceptedBlocks(ctx context.Cont
 	go func() {
 		defer subInfo.Close()
 		d.assertBlockMetadataTopics(ctx, acceptedChan, expectedBlockIDs, finishChan)
+		fmt.Println("AssertBlockMetadataAcceptedBlocks finished")
 	}()
 }
 
@@ -191,6 +201,7 @@ func (d *DockerTestFramework) AssertBlockMetadataConfirmedBlocks(ctx context.Con
 	go func() {
 		defer subInfo.Close()
 		d.assertBlockMetadataTopics(ctx, acceptedChan, expectedBlockIDs, finishChan)
+		fmt.Println("AssertBlockMetadataConfirmedBlocks finished")
 	}()
 }
 
@@ -206,6 +217,7 @@ func (d *DockerTestFramework) AssertOutput(ctx context.Context, eventClt *nodecl
 			}
 			return false
 		}, finishChan)
+		fmt.Println("AssertOutput finished")
 	}()
 }
 
@@ -222,6 +234,7 @@ func (d *DockerTestFramework) AssertDelegationOutput(ctx context.Context, eventC
 			}
 			return false
 		}, finishChan)
+		fmt.Println("AssertDelegationOutput finished")
 	}()
 }
 
@@ -238,6 +251,7 @@ func (d *DockerTestFramework) AssertFoundryOutput(ctx context.Context, eventClt 
 			}
 			return false
 		}, finishChan)
+		fmt.Println("AssertFoundryOutput finished")
 	}()
 }
 
@@ -254,6 +268,7 @@ func (d *DockerTestFramework) AssertAccountOutput(ctx context.Context, eventClt 
 			}
 			return false
 		}, finishChan)
+		fmt.Println("AssertAccountOutput finished")
 	}()
 }
 
@@ -270,6 +285,7 @@ func (d *DockerTestFramework) AssertAnchorOutput(ctx context.Context, eventClt *
 			}
 			return false
 		}, finishChan)
+		fmt.Println("AssertAnchorOutput finished")
 	}()
 }
 
@@ -286,6 +302,7 @@ func (d *DockerTestFramework) AssertNFTOutput(ctx context.Context, eventClt *nod
 			}
 			return false
 		}, finishChan)
+		fmt.Println("AssertNFTOutput finished")
 	}()
 }
 
