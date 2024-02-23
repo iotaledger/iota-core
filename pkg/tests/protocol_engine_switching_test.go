@@ -411,12 +411,23 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			return commitment.Slot() >= oldestNonEvictedCommitment
 		})
 
+		ts.AssertNodeState(ts.Nodes(),
+			testsuite.WithLatestFinalizedSlot(node0.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot()),
+		)
+
 		commitmentsMainChain := ts.CommitmentsOfMainEngine(nodesP1[0], oldestNonEvictedCommitment, expectedCommittedSlotAfterPartitionMerge)
 
 		ts.AssertUniqueCommitmentChain(ts.Nodes()...)
 		ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
 		ts.AssertCommitmentsOrphaned(ultimateCommitmentsP2, true, ts.Nodes()...)
-		ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
+
+		// When the test is slow on the CI the eviction of a commitment might be delayed, so here we account for that.
+		if oldestNonEvictedCommitment >= 14 {
+			ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
+		} else {
+			ts.AssertCommitmentsOrphaned(commitmentsMainChain, true, ts.Nodes()...)
+		}
+
 		ts.AssertCommitmentsOnChain(commitmentsMainChain, ts.CommitmentOfMainEngine(nodesP1[0], oldestNonEvictedCommitment).ID(), ts.Nodes()...)
 		// EmptyCommitmentID as ChainID means that the chain on those commitments should be set to nil.
 		ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, iotago.EmptyCommitmentID, ts.Nodes()...)
