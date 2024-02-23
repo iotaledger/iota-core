@@ -173,12 +173,15 @@ func Test_EventAPI_DelegationTransactionBlocks(t *testing.T) {
 		blk.MustID().ToHex(): blk,
 	}
 	finish := make(chan struct{})
-	totalTopics := 5
+	totalTopics := 6
 
 	d.AssertTransactionBlocks(ctx, eventClt, expectedBlocks, finish)
 	d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish)
 	d.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks, finish)
 	d.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks, finish)
+
+	// d.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID(), finish)
+	// d.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID(), finish)
 
 	d.AssertDelegationOutput(ctx, eventClt, delegationId, finish)
 	d.AssertOutput(ctx, eventClt, outputId, finish)
@@ -237,12 +240,15 @@ func Test_EventAPI_AccountTransactionBlocks(t *testing.T) {
 			blk.MustID().ToHex(): blk,
 		}
 		finish := make(chan struct{})
-		totalTopics := 5
+		totalTopics := 6
 
 		d.AssertTransactionBlocks(ctx, eventClt, expectedBlocks, finish)
 		d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish)
 		d.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks, finish)
 		d.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks, finish)
+
+		// d.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID(), finish)
+		// d.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID(), finish)
 
 		d.AssertAccountOutput(ctx, eventClt, account.AccountID, finish)
 		d.AssertOutput(ctx, eventClt, outputId, finish)
@@ -310,16 +316,20 @@ func Test_EventAPI_FoundryTransactionBlocks(t *testing.T) {
 			blk.MustID().ToHex(): blk,
 		}
 		finish := make(chan struct{})
-		totalTopics := 7
+		totalTopics := 8
 
 		d.AssertTransactionBlocks(ctx, eventClt, expectedBlocks, finish)
 		d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish)
 		d.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks, finish)
 		d.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks, finish)
 
+		// d.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID(), finish)
+		// d.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID(), finish)
+
 		d.AssertAccountOutput(ctx, eventClt, account.AccountID, finish)
 		d.AssertFoundryOutput(ctx, eventClt, foundryId, finish)
 		d.AssertOutput(ctx, eventClt, outputId, finish)
+		d.AssertOutput(ctx, eventClt, account.OutputID, finish)
 
 		// wait until all topics starts listening
 		err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
