@@ -264,3 +264,77 @@ func Test_EventAPI_AccountTransactionBlocks(t *testing.T) {
 		require.NoError(t, err)
 	}
 }
+
+func Test_EventAPI_FoundryTransactionBlocks(t *testing.T) {
+	d := NewDockerTestFramework(t,
+		WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 4),
+			iotago.WithLivenessOptions(10, 10, 2, 4, 8),
+		))
+	defer d.Stop()
+
+	d.AddValidatorNode("V1", "docker-network-inx-validator-1-1", "http://localhost:8050", "rms1pzg8cqhfxqhq7pt37y8cs4v5u4kcc48lquy2k73ehsdhf5ukhya3y5rx2w6")
+	d.AddValidatorNode("V2", "docker-network-inx-validator-2-1", "http://localhost:8060", "rms1pqm4xk8e9ny5w5rxjkvtp249tfhlwvcshyr3pc0665jvp7g3hc875k538hl")
+	d.AddValidatorNode("V3", "docker-network-inx-validator-3-1", "http://localhost:8070", "rms1pp4wuuz0y42caz48vv876qfpmffswsvg40zz8v79sy8cp0jfxm4kunflcgt")
+	d.AddValidatorNode("V4", "docker-network-inx-validator-4-1", "http://localhost:8040", "rms1pr8cxs3dzu9xh4cduff4dd4cxdthpjkpwmz2244f75m0urslrsvtsshrrjw")
+	d.AddNode("node5", "docker-network-node-5-1", "http://localhost:8090")
+
+	err := d.Run()
+	require.NoError(t, err)
+
+	d.WaitUntilNetworkReady()
+
+	// get event API client ready
+	clt := d.Node("V1").Client
+	ctx, cancel := context.WithCancel(context.Background())
+	eventClt, err := clt.EventAPI(ctx)
+	require.NoError(t, err)
+	err = eventClt.Connect(ctx)
+	require.NoError(t, err)
+
+	{
+		account := d.CreateAccount()
+
+		fundsAddr, privateKey := d.getAddress(iotago.AddressEd25519)
+		fundsOutputID, fundsUTXOOutput := d.RequestFaucetFunds(ctx, fundsAddr)
+		d.defaultWallet.AddOutput(fundsOutputID, &Output{
+			ID:         fundsOutputID,
+			Output:     fundsUTXOOutput,
+			PrivateKey: privateKey,
+			Address:    fundsAddr,
+		})
+
+		// prepare foundry output block
+		foundryId, account, outputId, blk := d.CreateFoundryBlockFromInput(account, fundsOutputID, 5_000_000, 10_000_000_000)
+		expectedBlocks := map[string]*iotago.Block{
+			blk.MustID().ToHex(): blk,
+		}
+		finish := make(chan struct{})
+		totalTopics := 7
+
+		d.AssertTransactionBlocks(ctx, eventClt, expectedBlocks, finish)
+		d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish)
+		d.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks, finish)
+		d.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks, finish)
+
+		d.AssertAccountOutput(ctx, eventClt, account.AccountID, finish)
+		d.AssertFoundryOutput(ctx, eventClt, foundryId, finish)
+		d.AssertOutput(ctx, eventClt, outputId, finish)
+
+		// wait until all topics starts listening
+		err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+		require.NoError(t, err)
+
+		// issue blocks
+		go func() {
+			for _, blk := range expectedBlocks {
+				fmt.Println("submitting a block")
+				d.SubmitBlock(context.Background(), blk)
+			}
+		}()
+
+		// wait until all topics receives all expected objects
+		err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+		require.NoError(t, err)
+	}
+}

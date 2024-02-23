@@ -4,6 +4,7 @@ package tests
 
 import (
 	"crypto/ed25519"
+	"math/big"
 	"testing"
 	"time"
 
@@ -180,6 +181,60 @@ func (w *Wallet) CreateDelegationFromInput(clt *nodeclient.Client, from *Account
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
 		AllotAllMana(currentSlot, from.AccountID, 0).
 		Build(fundsAddrSigner)
+	require.NoError(w.Testing, err)
+
+	return signedTx
+}
+
+func (w *Wallet) CreateNativeTokensFromInput(clt *nodeclient.Client, from *Account, inputId iotago.OutputID, mintedAmount iotago.BaseToken, maxSupply iotago.BaseToken, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
+	input := w.Output(inputId)
+	fundsAddr := input.Address
+	fundsUTXOOutput := input.Output
+	fundsOutputID := input.ID
+
+	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	apiForSlot := clt.APIForSlot(currentSlot)
+
+	// increase foundry counter
+	accTransitionOutput := builder.NewAccountOutputBuilderFromPrevious(from.AccountOutput).
+		FoundriesToGenerate(1).MustBuild()
+
+	// build foundry output
+	foundryID, err := iotago.FoundryIDFromAddressAndSerialNumberAndTokenScheme(from.AccountAddress, accTransitionOutput.FoundryCounter, iotago.TokenSchemeSimple)
+	require.NoError(w.Testing, err)
+	tokenScheme := &iotago.SimpleTokenScheme{
+		MintedTokens:  big.NewInt(int64(mintedAmount)),
+		MaximumSupply: big.NewInt(int64(maxSupply)),
+		MeltedTokens:  big.NewInt(0),
+	}
+
+	foundryOutput := builder.NewFoundryOutputBuilder(from.AccountAddress, fundsUTXOOutput.BaseTokenAmount(), accTransitionOutput.FoundryCounter, tokenScheme).
+		NativeToken(&iotago.NativeTokenFeature{
+			ID:     foundryID,
+			Amount: big.NewInt(int64(mintedAmount)),
+		}).MustBuild()
+
+	signer := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(fundsAddr.(*iotago.Ed25519Address), input.PrivateKey),
+		iotago.NewAddressKeysForEd25519Address(from.AccountOutput.UnlockConditionSet().Address().Address.(*iotago.Ed25519Address), from.BlockIssuerKey))
+
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+		AddInput(&builder.TxInput{
+			UnlockTarget: fundsAddr,
+			InputID:      fundsOutputID,
+			Input:        fundsUTXOOutput,
+		}).
+		AddInput(&builder.TxInput{
+			UnlockTarget: from.AccountOutput.UnlockConditionSet().Address().Address,
+			InputID:      from.OutputID,
+			Input:        from.AccountOutput,
+		}).
+		AddOutput(accTransitionOutput).
+		AddOutput(foundryOutput).
+		SetCreationSlot(currentSlot).
+		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: from.AccountID}).
+		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
+		AllotAllMana(currentSlot, from.AccountID, 0).
+		Build(signer)
 	require.NoError(w.Testing, err)
 
 	return signedTx
