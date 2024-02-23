@@ -142,7 +142,8 @@ func validatorByAccountAddress(c echo.Context) (*api.ValidatorResponse, error) {
 
 	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
 
-	active, err := deps.Protocol.Engines.Main.Get().SybilProtection.IsCandidateActive(accountID, nextEpoch)
+	// HINT: the validators for an epoch are stored in the previous epoch
+	active, err := deps.Protocol.Engines.Main.Get().SybilProtection.IsCandidateActive(accountID, nextEpoch-1)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to check if account %s is an active candidate", accountID.ToHex())
 	}
