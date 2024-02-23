@@ -146,7 +146,7 @@ func (r *BlockRetainer) blockStatus(blockID iotago.BlockID) api.BlockState {
 	}
 
 	switch blockData.State {
-	case api.BlockStatePending:
+	case api.BlockStatePending, api.BlockStateDropped:
 		if blockID.Slot() <= r.latestCommittedSlotFunc() {
 			return api.BlockStateOrphaned
 		}
@@ -189,8 +189,6 @@ func (r *BlockRetainer) OnBlockAccepted(blockID iotago.BlockID) error {
 }
 
 func (r *BlockRetainer) OnBlockConfirmed(blockID iotago.BlockID) error {
-	a := iotago.EmptyTransactionID
-	a.Slot()
 	store, err := r.store(blockID.Slot())
 	if err != nil {
 		return ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Slot())
@@ -205,5 +203,5 @@ func (r *BlockRetainer) OnBlockDropped(blockID iotago.BlockID) error {
 		return ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Slot())
 	}
 
-	return store.StoreBlockConfirmed(blockID)
+	return store.StoreBlockDropped(blockID)
 }
