@@ -9,8 +9,8 @@ import (
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
+	"github.com/iotaledger/hive.go/db"
 	"github.com/iotaledger/hive.go/ierrors"
-	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -86,13 +86,13 @@ func resetProtocolParameters() {
 func initConfigParams(c *dig.Container) error {
 	type cfgResult struct {
 		dig.Out
-		DatabaseEngine     hivedb.Engine `name:"databaseEngine"`
+		DatabaseEngine     db.Engine `name:"databaseEngine"`
 		BaseToken          *BaseToken
 		ProtocolParameters []iotago.ProtocolParameters
 	}
 
 	if err := c.Provide(func() cfgResult {
-		dbEngine, err := hivedb.EngineFromStringAllowed(ParamsDatabase.Engine, database.AllowedEnginesDefault)
+		dbEngine, err := db.EngineFromStringAllowed(ParamsDatabase.Engine, database.AllowedEnginesDefault)
 		if err != nil {
 			Component.LogPanic(err.Error())
 		}
@@ -113,7 +113,7 @@ func provide(c *dig.Container) error {
 	type protocolDeps struct {
 		dig.In
 
-		DatabaseEngine     hivedb.Engine `name:"databaseEngine"`
+		DatabaseEngine     db.Engine `name:"databaseEngine"`
 		ProtocolParameters []iotago.ProtocolParameters
 		NetworkManager     network.Manager
 	}

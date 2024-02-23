@@ -16,9 +16,9 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/app/configuration"
 	hivep2p "github.com/iotaledger/hive.go/crypto/p2p"
+	"github.com/iotaledger/hive.go/db"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
-	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
@@ -166,9 +166,9 @@ func provide(c *dig.Container) error {
 
 	type p2pDeps struct {
 		dig.In
-		DatabaseEngine        hivedb.Engine `name:"databaseEngine"`
-		P2PDatabasePath       string        `name:"p2pDatabasePath"`
-		P2PBindMultiAddresses []string      `name:"p2pBindMultiAddresses"`
+		DatabaseEngine        db.Engine `name:"databaseEngine"`
+		P2PDatabasePath       string    `name:"p2pDatabasePath"`
+		P2PBindMultiAddresses []string  `name:"p2pBindMultiAddresses"`
 	}
 
 	type p2pResult struct {

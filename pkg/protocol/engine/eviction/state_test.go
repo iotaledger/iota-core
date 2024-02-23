@@ -3,7 +3,7 @@ package eviction_test
 import (
 	"testing"
 
-	hivedb "github.com/iotaledger/hive.go/kvstore/database"
+	"github.com/iotaledger/hive.go/db"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
@@ -25,7 +25,7 @@ func TestState_RootBlocks(t *testing.T) {
 	))
 
 	prunableStorage := prunable.New(database.Config{
-		Engine:    hivedb.EngineMapDB,
+		Engine:    db.EngineMapDB,
 		Directory: t.TempDir(),
 	}, iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI), errorHandler)
 
