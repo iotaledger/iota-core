@@ -347,7 +347,7 @@ func (w *Wallet) CreateImplicitAccountFromInput(transactionName string, inputNam
 	return signedTransaction
 }
 
-// CreateImplicitAccountFromInput creates an implicit account output.
+// CreateImplicitAccountAndBasicOutputFromInput creates an implicit account output and a remainder basic output from a basic output.
 func (w *Wallet) CreateImplicitAccountAndBasicOutputFromInput(transactionName string, inputName string, recipientWallet *Wallet) *iotago.SignedTransaction {
 	input := w.Output(inputName)
 
@@ -361,8 +361,8 @@ func (w *Wallet) CreateImplicitAccountAndBasicOutputFromInput(transactionName st
 	}
 
 	remainderBasicOutput := &iotago.BasicOutput{
-		Amount: input.BaseTokenAmount() - MinIssuerAccountAmount(w.Node.Protocol.CommittedAPI().ProtocolParameters()),
-		Mana:   input.StoredMana() - AccountConversionManaCost(w.Node.Protocol.CommittedAPI().ProtocolParameters()),
+		Amount: input.BaseTokenAmount() - implicitAccountOutput.Amount,
+		Mana:   input.StoredMana() - implicitAccountOutput.Mana,
 		UnlockConditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: recipientWallet.Address()},
 		},
@@ -397,6 +397,9 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string
 			panic(fmt.Sprintf("output with alias %s is not *iotago.BasicOutput", inputName))
 		}
 		if basicOutput.UnlockConditionSet().Address().Address.Type() == iotago.AddressImplicitAccountCreation {
+			if implicitAccountOutput != nil {
+				panic("multiple implicit account outputs found")
+			}
 			implicitAccountOutput = input
 		}
 		inputs = append(inputs, input)
