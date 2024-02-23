@@ -356,7 +356,7 @@ func (c *Commitment) deriveChain(parent *Commitment) func() {
 				return currentChain
 			}
 
-			if parentChain == currentChain || mainChild == nil {
+			if parentChain == currentChain {
 				return nil
 			}
 

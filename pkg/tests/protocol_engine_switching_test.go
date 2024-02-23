@@ -1112,9 +1112,10 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 	// P3 commitments on P2 node should be on separate chain.
 	ts.AssertCommitmentsOnChain(ultimateCommitmentsP3, ultimateCommitmentsP3[0].ID(), otherPartitions[0])
 
+	//ts.AssertCommitmentsAndChainsEvicted(5, ts.Nodes()...)
+
 	// TODO:
 	//  Extend the test and make sure that after eviction everything is intact.
-	//  ts.AssertCommitmentsAndChainsEvicted(11, ts.Nodes()...)
 }
 
 type Blocks []*blocks.Block

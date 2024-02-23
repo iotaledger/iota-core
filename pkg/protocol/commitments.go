@@ -176,14 +176,9 @@ func (c *Commitments) publishRootCommitment(mainChain *Chain, mainEngine *engine
 			publishedCommitment.Chain.Set(mainChain)
 		}
 
-		// Update the forking point of a chain only if the root is empty or root belongs to the main chain
+		// Update the forking point of a chain only if the root is empty or root belongs to the main chain or the published commitment is on the main chain.
 		// to avoid updating ForkingPoint of the new mainChain into the past.
-		if c.Root.Get() == nil {
-			mainChain.LogDebug("set forking point", "publishedCommitment", publishedCommitment.LogName(), "mainChain", mainChain.LogName(), "Root", "nil", "published", published)
-
-			mainChain.ForkingPoint.Set(publishedCommitment)
-		} else if c.Root.Get().Chain.Get() == mainChain {
-			mainChain.LogDebug("set forking point", "publishedCommitment", publishedCommitment.LogName(), "mainChain", mainChain.LogName(), "Root", c.Root.Get().LogName(), "published", published)
+		if c.Root.Get() == nil || c.Root.Get().Chain.Get() == mainChain || publishedCommitment.Chain.Get() == mainChain {
 			mainChain.ForkingPoint.Set(publishedCommitment)
 		}
 
