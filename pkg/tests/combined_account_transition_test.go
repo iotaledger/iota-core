@@ -158,7 +158,6 @@ func createImplicitToFullAccount(ts *testsuite.TestSuite) iotago.AccountID {
 			iotago.BlockIssuerKeys{implicitBlockIssuerKey},
 			iotago.MaxSlotIndex,
 		),
-		mock.WithAccountAmount(mock.MinIssuerAccountAmount(ts.API.ProtocolParameters())),
 	)
 	block2Commitment := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
 	block3 := ts.IssueBasicBlockWithOptions("block3", newUserWallet, tx4, mock.WithStrongParents(latestParents...))

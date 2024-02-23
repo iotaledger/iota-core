@@ -388,6 +388,7 @@ func (w *Wallet) CreateImplicitAccountAndBasicOutputFromInput(transactionName st
 
 func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string, inputNames []string, opts ...options.Option[builder.AccountOutputBuilder]) *iotago.SignedTransaction {
 	var implicitAccountOutput *utxoledger.Output
+	var baseTokenAmount iotago.BaseToken
 	inputs := make(utxoledger.Outputs, 0, len(inputNames))
 	for _, inputName := range inputNames {
 		input := w.Output(inputName)
@@ -399,13 +400,14 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string
 			implicitAccountOutput = input
 		}
 		inputs = append(inputs, input)
+		baseTokenAmount += input.BaseTokenAmount()
 	}
 	if implicitAccountOutput == nil {
 		panic("no implicit account output found")
 	}
 	implicitAccountID := iotago.AccountIDFromOutputID(implicitAccountOutput.OutputID())
 
-	accountOutput := options.Apply(builder.NewAccountOutputBuilder(w.Address(), MinIssuerAccountAmount(w.Node.Protocol.CommittedAPI().ProtocolParameters())).
+	accountOutput := options.Apply(builder.NewAccountOutputBuilder(w.Address(), baseTokenAmount).
 		AccountID(implicitAccountID),
 		opts).MustBuild()
 
