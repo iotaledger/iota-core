@@ -111,6 +111,66 @@ func (d *DockerTestFramework) AssertTransactionBlocksByTag(ctx context.Context, 
 	go func() {
 		defer subInfo.Close()
 		d.assertBlocksTopics(ctx, blksChan, expectedBlockIDs, finishChan)
+		fmt.Println("AssertTransactionBlocksByTag finished")
+	}()
+}
+
+func (d *DockerTestFramework) AssertTransactionMetadataIncludedBlocks(ctx context.Context, eventClt *nodeclient.EventAPIClient, txID iotago.TransactionID, finishChan chan struct{}) {
+	acceptedChan, subInfo := eventClt.BlockMetadataTransactionIncludedBlocksByTransactionID(txID)
+	require.Nil(d.Testing, subInfo.Error())
+	counter := 0
+
+	go func() {
+		defer fmt.Println("AssertTransactionMetadataIncludedBlocks finished")
+		defer subInfo.Close()
+		// in order to inform that the channel is listened
+		finishChan <- struct{}{}
+
+		for {
+			select {
+			case metadata := <-acceptedChan:
+				if txID.Compare(metadata.TransactionMetadata.TransactionID) == 0 {
+					counter++
+					fmt.Println(metadata.TransactionMetadata.TransactionState)
+					// we should get 2 times of the same transaction, one for accepted and one for confirmed
+					if counter == 2 {
+						finishChan <- struct{}{}
+						return
+					}
+				}
+
+			case <-ctx.Done():
+
+				return
+			}
+		}
+
+	}()
+}
+
+func (d *DockerTestFramework) AssertTransactionMetadataByTransactionID(ctx context.Context, eventClt *nodeclient.EventAPIClient, txID iotago.TransactionID, finishChan chan struct{}) {
+	acceptedChan, subInfo := eventClt.TransactionMetadataByTransactionID(txID)
+	require.Nil(d.Testing, subInfo.Error())
+
+	go func() {
+		defer fmt.Println("AssertTransactionMetadataByTransactionID finished")
+		defer subInfo.Close()
+		// in order to inform that the channel is listened
+		finishChan <- struct{}{}
+
+		for {
+			select {
+			case metadata := <-acceptedChan:
+				if txID.Compare(metadata.TransactionID) == 0 {
+					fmt.Println(metadata.TransactionState)
+					finishChan <- struct{}{}
+					return
+				}
+
+			case <-ctx.Done():
+				return
+			}
+		}
 	}()
 }
 
