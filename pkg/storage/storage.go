@@ -4,9 +4,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/iotaledger/hive.go/db"
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ierrors"
-	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -46,8 +46,8 @@ type Storage struct {
 	lastPrunedSizeTime time.Time
 	lastAccessedBlocks reactive.Variable[iotago.SlotIndex]
 
-	optsDBEngine                       hivedb.Engine
-	optsAllowedDBEngines               []hivedb.Engine
+	optsDBEngine                       db.Engine
+	optsAllowedDBEngines               []db.Engine
 	optsPruningDelay                   iotago.EpochIndex
 	optPruningSizeEnabled              bool
 	optsPruningSizeMaxTargetSizeBytes  int64
@@ -65,7 +65,7 @@ func New(directory string, errorHandler func(error), opts ...options.Option[Stor
 		errorHandler:                       errorHandler,
 		lastPrunedEpoch:                    model.NewEvictionIndex[iotago.EpochIndex](),
 		lastAccessedBlocks:                 reactive.NewVariable[iotago.SlotIndex](),
-		optsDBEngine:                       hivedb.EngineRocksDB,
+		optsDBEngine:                       db.EngineRocksDB,
 		optsPruningDelay:                   30,
 		optPruningSizeEnabled:              false,
 		optsPruningSizeMaxTargetSizeBytes:  30 * 1024 * 1024 * 1024, // 30GB
