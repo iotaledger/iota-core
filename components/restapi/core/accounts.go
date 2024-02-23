@@ -89,15 +89,14 @@ func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 		return nil, ierrors.Wrapf(echo.ErrBadRequest, "request is too old, request started at %d, latest committed slot index is %d", requestedSlot, latestCommittedSlot)
 	}
 
-	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
+	epoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
 
 	slotRange := uint32(requestedSlot) / restapi.ParamsRestAPI.RequestsMemoryCacheGranularity
 	registeredValidators, exists := deps.Protocol.Engines.Main.Get().Retainer.RegisteredValidatorsCache(slotRange)
 	if !exists {
-		// HINT: the validators for an epoch are stored in the previous epoch
-		registeredValidators, err = deps.Protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(nextEpoch - 1)
+		registeredValidators, err = deps.Protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(epoch)
 		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get ordered registered validators list for epoch %d : %s", nextEpoch, err)
+			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get ordered registered validators list for epoch %d : %s", epoch, err)
 		}
 		deps.Protocol.Engines.Main.Get().Retainer.RetainRegisteredValidatorsCache(slotRange, registeredValidators)
 	}
@@ -140,10 +139,9 @@ func validatorByAccountAddress(c echo.Context) (*api.ValidatorResponse, error) {
 		return nil, ierrors.Wrapf(echo.ErrNotFound, "account %s not found for latest committedSlot %d", accountID.ToHex(), latestCommittedSlot)
 	}
 
-	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
+	epoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
 
-	// HINT: the validators for an epoch are stored in the previous epoch
-	active, err := deps.Protocol.Engines.Main.Get().SybilProtection.IsCandidateActive(accountID, nextEpoch-1)
+	active, err := deps.Protocol.Engines.Main.Get().SybilProtection.IsCandidateActive(accountID, epoch)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to check if account %s is an active candidate", accountID.ToHex())
 	}
