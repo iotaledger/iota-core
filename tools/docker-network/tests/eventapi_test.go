@@ -99,7 +99,7 @@ func Test_EventAPI_BasicTaggedDataBlocks(t *testing.T) {
 	// prepare data blocks to send
 	expectedBlocks := make(map[string]*iotago.Block, 0)
 	for i := 0; i < 10; i++ {
-		blk := d.CreateTaggedDataBlock(account, []byte("tag"))
+		blk := d.CreateTaggedDataBlock(account.AccountID, []byte("tag"))
 		expectedBlocks[blk.MustID().ToHex()] = blk
 	}
 	finish := make(chan struct{})
@@ -169,7 +169,7 @@ func Test_EventAPI_DelegationTransactionBlocks(t *testing.T) {
 	})
 
 	// prepare data blocks to send
-	delegationId, outputId, blk := d.CreateDelegationBlockFromInput(account, d.Node("V2"), fundsOutputID)
+	delegationId, outputId, blk := d.CreateDelegationBlockFromInput(account.AccountID, d.Node("V2"), fundsOutputID)
 	expectedBlocks := map[string]*iotago.Block{
 		blk.MustID().ToHex(): blk,
 	}
@@ -320,7 +320,7 @@ func Test_EventAPI_FoundryTransactionBlocks(t *testing.T) {
 		})
 
 		// prepare foundry output block
-		foundryId, account, outputId, blk := d.CreateFoundryBlockFromInput(account, fundsOutputID, 5_000_000, 10_000_000_000)
+		foundryId, outputId, blk := d.CreateFoundryBlockFromInput(account.AccountID, fundsOutputID, 5_000_000, 10_000_000_000)
 		expectedBlocks := map[string]*iotago.Block{
 			blk.MustID().ToHex(): blk,
 		}

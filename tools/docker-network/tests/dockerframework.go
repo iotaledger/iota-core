@@ -363,7 +363,8 @@ func (d *DockerTestFramework) StopIssueCandidacyPayload(nodes ...*Node) {
 	d.DockerComposeUp(true)
 }
 
-func (d *DockerTestFramework) CreateTaggedDataBlock(issuer *Account, tag []byte) *iotago.Block {
+func (d *DockerTestFramework) CreateTaggedDataBlock(issuerId iotago.AccountID, tag []byte) *iotago.Block {
+	issuer := d.defaultWallet.Account(issuerId)
 	ctx := context.TODO()
 	clt := d.Node("V1").Client
 
@@ -374,7 +375,7 @@ func (d *DockerTestFramework) CreateTaggedDataBlock(issuer *Account, tag []byte)
 	require.NoError(d.Testing, err)
 
 	if congestionResp.BlockIssuanceCredits <= 500 {
-		d.IncreaseBIC(issuer)
+		d.IncreaseBIC(issuerId)
 
 		// need to renew BlockIssuance and Congestion response
 		issuerResp, err = clt.BlockIssuance(ctx)
@@ -389,7 +390,8 @@ func (d *DockerTestFramework) CreateTaggedDataBlock(issuer *Account, tag []byte)
 	}, wallet.NewEd25519Account(issuer.AccountID, issuer.BlockIssuerKey), congestionResp, issuerResp)
 }
 
-func (d *DockerTestFramework) CreateDelegationBlockFromInput(issuer *Account, validator *Node, inputId iotago.OutputID) (iotago.DelegationID, iotago.OutputID, *iotago.Block) {
+func (d *DockerTestFramework) CreateDelegationBlockFromInput(issuerId iotago.AccountID, validator *Node, inputId iotago.OutputID) (iotago.DelegationID, iotago.OutputID, *iotago.Block) {
+	issuer := d.defaultWallet.Account(issuerId)
 	ctx := context.TODO()
 	clt := d.Node("V1").Client
 
@@ -400,7 +402,7 @@ func (d *DockerTestFramework) CreateDelegationBlockFromInput(issuer *Account, va
 	require.NoError(d.Testing, err)
 
 	if congestionResp.BlockIssuanceCredits <= 500 {
-		d.IncreaseBIC(issuer)
+		d.IncreaseBIC(issuerId)
 
 		// need to renew BlockIssuance and Congestion response
 		issuerResp, err = clt.BlockIssuance(ctx)
@@ -410,7 +412,7 @@ func (d *DockerTestFramework) CreateDelegationBlockFromInput(issuer *Account, va
 		require.NoError(d.Testing, err)
 	}
 
-	signedTx := d.defaultWallet.CreateDelegationFromInput(clt, issuer, validator, inputId, issuerResp)
+	signedTx := d.defaultWallet.CreateDelegationFromInput(clt, issuerId, validator, inputId, issuerResp)
 	delegationOutput := signedTx.Transaction.Outputs[0].(*iotago.DelegationOutput)
 	txId, err := signedTx.Transaction.ID()
 	require.NoError(d.Testing, err)
@@ -420,7 +422,8 @@ func (d *DockerTestFramework) CreateDelegationBlockFromInput(issuer *Account, va
 		d.CreateBlock(ctx, signedTx, wallet.NewEd25519Account(issuer.AccountID, issuer.BlockIssuerKey), congestionResp, issuerResp)
 }
 
-func (d *DockerTestFramework) CreateFoundryBlockFromInput(issuer *Account, inputId iotago.OutputID, mintedAmount iotago.BaseToken, maxSupply iotago.BaseToken) (iotago.FoundryID, *Account, iotago.OutputID, *iotago.Block) {
+func (d *DockerTestFramework) CreateFoundryBlockFromInput(issuerId iotago.AccountID, inputId iotago.OutputID, mintedAmount iotago.BaseToken, maxSupply iotago.BaseToken) (iotago.FoundryID, iotago.OutputID, *iotago.Block) {
+	issuer := d.defaultWallet.Account(issuerId)
 	ctx := context.TODO()
 	clt := d.Node("V1").Client
 
@@ -430,20 +433,31 @@ func (d *DockerTestFramework) CreateFoundryBlockFromInput(issuer *Account, input
 	congestionResp, err := clt.Congestion(ctx, issuer.AccountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
 	require.NoError(d.Testing, err)
 
-	signedTx := d.defaultWallet.CreateNativeTokensFromInput(clt, issuer, inputId, mintedAmount, maxSupply, issuerResp)
+	signedTx := d.defaultWallet.CreateFoundryAndNativeTokensFromInput(clt, issuerId, inputId, mintedAmount, maxSupply, issuerResp)
 	txId, err := signedTx.Transaction.ID()
 	require.NoError(d.Testing, err)
 
-	updatedAccount := &Account{
-		AccountID:      issuer.AccountID,
-		AccountAddress: issuer.AccountAddress,
-		BlockIssuerKey: issuer.BlockIssuerKey,
-		AccountOutput:  signedTx.Transaction.Outputs[0].(*iotago.AccountOutput),
-		OutputID:       iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0),
-	}
+	return signedTx.Transaction.Outputs[1].(*iotago.FoundryOutput).MustFoundryID(),
+		iotago.OutputIDFromTransactionIDAndIndex(txId, 1),
+		d.CreateBlock(ctx, signedTx, wallet.NewEd25519Account(issuer.AccountID, issuer.BlockIssuerKey), congestionResp, issuerResp)
+}
+
+func (d *DockerTestFramework) CreateFoundryTransitionBlockFromInput(issuerId iotago.AccountID, inputId iotago.OutputID) (iotago.FoundryID, iotago.OutputID, *iotago.Block) {
+	ctx := context.TODO()
+	clt := d.Node("V1").Client
+	issuer := d.defaultWallet.Account(issuerId)
+
+	issuerResp, err := clt.BlockIssuance(ctx)
+	require.NoError(d.Testing, err)
+
+	congestionResp, err := clt.Congestion(ctx, issuer.AccountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
+	require.NoError(d.Testing, err)
+
+	signedTx := d.defaultWallet.TransitionFoundry(clt, issuerId, inputId, issuerResp)
+	txId, err := signedTx.Transaction.ID()
+	require.NoError(d.Testing, err)
 
 	return signedTx.Transaction.Outputs[1].(*iotago.FoundryOutput).MustFoundryID(),
-		updatedAccount,
 		iotago.OutputIDFromTransactionIDAndIndex(txId, 1),
 		d.CreateBlock(ctx, signedTx, wallet.NewEd25519Account(issuer.AccountID, issuer.BlockIssuerKey), congestionResp, issuerResp)
 }
@@ -484,16 +498,20 @@ func (d *DockerTestFramework) CreateImplicitAccount(ctx context.Context) *Accoun
 	accountAddress, ok := accountID.ToAddress().(*iotago.AccountAddress)
 	require.True(d.Testing, ok)
 
-	// make sure an implicit account is committed
-	d.CheckAccountStatus(ctx, iotago.EmptyBlockID, fundsOutputID.TransactionID(), fundsOutputID, accountAddress)
-
-	// Note: the implicit account output is not an AccountOutput, thus we ignore it here.
-	return &Account{
+	accountInfo := &Account{
 		AccountID:      accountID,
 		AccountAddress: accountAddress,
 		BlockIssuerKey: privateKey,
 		OutputID:       fundsOutputID,
 	}
+
+	d.defaultWallet.AddAccount(accountID, accountInfo)
+
+	// make sure an implicit account is committed
+	d.CheckAccountStatus(ctx, iotago.EmptyBlockID, fundsOutputID.TransactionID(), fundsOutputID, accountAddress)
+
+	// Note: the implicit account output is not an AccountOutput, thus we ignore it here.
+	return accountInfo
 }
 
 // CreateAccount creates an new account from implicit one to full one, it already wait until the transaction is committed and the created account is useable.
@@ -526,7 +544,9 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 }
 
 // DelegateToValidator requests faucet funds and delegate the UTXO output to the validator.
-func (d *DockerTestFramework) DelegateToValidator(from *Account, validator *Node) iotago.EpochIndex {
+func (d *DockerTestFramework) DelegateToValidator(fromId iotago.AccountID, validator *Node) iotago.EpochIndex {
+	from := d.defaultWallet.Account(fromId)
+
 	// requesting faucet funds as delegation input
 	ctx := context.TODO()
 	fundsAddr, privateKey := d.getAddress(iotago.AddressEd25519)
@@ -546,7 +566,7 @@ func (d *DockerTestFramework) DelegateToValidator(from *Account, validator *Node
 	congestionResp, err := clt.Congestion(ctx, from.AccountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
 	require.NoError(d.Testing, err)
 
-	signedTx := d.defaultWallet.CreateDelegationFromInput(clt, from, validator, fundsOutputID, issuerResp)
+	signedTx := d.defaultWallet.CreateDelegationFromInput(clt, fromId, validator, fundsOutputID, issuerResp)
 
 	blkID := d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(from.AccountID, from.BlockIssuerKey), congestionResp, issuerResp)
 
@@ -558,7 +578,9 @@ func (d *DockerTestFramework) DelegateToValidator(from *Account, validator *Node
 }
 
 // IncreaseBIC requests faucet funds then uses it to allots mana to an account.
-func (d *DockerTestFramework) IncreaseBIC(to *Account) {
+func (d *DockerTestFramework) IncreaseBIC(toId iotago.AccountID) {
+	to := d.defaultWallet.Account(toId)
+
 	// requesting faucet funds for allotment
 	ctx := context.TODO()
 	fundsAddr, privateKey := d.getAddress(iotago.AddressEd25519)
@@ -599,7 +621,9 @@ func (d *DockerTestFramework) IncreaseBIC(to *Account) {
 }
 
 // AllotManaTo requests faucet funds then uses it to allots mana from one account to another.
-func (d *DockerTestFramework) AllotManaTo(from *Account, to *Account, manaToAllot iotago.Mana) {
+func (d *DockerTestFramework) AllotManaTo(fromId iotago.AccountID, toId iotago.AccountID, manaToAllot iotago.Mana) {
+	from := d.defaultWallet.Account(fromId)
+	to := d.defaultWallet.Account(toId)
 	// requesting faucet funds for allotment
 	ctx := context.TODO()
 	fundsAddr, privateKey := d.getAddress(iotago.AddressEd25519)
@@ -650,8 +674,9 @@ func (d *DockerTestFramework) AllotManaTo(from *Account, to *Account, manaToAllo
 }
 
 // CreateNativeToken request faucet funds then use it to create native token for the account, and returns the updated Account.
-func (d *DockerTestFramework) CreateNativeToken(from *Account, mintedAmount iotago.BaseToken, maxSupply iotago.BaseToken) (updatedAccount *Account) {
+func (d *DockerTestFramework) CreateNativeToken(fromId iotago.AccountID, mintedAmount iotago.BaseToken, maxSupply iotago.BaseToken) {
 	require.GreaterOrEqual(d.Testing, maxSupply, mintedAmount)
+	from := d.defaultWallet.Account(fromId)
 
 	// requesting faucet funds for native token creation
 	ctx := context.TODO()
@@ -672,17 +697,9 @@ func (d *DockerTestFramework) CreateNativeToken(from *Account, mintedAmount iota
 	congestionResp, err := clt.Congestion(ctx, from.AccountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
 	require.NoError(d.Testing, err)
 
-	signedTx := d.defaultWallet.CreateNativeTokensFromInput(clt, from, fundsOutputID, mintedAmount, maxSupply, issuerResp)
+	signedTx := d.defaultWallet.CreateFoundryAndNativeTokensFromInput(clt, fromId, fundsOutputID, mintedAmount, maxSupply, issuerResp)
 
 	blkID := d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(from.AccountID, from.BlockIssuerKey), congestionResp, issuerResp)
-
-	updatedAccount = &Account{
-		AccountID:      from.AccountID,
-		AccountAddress: from.AccountAddress,
-		BlockIssuerKey: from.BlockIssuerKey,
-		AccountOutput:  signedTx.Transaction.Outputs[0].(*iotago.AccountOutput),
-		OutputID:       iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0),
-	}
 
 	d.AwaitTransactionPayloadAccepted(ctx, blkID)
 
@@ -691,10 +708,9 @@ func (d *DockerTestFramework) CreateNativeToken(from *Account, mintedAmount iota
 	// wait for the account to be committed
 	d.AwaitCommitment(blkID.Slot())
 
-	d.AssertIndexerAccount(updatedAccount)
+	from = d.defaultWallet.Account(fromId)
+	d.AssertIndexerAccount(from)
 	d.AssertIndexerFoundry(signedTx.Transaction.Outputs[1].(*iotago.FoundryOutput).MustFoundryID())
-
-	return updatedAccount
 }
 
 func (d *DockerTestFramework) RequestFaucetFunds(ctx context.Context, receiveAddr iotago.Address) (iotago.OutputID, iotago.Output) {

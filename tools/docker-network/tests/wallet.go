@@ -32,7 +32,8 @@ type Wallet struct {
 
 	keyManager *wallet.KeyManager
 
-	outputs map[iotago.OutputID]*Output
+	outputs        map[iotago.OutputID]*Output
+	accountOutputs map[iotago.AccountID]*Account
 }
 
 type Output struct {
@@ -51,15 +52,20 @@ func NewWallet(t *testing.T, name string, keyManager ...*wallet.KeyManager) *Wal
 	}
 
 	return &Wallet{
-		Testing:    t,
-		Name:       name,
-		outputs:    make(map[iotago.OutputID]*Output),
-		keyManager: km,
+		Testing:        t,
+		Name:           name,
+		outputs:        make(map[iotago.OutputID]*Output),
+		accountOutputs: make(map[iotago.AccountID]*Account),
+		keyManager:     km,
 	}
 }
 
 func (w *Wallet) AddOutput(outputId iotago.OutputID, output *Output) {
 	w.outputs[outputId] = output
+}
+
+func (w *Wallet) AddAccount(accountId iotago.AccountID, data *Account) {
+	w.accountOutputs[accountId] = data
 }
 
 func (w *Wallet) Balance() iotago.BaseToken {
@@ -78,6 +84,15 @@ func (w *Wallet) Output(outputName iotago.OutputID) *Output {
 	}
 
 	return output
+}
+
+func (w *Wallet) Account(accountId iotago.AccountID) *Account {
+	acc, exists := w.accountOutputs[accountId]
+	if !exists {
+		panic(ierrors.Errorf("account %s not registered in wallet %s", accountId.ToHex(), w.Name))
+	}
+
+	return acc
 }
 
 func (w *Wallet) Address(index ...uint32) iotago.DirectUnlockableAddress {
@@ -142,24 +157,19 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(clt *nodeclient.Client
 		Build(implicitAddrSigner)
 	require.NoError(w.Testing, err)
 
-	accountOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
-	w.AddOutput(accountOutputId, &Output{
-		ID:         accountOutputId,
-		Output:     accountOutput,
-		Address:    accEd25519Addr,
-		PrivateKey: accPrivateKey,
-	})
-
-	return &Account{
+	accountInfo := &Account{
 		AccountID:      accountID,
 		AccountAddress: accountAddress,
 		BlockIssuerKey: accPrivateKey,
 		AccountOutput:  accountOutput,
-		OutputID:       accountOutputId,
-	}, signedTx
+		OutputID:       iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0),
+	}
+	w.AddAccount(accountID, accountInfo)
+
+	return accountInfo, signedTx
 }
 
-func (w *Wallet) CreateDelegationFromInput(clt *nodeclient.Client, from *Account, validator *Node, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
+func (w *Wallet) CreateDelegationFromInput(clt *nodeclient.Client, issuerId iotago.AccountID, validator *Node, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
 	input := w.Output(inputId)
 	fundsAddr := input.Address
 	fundsUTXOOutput := input.Output
@@ -187,7 +197,7 @@ func (w *Wallet) CreateDelegationFromInput(clt *nodeclient.Client, from *Account
 		AddOutput(delegationOutput).
 		SetCreationSlot(currentSlot).
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
-		AllotAllMana(currentSlot, from.AccountID, 0).
+		AllotAllMana(currentSlot, issuerId, 0).
 		Build(fundsAddrSigner)
 	require.NoError(w.Testing, err)
 
@@ -202,21 +212,22 @@ func (w *Wallet) CreateDelegationFromInput(clt *nodeclient.Client, from *Account
 	return signedTx
 }
 
-func (w *Wallet) CreateFoundryAndNativeTokensFromInput(clt *nodeclient.Client, from *Account, inputId iotago.OutputID, mintedAmount iotago.BaseToken, maxSupply iotago.BaseToken, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
+func (w *Wallet) CreateFoundryAndNativeTokensFromInput(clt *nodeclient.Client, issuerId iotago.AccountID, inputId iotago.OutputID, mintedAmount iotago.BaseToken, maxSupply iotago.BaseToken, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
 	input := w.Output(inputId)
 	fundsAddr := input.Address
 	fundsUTXOOutput := input.Output
 	fundsOutputID := input.ID
 
+	issuer := w.Account(issuerId)
 	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
 	apiForSlot := clt.APIForSlot(currentSlot)
 
 	// increase foundry counter
-	accTransitionOutput := builder.NewAccountOutputBuilderFromPrevious(from.AccountOutput).
+	accTransitionOutput := builder.NewAccountOutputBuilderFromPrevious(issuer.AccountOutput).
 		FoundriesToGenerate(1).MustBuild()
 
 	// build foundry output
-	foundryID, err := iotago.FoundryIDFromAddressAndSerialNumberAndTokenScheme(from.AccountAddress, accTransitionOutput.FoundryCounter, iotago.TokenSchemeSimple)
+	foundryID, err := iotago.FoundryIDFromAddressAndSerialNumberAndTokenScheme(issuer.AccountAddress, accTransitionOutput.FoundryCounter, iotago.TokenSchemeSimple)
 	require.NoError(w.Testing, err)
 	tokenScheme := &iotago.SimpleTokenScheme{
 		MintedTokens:  big.NewInt(int64(mintedAmount)),
@@ -224,14 +235,14 @@ func (w *Wallet) CreateFoundryAndNativeTokensFromInput(clt *nodeclient.Client, f
 		MeltedTokens:  big.NewInt(0),
 	}
 
-	foundryOutput := builder.NewFoundryOutputBuilder(from.AccountAddress, fundsUTXOOutput.BaseTokenAmount(), accTransitionOutput.FoundryCounter, tokenScheme).
+	foundryOutput := builder.NewFoundryOutputBuilder(issuer.AccountAddress, fundsUTXOOutput.BaseTokenAmount(), accTransitionOutput.FoundryCounter, tokenScheme).
 		NativeToken(&iotago.NativeTokenFeature{
 			ID:     foundryID,
 			Amount: big.NewInt(int64(mintedAmount)),
 		}).MustBuild()
 
 	signer := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(fundsAddr.(*iotago.Ed25519Address), input.PrivateKey),
-		iotago.NewAddressKeysForEd25519Address(from.AccountOutput.UnlockConditionSet().Address().Address.(*iotago.Ed25519Address), from.BlockIssuerKey))
+		iotago.NewAddressKeysForEd25519Address(issuer.AccountOutput.UnlockConditionSet().Address().Address.(*iotago.Ed25519Address), issuer.BlockIssuerKey))
 
 	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
 		AddInput(&builder.TxInput{
@@ -240,16 +251,16 @@ func (w *Wallet) CreateFoundryAndNativeTokensFromInput(clt *nodeclient.Client, f
 			Input:        fundsUTXOOutput,
 		}).
 		AddInput(&builder.TxInput{
-			UnlockTarget: from.AccountOutput.UnlockConditionSet().Address().Address,
-			InputID:      from.OutputID,
-			Input:        from.AccountOutput,
+			UnlockTarget: issuer.AccountOutput.UnlockConditionSet().Address().Address,
+			InputID:      issuer.OutputID,
+			Input:        issuer.AccountOutput,
 		}).
 		AddOutput(accTransitionOutput).
 		AddOutput(foundryOutput).
 		SetCreationSlot(currentSlot).
-		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: from.AccountID}).
+		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: issuerId}).
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
-		AllotAllMana(currentSlot, from.AccountID, 0).
+		AllotAllMana(currentSlot, issuerId, 0).
 		Build(signer)
 	require.NoError(w.Testing, err)
 
@@ -257,14 +268,23 @@ func (w *Wallet) CreateFoundryAndNativeTokensFromInput(clt *nodeclient.Client, f
 	w.AddOutput(foundryOutputId, &Output{
 		ID:      foundryOutputId,
 		Output:  foundryOutput,
-		Address: from.AccountAddress,
+		Address: issuer.AccountAddress,
+	})
+
+	w.AddAccount(issuerId, &Account{
+		AccountID:      issuerId,
+		AccountAddress: issuer.AccountAddress,
+		BlockIssuerKey: issuer.BlockIssuerKey,
+		AccountOutput:  signedTx.Transaction.Outputs[0].(*iotago.AccountOutput),
+		OutputID:       iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0),
 	})
 
 	return signedTx
 }
 
 // TransitionFoundry transitions a FoundryOutput by increasing the native token amount on the output by one.
-func (w *Wallet) TransitionFoundry(clt *nodeclient.Client, from *Account, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
+func (w *Wallet) TransitionFoundry(clt *nodeclient.Client, issuerId iotago.AccountID, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
+	issuer := w.Account(issuerId)
 	input := w.Output(inputId)
 	inputFoundry, isFoundry := input.Output.(*iotago.FoundryOutput)
 	require.True(w.Testing, isFoundry)
@@ -289,14 +309,14 @@ func (w *Wallet) TransitionFoundry(clt *nodeclient.Client, from *Account, inputI
 		TokenScheme(tokenScheme).
 		MustBuild()
 
-	outputAccount := builder.NewAccountOutputBuilderFromPrevious(from.AccountOutput).
+	outputAccount := builder.NewAccountOutputBuilderFromPrevious(issuer.AccountOutput).
 		MustBuild()
 
 	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
 	apiForSlot := clt.APIForSlot(currentSlot)
 
 	signer := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(input.Address.(*iotago.Ed25519Address), input.PrivateKey),
-		iotago.NewAddressKeysForEd25519Address(from.AccountOutput.UnlockConditionSet().Address().Address.(*iotago.Ed25519Address), from.BlockIssuerKey))
+		iotago.NewAddressKeysForEd25519Address(issuer.AccountOutput.UnlockConditionSet().Address().Address.(*iotago.Ed25519Address), issuer.BlockIssuerKey))
 
 	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
 		AddInput(&builder.TxInput{
@@ -305,16 +325,16 @@ func (w *Wallet) TransitionFoundry(clt *nodeclient.Client, from *Account, inputI
 			Input:        input.Output,
 		}).
 		AddInput(&builder.TxInput{
-			UnlockTarget: from.AccountOutput.UnlockConditionSet().Address().Address,
-			InputID:      from.OutputID,
-			Input:        from.AccountOutput,
+			UnlockTarget: issuer.AccountOutput.UnlockConditionSet().Address().Address,
+			InputID:      issuer.OutputID,
+			Input:        issuer.AccountOutput,
 		}).
 		AddOutput(outputAccount).
 		AddOutput(outputFoundry).
 		SetCreationSlot(currentSlot).
-		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: from.AccountID}).
+		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: issuer.AccountID}).
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
-		AllotAllMana(currentSlot, from.AccountID, 0).
+		AllotAllMana(currentSlot, issuerId, 0).
 		Build(signer)
 	require.NoError(w.Testing, err)
 
@@ -322,7 +342,15 @@ func (w *Wallet) TransitionFoundry(clt *nodeclient.Client, from *Account, inputI
 	w.AddOutput(foundryOutputId, &Output{
 		ID:      foundryOutputId,
 		Output:  outputFoundry,
-		Address: from.AccountAddress,
+		Address: issuer.AccountAddress,
+	})
+
+	w.AddAccount(issuerId, &Account{
+		AccountID:      issuerId,
+		AccountAddress: issuer.AccountAddress,
+		BlockIssuerKey: issuer.BlockIssuerKey,
+		AccountOutput:  signedTx.Transaction.Outputs[0].(*iotago.AccountOutput),
+		OutputID:       iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0),
 	})
 
 	return signedTx
