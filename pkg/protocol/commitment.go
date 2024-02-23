@@ -271,7 +271,7 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 				c.CumulativeWeight.Set(c.Commitment.CumulativeWeight())
 			}
 
-			return lo.Batch(
+			return lo.BatchReverse(
 				parent.deriveChildren(c),
 
 				c.deriveOrphaned(parent),
@@ -340,11 +340,6 @@ func (c *Commitment) deriveChain(parent *Commitment) func() {
 		// Eventually, the orphaned commitments will be evicted once the finalized slot advances.
 		if isOrphaned {
 			return nil
-		}
-
-		// if mainChild is nil that means that the parent has been evicted, so we should stay on the currentChain
-		if mainChild == nil {
-			return currentChain
 		}
 
 		// if we are not the main child of our parent, we spawn a new chain
