@@ -7,11 +7,11 @@ import (
 )
 
 // TestBlockRetainer_RetainBlock tests the BlockRetainer.
-// A: BlockBooked -> BlockAccepted -> BlockConfirmed -> BlockFinalized
-// A2: BlockBooked -> BlockAccepted -> BlockConfirmed -> BlockFinalized (issued one slot later)
-// B: BlockBooked -> BlockAccepted -> BlockFinalized
-// C: BlockBooked -> BlockDropped
-// D: BlockBooked -> BlockDropped -> BlockAccepted
+// A: BlockBooked  -> BlockAccepted -> BlockConfirmed -> slot finalized
+// A2: BlockBooked -> BlockAccepted -> BlockConfirmed -> slot finalized (issued one slot later)
+// B: BlockBooked  -> BlockAccepted ->                -> slot finalized
+// C: BlockBooked  -> BlockDropped
+// D: BlockBooked  -> BlockDropped  -> BlockAccepted  -> slot finalized
 // E: BlockBooked
 func TestBlockRetainer_RetainBlockNoFailures(t *testing.T) {
 	tf := NewTestFramework(t)
@@ -24,7 +24,7 @@ func TestBlockRetainer_RetainBlockNoFailures(t *testing.T) {
 	{
 		tf.commitSlot(3)
 		tf.finalizeSlot(0)
-		tf.initiateRetainerBlockFlow(6, []string{"A2", "C", "D"})
+		tf.initiateRetainerBlockFlow(6, []string{"A2", "C", "D", "E"})
 	}
 	{
 		tf.commitSlot(4)
@@ -33,17 +33,17 @@ func TestBlockRetainer_RetainBlockNoFailures(t *testing.T) {
 			{
 				"A",
 				eventAccepted,
-				api.BlockStateAccepted,
+				api.BlockStatePending, // we do not expose the accepted state
 			},
 			{
 				"A2",
 				eventAccepted,
-				api.BlockStateAccepted,
+				api.BlockStatePending,
 			},
 			{
 				"B",
 				eventAccepted,
-				api.BlockStateAccepted,
+				api.BlockStatePending,
 			},
 			{
 				"C",
@@ -52,7 +52,7 @@ func TestBlockRetainer_RetainBlockNoFailures(t *testing.T) {
 			},
 			{
 				"D",
-				none,
+				eventDropped,
 				api.BlockStateDropped,
 			},
 			{
@@ -63,7 +63,7 @@ func TestBlockRetainer_RetainBlockNoFailures(t *testing.T) {
 		})
 	}
 	{
-		tf.commitSlot(6)
+		tf.commitSlot(5)
 		tf.finalizeSlot(2)
 		tf.assertBlockMetadata([]*BlockRetainerAction{
 			{
@@ -79,22 +79,22 @@ func TestBlockRetainer_RetainBlockNoFailures(t *testing.T) {
 			{
 				"B",
 				none,
-				api.BlockStateAccepted,
+				api.BlockStatePending,
 			},
 			{
 				"C",
 				none,
-				api.BlockStateOrphaned,
+				api.BlockStateDropped,
 			},
 			{
 				"D",
-				none,
-				api.BlockStateAccepted,
+				eventAccepted,
+				api.BlockStatePending,
 			},
 			{
 				"E",
 				none,
-				api.BlockStateOrphaned,
+				api.BlockStatePending,
 			},
 		})
 
@@ -127,7 +127,7 @@ func TestBlockRetainer_RetainBlockNoFailures(t *testing.T) {
 			{
 				"D",
 				none,
-				api.BlockStateAccepted,
+				api.BlockStatePending,
 			},
 			{
 				"E",
