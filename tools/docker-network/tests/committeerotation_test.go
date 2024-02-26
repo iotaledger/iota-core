@@ -207,7 +207,7 @@ func Test_Staking(t *testing.T) {
 
 	account := d.CreateAccount(WithStakingFeature(100, 1, 0))
 
-	d.AssertValidatorExists(account.AccountAddress)
+	d.AssertValidatorExists(account.Address)
 }
 
 // Test_Delegation tests if committee changed due to delegation.
@@ -245,10 +245,10 @@ func Test_Delegation(t *testing.T) {
 	account := d.CreateAccount()
 
 	// delegate all faucet funds to V2, V2 should replace V3
-	delegationStartEpoch := d.DelegateToValidator(account.AccountID, d.Node("V2"))
+	delegationStartEpoch := d.DelegateToValidator(account.ID, d.Node("V2"))
 	d.AssertCommittee(delegationStartEpoch+1, d.AccountsFromNodes(d.Nodes("V1", "V2", "V4")...))
 
 	// delegate all faucet funds to V3, V3 should replace V1
-	delegationStartEpoch = d.DelegateToValidator(account.AccountID, d.Node("V3"))
+	delegationStartEpoch = d.DelegateToValidator(account.ID, d.Node("V3"))
 	d.AssertCommittee(delegationStartEpoch+1, d.AccountsFromNodes(d.Nodes("V2", "V3", "V4")...))
 }
