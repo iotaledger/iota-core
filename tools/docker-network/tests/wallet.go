@@ -190,6 +190,7 @@ func (w *Wallet) AllotManaFromInput(clt *nodeclient.Client, toId iotago.AccountI
 		}).
 		AddOutput(basicOutput).
 		AllotAllMana(currentSlot, to.AccountID, 0).
+		SetCreationSlot(currentSlot).
 		Build(fundsAddrSigner)
 
 	delegationOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
