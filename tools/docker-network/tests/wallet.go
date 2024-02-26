@@ -439,3 +439,34 @@ func (w *Wallet) TransitionFoundry(clt *nodeclient.Client, issuerId iotago.Accou
 
 	return signedTx
 }
+
+func (w *Wallet) CreateNFTFromInput(clt *nodeclient.Client, issuerId iotago.AccountID, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse, opts ...options.Option[builder.NFTOutputBuilder]) *iotago.SignedTransaction {
+	input := w.Output(inputId)
+	fundsAddr := input.Address
+	fundsUTXOOutput := input.Output
+	fundsOutputID := input.ID
+
+	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	apiForSlot := clt.APIForSlot(currentSlot)
+
+	nftOutputBuilder := builder.NewNFTOutputBuilder(w.Address(), input.Output.BaseTokenAmount())
+	options.Apply(nftOutputBuilder, opts)
+	nftOutput := nftOutputBuilder.MustBuild()
+	signer := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(fundsAddr.(*iotago.Ed25519Address), input.PrivateKey))
+
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+		AddInput(&builder.TxInput{
+			UnlockTarget: fundsAddr,
+			InputID:      fundsOutputID,
+			Input:        fundsUTXOOutput,
+		}).
+		AddOutput(nftOutput).
+		SetCreationSlot(currentSlot).
+		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: issuerId}).
+		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
+		AllotAllMana(currentSlot, issuerId, 0).
+		Build(signer)
+	require.NoError(w.Testing, err)
+
+	return signedTx
+}

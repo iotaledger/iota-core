@@ -411,6 +411,22 @@ func (d *DockerTestFramework) CreateFoundryBlockFromInput(issuerId iotago.Accoun
 		d.CreateBlock(ctx, signedTx, wallet.NewEd25519Account(issuer.AccountID, issuer.BlockIssuerKey), congestionResp, issuerResp)
 }
 
+func (d *DockerTestFramework) CreateNFTBlockFromInput(issuerId iotago.AccountID, inputId iotago.OutputID, opts ...options.Option[builder.NFTOutputBuilder]) (iotago.NFTID, iotago.OutputID, *iotago.Block) {
+	issuer := d.defaultWallet.Account(issuerId)
+	ctx := context.TODO()
+	clt := d.Node("V1").Client
+
+	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, issuer.AccountAddress)
+
+	signedTx := d.defaultWallet.CreateNFTFromInput(clt, issuerId, inputId, issuerResp, opts...)
+	txId, err := signedTx.Transaction.ID()
+	require.NoError(d.Testing, err)
+
+	return signedTx.Transaction.Outputs[0].(*iotago.NFTOutput).NFTID,
+		iotago.OutputIDFromTransactionIDAndIndex(txId, 0),
+		d.CreateBlock(ctx, signedTx, wallet.NewEd25519Account(issuer.AccountID, issuer.BlockIssuerKey), congestionResp, issuerResp)
+}
+
 func (d *DockerTestFramework) CreateFoundryTransitionBlockFromInput(issuerId iotago.AccountID, inputId iotago.OutputID) (iotago.FoundryID, iotago.OutputID, *iotago.Block) {
 	ctx := context.TODO()
 	clt := d.Node("V1").Client
