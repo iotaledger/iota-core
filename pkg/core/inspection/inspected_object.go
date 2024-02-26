@@ -80,8 +80,10 @@ func (i *inspectedObject) AddChild(name string, instance any, inspectManually ..
 		i.childObjects.Set(name, nil)
 	} else if len(inspectManually) >= 1 {
 		i.childObjects.Set(name, NewInspectedObject(instance, inspectManually[0], i.session))
+	} else if inspectableInstance, isInspectable := instance.(inspectable); isInspectable {
+		i.childObjects.Set(name, inspectableInstance.Inspect(i.session))
 	} else {
-		i.childObjects.Set(name, instance.(inspectable).Inspect(i.session))
+		panic("added object does not have an 'Inspect(session ...Session) InspectedObject' method - please provide a manual inspection function")
 	}
 }
 

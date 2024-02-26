@@ -14,14 +14,14 @@ func (p *Protocol) Inspect(session ...inspection.Session) inspection.InspectedOb
 }
 
 func (c *Commitments) Inspect(session ...inspection.Session) inspection.InspectedObject {
-	return inspection.NewInspectedObject(c, func(o inspection.InspectedObject) {
-		o.AddChild("Set", c.Set, func(set inspection.InspectedObject) {
+	var (
+		inspectSet = func(set inspection.InspectedObject) {
 			c.Range(func(commitment *Commitment) {
 				set.AddChild(commitment.LogName(), commitment)
 			})
-		})
+		}
 
-		o.AddChild("cachedRequests", c.cachedRequests, func(cachedRequests inspection.InspectedObject) {
+		inspectCachedRequests = func(cachedRequests inspection.InspectedObject) {
 			c.cachedRequests.ForEach(func(commitmentID iotago.CommitmentID, cachedRequest *promise.Promise[*Commitment]) bool {
 				if commitment := cachedRequest.Result(); commitment != nil {
 					cachedRequests.AddChild(commitmentID.String(), commitment)
@@ -29,42 +29,52 @@ func (c *Commitments) Inspect(session ...inspection.Session) inspection.Inspecte
 
 				return true
 			})
-		})
+		}
+	)
+
+	return inspection.NewInspectedObject(c, func(o inspection.InspectedObject) {
+		o.AddChild("Set", c.Set, inspectSet)
+		o.AddChild("cachedRequests", c.cachedRequests, inspectCachedRequests)
 	}, session...)
 }
 
 func (c *Commitment) Inspect(session ...inspection.Session) inspection.InspectedObject {
+	inspectChildren := func(children inspection.InspectedObject) {
+		c.Children.Range(func(child *Commitment) {
+			children.AddChild(child.LogName(), child)
+		})
+	}
+
 	return inspection.NewInspectedObject(c, func(o inspection.InspectedObject) {
 		o.AddChild("Parent", c.Parent.Get())
 		o.AddChild("MainChild", c.MainChild.Get())
 		o.AddChild("Chain", c.Chain.Get())
-
-		o.AddChild("Children", c.Children, func(children inspection.InspectedObject) {
-			c.Children.Range(func(child *Commitment) {
-				children.AddChild(child.LogName(), child)
-			})
-		})
+		o.AddChild("Children", c.Children, inspectChildren)
 	}, session...)
 }
 
 func (c *Chains) Inspect(session ...inspection.Session) inspection.InspectedObject {
-	return inspection.NewInspectedObject(c, func(o inspection.InspectedObject) {
-		o.AddChild("Set", c.Set, func(set inspection.InspectedObject) {
-			c.Range(func(chain *Chain) {
-				set.AddChild(chain.LogName(), chain)
-			})
+	inspectSet := func(set inspection.InspectedObject) {
+		c.Set.Range(func(chain *Chain) {
+			set.AddChild(chain.LogName(), chain)
 		})
+	}
+
+	return inspection.NewInspectedObject(c, func(o inspection.InspectedObject) {
+		o.AddChild("Set", c.Set, inspectSet)
 	}, session...)
 }
 
 func (c *Chain) Inspect(session ...inspection.Session) inspection.InspectedObject {
+	inspectChildChains := func(childChains inspection.InspectedObject) {
+		c.ChildChains.Range(func(childChain *Chain) {
+			childChains.AddChild(childChain.LogName(), childChain)
+		})
+	}
+
 	return inspection.NewInspectedObject(c, func(chain inspection.InspectedObject) {
 		chain.AddChild("ForkingPoint", c.ForkingPoint.Get())
 		chain.AddChild("ParentChain", c.ParentChain.Get())
-		chain.AddChild("ChildChains", c.ChildChains, func(childChains inspection.InspectedObject) {
-			c.ChildChains.Range(func(childChain *Chain) {
-				childChains.AddChild(childChain.LogName(), childChain)
-			})
-		})
+		chain.AddChild("ChildChains", c.ChildChains, inspectChildChains)
 	}, session...)
 }
