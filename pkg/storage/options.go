@@ -3,20 +3,20 @@ package storage
 import (
 	"time"
 
-	hivedb "github.com/iotaledger/hive.go/kvstore/database"
+	"github.com/iotaledger/hive.go/db"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func WithDBEngine(optsDBEngine hivedb.Engine) options.Option[Storage] {
+func WithDBEngine(optsDBEngine db.Engine) options.Option[Storage] {
 	return func(s *Storage) {
 		s.optsDBEngine = optsDBEngine
 	}
 }
 
-func WithAllowedDBEngines(optsAllowedDBEngines []hivedb.Engine) options.Option[Storage] {
+func WithAllowedDBEngines(optsAllowedDBEngines []db.Engine) options.Option[Storage] {
 	return func(s *Storage) {
 		s.optsAllowedDBEngines = optsAllowedDBEngines
 	}

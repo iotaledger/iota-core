@@ -8,9 +8,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/db"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore"
-	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -49,7 +49,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	}
 
 	prunableStorage := prunable.New(database.Config{
-		Engine:    hivedb.EngineMapDB,
+		Engine:    db.EngineMapDB,
 		Directory: t.TempDir(),
 	}, iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI), func(err error) { panic(err) })
 
