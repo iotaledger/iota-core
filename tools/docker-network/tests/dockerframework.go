@@ -363,6 +363,7 @@ func (d *DockerTestFramework) StopIssueCandidacyPayload(nodes ...*Node) {
 	d.DockerComposeUp(true)
 }
 
+// CreateTaggedDataBlock creates a block of a tagged data payload.
 func (d *DockerTestFramework) CreateTaggedDataBlock(issuerId iotago.AccountID, tag []byte) *iotago.Block {
 	issuer := d.defaultWallet.Account(issuerId)
 	ctx := context.TODO()
@@ -378,6 +379,7 @@ func (d *DockerTestFramework) CreateTaggedDataBlock(issuerId iotago.AccountID, t
 	}, wallet.NewEd25519Account(issuer.AccountID, issuer.BlockIssuerKey), congestionResp, issuerResp)
 }
 
+// CreateDelegationBlockFromInput consumes the given basic output, then build a block of a transaction that includes a delegation output, in order to delegate the given validator.
 func (d *DockerTestFramework) CreateDelegationBlockFromInput(issuerId iotago.AccountID, validator *Node, inputId iotago.OutputID) (iotago.DelegationID, iotago.OutputID, *iotago.Block) {
 	issuer := d.defaultWallet.Account(issuerId)
 	ctx := context.TODO()
@@ -395,6 +397,7 @@ func (d *DockerTestFramework) CreateDelegationBlockFromInput(issuerId iotago.Acc
 		d.CreateBlock(ctx, signedTx, wallet.NewEd25519Account(issuer.AccountID, issuer.BlockIssuerKey), congestionResp, issuerResp)
 }
 
+// CreateFoundryBlockFromInput consumes the given basic output, then build a block of a transaction that includes a foundry output with the given mintedAmount and maxSupply.
 func (d *DockerTestFramework) CreateFoundryBlockFromInput(issuerId iotago.AccountID, inputId iotago.OutputID, mintedAmount iotago.BaseToken, maxSupply iotago.BaseToken) (iotago.FoundryID, iotago.OutputID, *iotago.Block) {
 	issuer := d.defaultWallet.Account(issuerId)
 	ctx := context.TODO()
@@ -411,6 +414,7 @@ func (d *DockerTestFramework) CreateFoundryBlockFromInput(issuerId iotago.Accoun
 		d.CreateBlock(ctx, signedTx, wallet.NewEd25519Account(issuer.AccountID, issuer.BlockIssuerKey), congestionResp, issuerResp)
 }
 
+// CreateNFTBlockFromInput consumes the given basic output, then build a block of a transaction that includes a NFT output with the given NFT output options.
 func (d *DockerTestFramework) CreateNFTBlockFromInput(issuerId iotago.AccountID, inputId iotago.OutputID, opts ...options.Option[builder.NFTOutputBuilder]) (iotago.NFTID, iotago.OutputID, *iotago.Block) {
 	issuer := d.defaultWallet.Account(issuerId)
 	ctx := context.TODO()
@@ -427,6 +431,7 @@ func (d *DockerTestFramework) CreateNFTBlockFromInput(issuerId iotago.AccountID,
 		d.CreateBlock(ctx, signedTx, wallet.NewEd25519Account(issuer.AccountID, issuer.BlockIssuerKey), congestionResp, issuerResp)
 }
 
+// CreateFoundryTransitionBlockFromInput consumes the given foundry output, then build block by increasing the minted amount by 1.
 func (d *DockerTestFramework) CreateFoundryTransitionBlockFromInput(issuerId iotago.AccountID, inputId iotago.OutputID) (iotago.FoundryID, iotago.OutputID, *iotago.Block) {
 	ctx := context.TODO()
 	clt := d.Node("V1").Client
@@ -532,6 +537,7 @@ func (d *DockerTestFramework) DelegateToValidator(fromId iotago.AccountID, valid
 	return delegationOutput.StartEpoch
 }
 
+// PrepareBlockIssuance prepares the BlockIssuance and Congestion response, and increase BIC of the issuer if necessary.
 func (d *DockerTestFramework) PrepareBlockIssuance(ctx context.Context, clt *nodeclient.Client, issuerAddress *iotago.AccountAddress) (*api.IssuanceBlockHeaderResponse, *api.CongestionResponse) {
 	issuerResp, err := clt.BlockIssuance(ctx)
 	require.NoError(d.Testing, err)
@@ -627,6 +633,7 @@ func (d *DockerTestFramework) CreateNativeToken(fromId iotago.AccountID, mintedA
 	d.AssertIndexerFoundry(signedTx.Transaction.Outputs[1].(*iotago.FoundryOutput).MustFoundryID())
 }
 
+// RequestFaucetFunds requests faucet funds for the given address type, and returns the outputID of the received funds.
 func (d *DockerTestFramework) RequestFaucetFunds(ctx context.Context, addressType iotago.AddressType) iotago.OutputID {
 	privateKey, _ := d.defaultWallet.KeyPair()
 	var address iotago.Address
