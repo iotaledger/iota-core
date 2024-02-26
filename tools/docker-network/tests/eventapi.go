@@ -58,14 +58,39 @@ func (d *DockerTestFramework) AssertBasicBlocks(ctx context.Context, eventClt *n
 	}()
 }
 
-func (d *DockerTestFramework) AssertValidationBlocks(ctx context.Context, eventClt *nodeclient.EventAPIClient, expectedBlockIDs map[string]*iotago.Block, finishChan chan struct{}) {
+// AssertValidationBlocks listens to the validation blocks and checks if the block is a validation block and the issuer is in the validators list. The check passes after 10 blocks.
+func (d *DockerTestFramework) AssertValidationBlocks(ctx context.Context, eventClt *nodeclient.EventAPIClient, hrp iotago.NetworkPrefix, validators map[string]struct{}, finishChan chan struct{}) {
 	blksChan, subInfo := eventClt.BlocksValidation()
 	require.Nil(d.Testing, subInfo.Error())
 
 	go func() {
+		defer fmt.Println("AssertValidationBlocks finished")
 		defer subInfo.Close()
-		d.assertBlocksTopics(ctx, blksChan, expectedBlockIDs, finishChan)
-		fmt.Println("AssertValidationBlocks finished")
+		blkIDs := make([]string, 0)
+		counter := 0
+
+		// in order to inform that the channel is listened
+		finishChan <- struct{}{}
+
+		for {
+			select {
+			case blk := <-blksChan:
+				require.Equal(d.Testing, iotago.BlockBodyTypeValidation, blk.Body.Type())
+				_, ok := validators[blk.Header.IssuerID.ToAddress().Bech32(hrp)]
+				require.True(d.Testing, ok)
+
+				// The check passes after 10 blocks
+				counter++
+				if counter == 10 {
+					finishChan <- struct{}{}
+					return
+				}
+			case <-ctx.Done():
+				fmt.Println("Received blocks:", blkIDs)
+				return
+			}
+		}
+
 	}()
 }
 

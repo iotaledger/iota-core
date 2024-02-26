@@ -15,6 +15,7 @@ import (
 
 var eventAPITests = map[string]func(t *testing.T, d *DockerTestFramework){
 	"Test_Commitments":                 test_Commitments,
+	"Test_ValidationBlocks":            test_ValidationBlocks,
 	"Test_BasicTaggedDataBlocks":       test_BasicTaggedDataBlocks,
 	"Test_DelegationTransactionBlocks": test_DelegationTransactionBlocks,
 	"Test_AccountTransactionBlocks":    test_AccountTransactionBlocks,
@@ -78,6 +79,34 @@ func test_Commitments(t *testing.T, d *DockerTestFramework) {
 
 	d.AssertLatestCommitments(ctx, eventClt, expectedLatestSlots, finish)
 	d.AssertFinalizedCommitments(ctx, eventClt, expectedFinalizedSlots, finish)
+
+	// wait until all topics receives all expected objects
+	err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+	require.NoError(t, err)
+}
+
+func test_ValidationBlocks(t *testing.T, d *DockerTestFramework) {
+	finish := make(chan struct{})
+
+	// get event API client ready
+	clt := d.Node("V1").Client
+	ctx, cancel := context.WithCancel(context.Background())
+	eventClt, err := clt.EventAPI(ctx)
+	require.NoError(t, err)
+	err = eventClt.Connect(ctx)
+	require.NoError(t, err)
+	defer eventClt.Close()
+
+	// prepare the expected commitments to be received
+	validators := make(map[string]struct{}, 0)
+	nodes := d.Nodes("V1", "V2", "V3", "V4")
+	for _, node := range nodes {
+		validators[node.AccountAddressBech32] = struct{}{}
+	}
+
+	totalTopics := 1
+
+	d.AssertValidationBlocks(ctx, eventClt, clt.CommittedAPI().ProtocolParameters().Bech32HRP(), validators, finish)
 
 	// wait until all topics receives all expected objects
 	err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
