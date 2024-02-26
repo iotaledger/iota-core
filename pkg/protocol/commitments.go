@@ -1,8 +1,6 @@
 package protocol
 
 import (
-	"fmt"
-
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
@@ -13,7 +11,6 @@ import (
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
-	"github.com/iotaledger/iota-core/pkg/core/traversed"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -98,26 +95,6 @@ func (c *Commitments) API(commitmentID iotago.CommitmentID) (commitmentAPI *engi
 	}
 
 	return commitment.TargetEngine().CommitmentAPI(commitmentID)
-}
-
-func (c *Commitments) Traverse(seenObjects ...traversed.SeenElements) *traversed.Object {
-	return traversed.NewObject("Commitments", c.LogName(), func(o *traversed.Object) {
-		o.AddNewObject("Set", "Set", fmt.Sprintf("%p", c.Set), func(set *traversed.Object) {
-			c.Range(func(commitment *Commitment) {
-				set.AddTraversable(commitment.LogName(), commitment)
-			})
-		})
-
-		o.AddNewObject("cachedRequests", "ShrinkingMap", "ShrinkingMap", func(cachedRequests *traversed.Object) {
-			c.cachedRequests.ForEach(func(commitmentID iotago.CommitmentID, cachedRequest *promise.Promise[*Commitment]) bool {
-				if commitment := cachedRequest.Result(); commitment != nil {
-					cachedRequests.AddTraversable(commitmentID.String(), commitment)
-				}
-
-				return true
-			})
-		})
-	}, seenObjects...)
 }
 
 // initLogger initializes the logger for this component.

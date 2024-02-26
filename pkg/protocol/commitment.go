@@ -8,7 +8,6 @@ import (
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
-	"github.com/iotaledger/iota-core/pkg/core/traversed"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -144,20 +143,6 @@ func (c *Commitment) TargetEngine() *engine.Engine {
 	}
 
 	return nil
-}
-
-func (c *Commitment) Traverse(seenObjects ...traversed.SeenElements) *traversed.Object {
-	return traversed.NewObject("Commitment", c.LogName(), func(o *traversed.Object) {
-		o.AddTraversable("Parent", c.Parent.Get())
-		o.AddTraversable("MainChild", c.MainChild.Get())
-		o.AddTraversable("Chain", c.Chain.Get())
-
-		o.AddNewObject("Children", "Set", fmt.Sprintf("%p", c.Children), func(children *traversed.Object) {
-			c.Children.Range(func(child *Commitment) {
-				children.AddTraversable(child.LogName(), child)
-			})
-		})
-	}, seenObjects...)
 }
 
 // Less is a function that is used to break ties between two Commitments that have the same cumulative weight by using

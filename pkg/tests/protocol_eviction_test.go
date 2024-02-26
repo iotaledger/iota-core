@@ -181,13 +181,13 @@ func TestProtocol_Eviction(t *testing.T) {
 	issueBlocksTill(8)
 
 	memConsumptionStart := memsize.Scan(node.Protocol).Total
-	fmt.Println(node.Protocol.Traverse())
+	fmt.Println(node.Protocol.Inspect())
 
 	// issue more blocks
 	issueBlocksTill(100)
 
 	memConsumptionEnd := memsize.Scan(node.Protocol).Total
-	fmt.Println(node.Protocol.Traverse())
+	fmt.Println(node.Protocol.Inspect())
 
 	require.Less(t, float64(lo.Return1(memConsumptionEnd)), 1.05*float64(memConsumptionStart), "memory consumption should not grow by more than 5%")
 }
