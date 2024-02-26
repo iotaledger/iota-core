@@ -421,7 +421,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
 		ts.AssertCommitmentsOrphaned(ultimateCommitmentsP2, true, ts.Nodes()...)
 
-		// When the test is slow on the CI the eviction of a commitment might be delayed, so here we account for that.
+		// When the test is slow on the CI, the eviction of a commitment might be delayed, so here we account for that.
 		if oldestNonEvictedCommitment >= 14 {
 			ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
 		} else {
@@ -1123,7 +1123,7 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 	// P3 commitments on P2 node should be on separate chain.
 	ts.AssertCommitmentsOnChain(ultimateCommitmentsP3, ultimateCommitmentsP3[0].ID(), otherPartitions[0])
 
-	//ts.AssertCommitmentsAndChainsEvicted(5, ts.Nodes()...)
+	ts.AssertCommitmentsAndChainsEvicted(5, ts.Nodes()...)
 
 	// TODO:
 	//  Extend the test and make sure that after eviction everything is intact.

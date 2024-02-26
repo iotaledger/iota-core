@@ -149,7 +149,7 @@ func (c *Chain) Commitment(slot iotago.SlotIndex) (commitment *Commitment, exist
 		case slot > forkingPoint.Slot():
 			return currentChain.commitments.Get(slot)
 		default:
-			currentChain = c.ParentChain.Get()
+			currentChain = currentChain.ParentChain.Get()
 		}
 	}
 
