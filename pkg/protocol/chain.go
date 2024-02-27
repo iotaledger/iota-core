@@ -150,7 +150,7 @@ func (c *Chain) Commitment(slot iotago.SlotIndex) (commitment *Commitment, exist
 		case slot > forkingPoint.Slot():
 			return currentChain.commitments.Get(slot)
 		default:
-			currentChain = c.ParentChain.Get()
+			currentChain = currentChain.ParentChain.Get()
 		}
 	}
 
@@ -295,8 +295,6 @@ func (c *Chain) addCommitment(newCommitment *Commitment) (shutdown func()) {
 		newCommitment.IsSynced.OnTrigger(func() { c.LatestSyncedSlot.Set(newCommitment.Slot()) }),
 
 		func() {
-			// TODO: this should not be done here, because it might cause problems upon chain switching.
-			//   A chain should manage this field by itself.
 			c.commitments.Delete(newCommitment.Slot())
 		},
 	)

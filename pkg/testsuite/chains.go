@@ -197,3 +197,19 @@ func (t *TestSuite) AssertCommitmentsOrphaned(expectedCommitments []*model.Commi
 		})
 	}
 }
+
+func (t *TestSuite) AssertMainChain(expectedChainID iotago.CommitmentID, nodes ...*mock.Node) {
+	mustNodes(nodes)
+
+	for _, node := range nodes {
+		t.Eventually(func() error {
+			mainChainID := node.Protocol.Chains.Main.Get().ForkingPoint.Get().ID()
+
+			if mainChainID != expectedChainID {
+				return ierrors.Errorf("AssertMainChain: %s: expected main chain to be %s, got %s", node.Name, expectedChainID, mainChainID)
+			}
+
+			return nil
+		})
+	}
+}
