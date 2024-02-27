@@ -485,22 +485,28 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 	// create an implicit account by requesting faucet funds
 	ctx := context.TODO()
 	implicitAccount := d.CreateImplicitAccount(ctx)
-
-	// transition to a full account with new Ed25519 address and staking feature
 	clt := d.Node("V1").Client
 
-	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, implicitAccount.Address)
+	// get the congestion here to avoid triggering IncreaseBIC, the implicit account has 0 BIC, but it'll get BIC after the account transition.
+	issuerResp, err := clt.BlockIssuance(ctx)
+	require.NoError(d.Testing, err)
+
+	congestionResp, err := clt.Congestion(ctx, implicitAccount.Address, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
+	require.NoError(d.Testing, err)
 
 	fullAccount, signedTx := d.wallet.TransitionImplicitAccountToAccountOutput(clt, implicitAccount.OutputID, issuerResp, opts...)
 
 	// The account transition block should be issued by the implicit account block issuer key.
-	blkID := d.SubmitPayload(ctx, signedTx, implicitAccount.ID, congestionResp, issuerResp)
+	blkID := d.SubmitPayload(ctx, signedTx, fullAccount.ID, congestionResp, issuerResp)
 
 	// check if the account is committed
 	accOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
-	d.CheckAccountStatus(ctx, blkID, lo.PanicOnErr(signedTx.Transaction.ID()), accOutputID, implicitAccount.Address, true)
+	d.CheckAccountStatus(ctx, blkID, lo.PanicOnErr(signedTx.Transaction.ID()), accOutputID, fullAccount.Address, true)
 
-	fmt.Printf("Account created, Bech addr: %s, in txID: %s, slot: %d\n", implicitAccount.Address.Bech32(clt.CommittedAPI().ProtocolParameters().Bech32HRP()), lo.PanicOnErr(signedTx.Transaction.ID()).ToHex(), blkID.Slot())
+	// update account info after it's transitioned to full account
+	d.wallet.AddAccount(fullAccount.ID, fullAccount)
+
+	fmt.Printf("Account created, Bech addr: %s, in txID: %s, slot: %d\n", fullAccount.Address.Bech32(clt.CommittedAPI().ProtocolParameters().Bech32HRP()), lo.PanicOnErr(signedTx.Transaction.ID()).ToHex(), blkID.Slot())
 
 	return fullAccount
 }
@@ -627,10 +633,11 @@ func (d *DockerTestFramework) CreateNativeToken(fromId iotago.AccountID, mintedA
 // RequestFaucetFunds requests faucet funds for the given address type, and returns the outputID of the received funds.
 func (d *DockerTestFramework) RequestFaucetFunds(ctx context.Context, addressType iotago.AddressType) iotago.OutputID {
 	var address iotago.Address
+	var addrIndex uint32
 	if addressType == iotago.AddressImplicitAccountCreation {
-		address = d.wallet.ImplicitAccountCreationAddress()
+		addrIndex, address = d.wallet.ImplicitAccountCreationAddress()
 	} else {
-		address = d.wallet.Address()
+		addrIndex, address = d.wallet.Address()
 	}
 
 	d.SendFaucetRequest(ctx, address)
@@ -641,7 +648,7 @@ func (d *DockerTestFramework) RequestFaucetFunds(ctx context.Context, addressTyp
 	d.wallet.AddOutput(outputID, &Output{
 		ID:           outputID,
 		Address:      address,
-		AddressIndex: 0,
+		AddressIndex: addrIndex,
 		Output:       output,
 	})
 

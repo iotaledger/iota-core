@@ -5,6 +5,7 @@ package tests
 import (
 	"crypto/ed25519"
 	"math/big"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -25,6 +26,8 @@ type DockerWallet struct {
 	Testing *testing.T
 
 	keyManager *wallet.KeyManager
+
+	lastUsedIndex atomic.Uint32
 
 	outputs  map[iotago.OutputID]*Output
 	accounts map[iotago.AccountID]*Account
@@ -86,16 +89,24 @@ func (w *DockerWallet) Account(accountId iotago.AccountID) *Account {
 	return acc
 }
 
-func (w *DockerWallet) Address(index ...uint32) *iotago.Ed25519Address {
+func (w *DockerWallet) Address(index ...uint32) (uint32, *iotago.Ed25519Address) {
+	if len(index) == 0 {
+		index = append(index, w.lastUsedIndex.Add(1))
+	}
+
 	address := w.keyManager.Address(iotago.AddressEd25519, index...)
 	//nolint:forcetypeassert
-	return address.(*iotago.Ed25519Address)
+	return index[0], address.(*iotago.Ed25519Address)
 }
 
-func (w *DockerWallet) ImplicitAccountCreationAddress(index ...uint32) *iotago.ImplicitAccountCreationAddress {
+func (w *DockerWallet) ImplicitAccountCreationAddress(index ...uint32) (uint32, *iotago.ImplicitAccountCreationAddress) {
+	if len(index) == 0 {
+		index = append(index, w.lastUsedIndex.Add(1))
+	}
+
 	address := w.keyManager.Address(iotago.AddressImplicitAccountCreation, index...)
 	//nolint:forcetypeassert
-	return address.(*iotago.ImplicitAccountCreationAddress)
+	return index[0], address.(*iotago.ImplicitAccountCreationAddress)
 }
 
 func (w *DockerWallet) KeyPair(indexes ...uint32) (ed25519.PrivateKey, ed25519.PublicKey) {
@@ -194,8 +205,8 @@ func (w *DockerWallet) TransitionImplicitAccountToAccountOutput(clt *nodeclient.
 	apiForSlot := clt.APIForSlot(currentSlot)
 
 	// transition to a full account with new Ed25519 address and staking feature
-	accEd25519Addr := w.Address()
-	accPrivateKey, _ := w.KeyPair()
+	accEd25519AddrIndex, accEd25519Addr := w.Address()
+	accPrivateKey, _ := w.KeyPair(accEd25519AddrIndex)
 	accBlockIssuerKey := iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(hiveEd25519.PublicKey(accPrivateKey.Public().(ed25519.PublicKey)))
 	accountOutput := options.Apply(builder.NewAccountOutputBuilder(accEd25519Addr, input.Output.BaseTokenAmount()),
 		opts, func(b *builder.AccountOutputBuilder) {
@@ -220,11 +231,10 @@ func (w *DockerWallet) TransitionImplicitAccountToAccountOutput(clt *nodeclient.
 	accountInfo := &Account{
 		ID:           accountID,
 		Address:      accountAddress,
-		AddressIndex: 0,
+		AddressIndex: accEd25519AddrIndex,
 		Output:       accountOutput,
 		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0),
 	}
-	w.AddAccount(accountID, accountInfo)
 
 	return accountInfo, signedTx
 }
@@ -408,7 +418,8 @@ func (w *DockerWallet) CreateNFTFromInput(clt *nodeclient.Client, issuerId iotag
 	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
 	apiForSlot := clt.APIForSlot(currentSlot)
 
-	nftOutputBuilder := builder.NewNFTOutputBuilder(w.Address(), input.Output.BaseTokenAmount())
+	nftAddressIndex, nftAddress := w.Address()
+	nftOutputBuilder := builder.NewNFTOutputBuilder(nftAddress, input.Output.BaseTokenAmount())
 	options.Apply(nftOutputBuilder, opts)
 	nftOutput := nftOutputBuilder.MustBuild()
 
@@ -425,6 +436,14 @@ func (w *DockerWallet) CreateNFTFromInput(clt *nodeclient.Client, issuerId iotag
 		AllotAllMana(currentSlot, issuerId, 0).
 		Build(w.AddressSigner(input.AddressIndex))
 	require.NoError(w.Testing, err)
+
+	nftOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
+	w.AddOutput(nftOutputId, &Output{
+		ID:           nftOutputId,
+		Output:       nftOutput,
+		Address:      nftAddress,
+		AddressIndex: nftAddressIndex,
+	})
 
 	return signedTx
 }
