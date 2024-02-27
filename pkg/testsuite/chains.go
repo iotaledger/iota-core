@@ -188,8 +188,8 @@ func (t *TestSuite) AssertCommitmentsOrphaned(expectedCommitments []*model.Commi
 					return ierrors.Wrapf(err, "AssertCommitmentsOrphaned: %s: expected commitment %s not found", node.Name, expectedCommitment.ID())
 				}
 
-				if expectedOrphaned != commitment.IsOrphaned.Get() {
-					return ierrors.Errorf("AssertCommitmentsOrphaned: %s: expected commitment %s to be orphaned %t, got %t", node.Name, expectedCommitment.ID(), expectedOrphaned, commitment.IsOrphaned.Get())
+				if chain := commitment.Chain.Get(); expectedOrphaned != (chain == nil || chain.IsEvicted.Get()) {
+					return ierrors.Errorf("AssertCommitmentsOrphaned: %s: expected commitment %s to be orphaned %t, got %t", node.Name, expectedCommitment.ID(), expectedOrphaned, chain == nil || chain.IsEvicted.Get())
 				}
 			}
 

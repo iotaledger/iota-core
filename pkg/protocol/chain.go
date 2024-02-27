@@ -126,6 +126,10 @@ func (c *Chain) LastCommonSlot() iotago.SlotIndex {
 func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (dispatched bool) {
 	if c == nil {
 		return false
+	} else if c.IsEvicted.Get() {
+		c.LogTrace("discard for evicted chain", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID())
+
+		return true
 	}
 
 	dispatched = c.dispatchBlockToSpawnedEngine(block, src)
@@ -262,15 +266,10 @@ func (c *Chain) deriveIsEvicted(forkingPoint *Commitment) (shutdown func()) {
 	// 	return forkingPointIsOrphaned || forkingPointIsEvicted
 	// }, forkingPoint.IsOrphaned, forkingPoint.IsEvicted))
 
-	return lo.Batch(
-		forkingPoint.IsEvicted.OnTrigger(func() {
-			// TODO: MOVE TO DEDICATED WORKER
-			go c.IsEvicted.Trigger()
-		}),
-		forkingPoint.IsOrphaned.OnTrigger(func() {
-			go c.IsEvicted.Trigger()
-		}),
-	)
+	return forkingPoint.IsEvicted.OnTrigger(func() {
+		// TODO: MOVE TO DEDICATED WORKER
+		go c.IsEvicted.Trigger()
+	})
 }
 
 // deriveOutOfSyncThreshold defines how a chain determines its "out of sync" threshold (the latest seen slot minus 2

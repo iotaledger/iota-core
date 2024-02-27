@@ -95,12 +95,6 @@ func (b *Blocks) ProcessResponse(block *model.Block, from peer.ID) {
 			return
 		}
 
-		if commitment != nil && commitment.IsOrphaned.Get() {
-			b.LogTrace("discard block from an orphaned chain", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID())
-
-			return
-		}
-
 		// add the block to the dropped blocks buffer if we could not dispatch it to the chain
 		if commitment == nil || !commitment.Chain.Get().DispatchBlock(block, from) {
 			if !b.droppedBlocksBuffer.Add(block.ProtocolBlock().Header.SlotCommitmentID, types.NewTuple(block, from)) {

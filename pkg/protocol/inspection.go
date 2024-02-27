@@ -23,9 +23,7 @@ func (c *Commitments) Inspect(session ...inspection.Session) inspection.Inspecte
 
 		inspectCachedRequests = func(cachedRequests inspection.InspectedObject) {
 			c.cachedRequests.ForEach(func(commitmentID iotago.CommitmentID, cachedRequest *promise.Promise[*Commitment]) bool {
-				if commitment := cachedRequest.Result(); commitment != nil {
-					cachedRequests.AddChild(commitmentID.String(), commitment)
-				}
+				cachedRequests.AddChild(commitmentID.String(), cachedRequest.Result())
 
 				return true
 			})
