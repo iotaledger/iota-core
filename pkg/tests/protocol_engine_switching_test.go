@@ -990,22 +990,12 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 	slices.SortFunc(partitionsInOrder, func(a, b *types.Tuple[int, *model.Commitment]) int {
 		return bytes.Compare(lo.PanicOnErr(a.B.ID().Bytes()), lo.PanicOnErr(b.B.ID().Bytes()))
 	})
-	fmt.Println(partitionsInOrder)
 
-	switch commitmentWithLargestID(commitment140, commitment141, commitment142) {
-	case commitment140:
-		mainPartition = nodes[0:1]
-		otherPartitions = []*mock.Node{nodes[1], nodes[2]}
-	case commitment141:
-		mainPartition = nodes[1:2]
-		otherPartitions = []*mock.Node{nodes[0], nodes[2]}
-	case commitment142:
-		mainPartition = nodes[2:3]
-		otherPartitions = []*mock.Node{nodes[0], nodes[1]}
-	}
+	mainPartition = nodes[partitionsInOrder[2].A-1 : partitionsInOrder[2].A]
+	otherPartitions = []*mock.Node{nodes[partitionsInOrder[0].A-1], nodes[partitionsInOrder[1].A-1]}
 
-	engineCommitmentsP2 := ts.CommitmentsOfMainEngine(otherPartitions[0], lastCommonSlot+1, 18)
-	engineCommitmentsP3 := ts.CommitmentsOfMainEngine(otherPartitions[1], lastCommonSlot+1, 18)
+	engineCommitmentsP2 := ts.CommitmentsOfMainEngine(otherPartitions[1], lastCommonSlot+1, 18)
+	engineCommitmentsP3 := ts.CommitmentsOfMainEngine(otherPartitions[0], lastCommonSlot+1, 18)
 
 	// Merge the partitions
 	{
@@ -1023,15 +1013,23 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 
 	// Make sure the nodes switch their engines.
 	{
-		// We need to issue in order, so that after merging the network we issue from the lowest partition,
-		// to make sure that the two losing nodes don't switch engines before they learn about the partition that should win in the end.
-		for _, partition := range partitionsInOrder {
-			// Tuple contains partition index.
-			ts.IssueBlocksAtSlots(fmt.Sprintf("P%d-merge:", partition.A), []iotago.SlotIndex{20}, 1, slotPrefix(partition.A, 20)+strconv.Itoa(20)+".3", nodes[partition.A-1:partition.A], false, true)
-		}
+		ts.IssueBlocksAtSlots(fmt.Sprintf("P%d-merge:", partitionsInOrder[0].A), []iotago.SlotIndex{20}, 1, slotPrefix(partitionsInOrder[0].A, 20)+strconv.Itoa(20)+".3", nodes[partitionsInOrder[0].A-1:partitionsInOrder[0].A], true, true)
+		ts.AssertCommitmentsOnChain(engineCommitmentsP3, engineCommitmentsP3[0].ID(), mainPartition[0], otherPartitions[1])
+
+		ts.IssueBlocksAtSlots(fmt.Sprintf("P%d-merge:", partitionsInOrder[1].A), []iotago.SlotIndex{20}, 1, slotPrefix(partitionsInOrder[1].A, 20)+strconv.Itoa(20)+".3", nodes[partitionsInOrder[1].A-1:partitionsInOrder[1].A], true, true)
+		ts.AssertMainEngineSwitchedCount(1, otherPartitions[0])
+		ts.AssertCommitmentsOnChain(engineCommitmentsP3, engineCommitmentsP3[0].ID(), mainPartition[0], otherPartitions[1])
+		ts.AssertCommitmentsOnChain(engineCommitmentsP2, engineCommitmentsP2[0].ID(), mainPartition[0], otherPartitions[0])
+
+		ts.IssueBlocksAtSlots(fmt.Sprintf("P%d-merge:", partitionsInOrder[2].A), []iotago.SlotIndex{20}, 1, slotPrefix(partitionsInOrder[2].A, 20)+strconv.Itoa(20)+".3", nodes[partitionsInOrder[2].A-1:partitionsInOrder[2].A], true, true)
+		ts.AssertCommitmentsOnChain(engineCommitmentsP3, engineCommitmentsP3[0].ID(), mainPartition[0], otherPartitions[1])
+		ts.AssertCommitmentsOnChain(engineCommitmentsP2, engineCommitmentsP2[0].ID(), mainPartition[0], otherPartitions[0])
+		ts.AssertCommitmentsOnChain(commitmentsMainChain, commitmentsMainChain[0].ID(), otherPartitions...)
 
 		ts.AssertMainEngineSwitchedCount(0, mainPartition...)
-		ts.AssertMainEngineSwitchedCountGreaterEqualThan(1, otherPartitions...)
+		ts.AssertMainEngineSwitchedCount(2, otherPartitions[0])
+		ts.AssertMainEngineSwitchedCount(1, otherPartitions[1])
+
 		ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
 	}
 
@@ -1069,16 +1067,16 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 		ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, ultimateCommitmentsP2[0].ID(), mainPartition...)
 
 		// P2 commitments on P2 node should be on the old chain, that is not the main chain anymore.
-		ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, ts.CommitmentOfMainEngine(otherPartitions[0], oldestNonEvictedCommitment).ID(), otherPartitions[0])
+		ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, ts.CommitmentOfMainEngine(otherPartitions[1], oldestNonEvictedCommitment).ID(), otherPartitions[1])
 		// P2 commitments on P3 node should be on separate chain.
-		ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, ultimateCommitmentsP2[0].ID(), otherPartitions[1])
+		ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, ultimateCommitmentsP2[0].ID(), otherPartitions[0])
 
 		// P3 commitments on the main partition should be on its own chain.
 		ts.AssertCommitmentsOnChain(ultimateCommitmentsP3, ultimateCommitmentsP3[0].ID(), mainPartition...)
 		// P3 commitments on P3 node should be on the old chain, that is not the main chain anymore.
-		ts.AssertCommitmentsOnChain(ultimateCommitmentsP3, ts.CommitmentOfMainEngine(otherPartitions[1], oldestNonEvictedCommitment).ID(), otherPartitions[1])
+		ts.AssertCommitmentsOnChain(ultimateCommitmentsP3, ts.CommitmentOfMainEngine(otherPartitions[0], oldestNonEvictedCommitment).ID(), otherPartitions[0])
 		// P3 commitments on P2 node should be on separate chain.
-		ts.AssertCommitmentsOnChain(ultimateCommitmentsP3, ultimateCommitmentsP3[0].ID(), otherPartitions[0])
+		ts.AssertCommitmentsOnChain(ultimateCommitmentsP3, ultimateCommitmentsP3[0].ID(), otherPartitions[1])
 
 		ts.AssertCommitmentsAndChainsEvicted(5, ts.Nodes()...)
 	}
