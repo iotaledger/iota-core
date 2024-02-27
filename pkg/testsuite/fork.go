@@ -52,3 +52,19 @@ func (t *TestSuite) AssertMainEngineSwitchedCount(expectedCount int, nodes ...*m
 		})
 	}
 }
+
+func (t *TestSuite) AssertMainEngineSwitchedCountGreaterEqualThan(expectedCount int, nodes ...*mock.Node) {
+	mustNodes(nodes)
+
+	for _, node := range nodes {
+		t.Eventually(func() error {
+
+			actualCount := node.MainEngineSwitchedCount()
+			if expectedCount <= actualCount {
+				return ierrors.Errorf("AssertMainEngineSwitchedCountGreaterEqualThan: %s: expected at least %v, got %v", node.Name, expectedCount, actualCount)
+			}
+
+			return nil
+		})
+	}
+}

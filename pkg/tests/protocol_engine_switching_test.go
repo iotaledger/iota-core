@@ -2,17 +2,16 @@ package tests
 
 import (
 	"bytes"
-	"context"
 	"fmt"
+	"slices"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -71,7 +70,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	node8 := ts.AddNode("node8")
 	ts.AddDefaultWallet(node0)
 
-	const expectedCommittedSlotAfterPartitionMerge = 18
+	const expectedCommittedSlotAfterPartitionMerge = 19
 	nodesP1 := []*mock.Node{node0, node1, node2, node3, node4, node5}
 	nodesP2 := []*mock.Node{node6, node7, node8}
 
@@ -120,9 +119,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	}
 
 	ts.Run(false, nodeOptions)
-	ts.Node("node6").Protocol.SetLogLevel(log.LevelTrace)
-	ts.Node("node6").Protocol.Engines.Main.Get().SetLogLevel(log.LevelDebug)
-	ts.Node("node6").Protocol.Blocks.SetLogLevel(log.LevelDebug)
+
 	expectedCommittee := []iotago.AccountID{
 		node0.Validator.AccountID,
 		node1.Validator.AccountID,
@@ -349,40 +346,25 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ts.AssertStrongTips(tipBlocks, nodesP2...)
 	}
 
-	for _, node := range ts.Nodes() {
-		manualPOA := node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().(*mock2.ManualPOA)
-		manualPOA.SetOnline("node0", "node1", "node2", "node3", "node4", "node6", "node7")
-	}
 	// Merge the partitions
 	{
 		ts.MergePartitionsToMain()
 		fmt.Println("\n=========================\nMerged network partitions\n=========================")
 
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		defer cancel()
-
-		ctxP1, ctxP1Cancel := context.WithCancel(ctx)
-		ctxP2, ctxP2Cancel := context.WithCancel(ctx)
-
-		wg := &sync.WaitGroup{}
-
 		// Issue blocks on both partitions after merging the networks.
-		node0.Validator.IssueActivity(ctxP1, wg, 21, node0)
-		node1.Validator.IssueActivity(ctxP1, wg, 21, node1)
-		node2.Validator.IssueActivity(ctxP1, wg, 21, node2)
-		node3.Validator.IssueActivity(ctxP1, wg, 21, node3)
-		node4.Validator.IssueActivity(ctxP1, wg, 21, node4)
-		// node5.Validator.IssueActivity(ctxP1, wg, 21, node5)
-
-		node6.Validator.IssueActivity(ctxP2, wg, 21, node6)
-		node7.Validator.IssueActivity(ctxP2, wg, 21, node7)
-		// node8.Validator.IssueActivity(ctxP2, wg, 21, node8)
+		ts.IssueBlocksAtSlots("P2-merge:", []iotago.SlotIndex{20, 21}, 4, "P2:20.3", nodesP2[:len(nodesP2)-1], true, true)
 
 		// P1 finalized until slot 18. We do not expect any forks here because our CW is higher than the other partition's.
 		ts.AssertForkDetectedCount(0, nodesP1...)
 		// P1's chain is heavier, they should not consider switching the chain.
 		ts.AssertCandidateEngineActivatedCount(0, nodesP1...)
-		ctxP2Cancel() // we can stop issuing on P2.
+
+		for _, node := range ts.Nodes() {
+			manualPOA := node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().(*mock2.ManualPOA)
+			manualPOA.SetOnline("node0", "node1", "node2", "node3", "node4", "node6", "node7")
+		}
+
+		ts.IssueBlocksAtSlots("P1-merge:", []iotago.SlotIndex{20, 21, 22}, 4, "P1:20.3", nodesP1[:len(nodesP1)-1], true, true)
 
 		// Nodes from P2 should switch the chain.
 		ts.AssertForkDetectedCount(1, nodesP2...)
@@ -390,9 +372,6 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 		// Here we need to let enough time pass for the nodes to sync up the candidate engines and switch them
 		ts.AssertMainEngineSwitchedCount(1, nodesP2...)
-
-		ctxP1Cancel()
-		wg.Wait()
 	}
 
 	// Make sure that nodes that switched their engine still have blocks with prefix P0 from before the fork.
@@ -406,25 +385,21 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 	// Assert Protocol.Chains and Protocol.Commitments state.
 	{
-		oldestNonEvictedCommitment := node0.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot() - maxCommittableAge
+		oldestNonEvictedCommitment := iotago.SlotIndex(15)
 		ultimateCommitmentsP2 := lo.Filter(engineCommitmentsP2, func(commitment *model.Commitment) bool {
 			return commitment.Slot() >= oldestNonEvictedCommitment
 		})
 
-		ts.AssertFinalizedCommitmentAtLeastSlotIndex(14+maxCommittableAge, ts.Nodes()...)
+		ts.AssertLatestFinalizedSlot(19, ts.Nodes()...)
 
 		commitmentsMainChain := ts.CommitmentsOfMainEngine(nodesP1[0], oldestNonEvictedCommitment, expectedCommittedSlotAfterPartitionMerge)
 
+		ts.AssertMainChain(ts.CommitmentOfMainEngine(nodesP1[0], oldestNonEvictedCommitment).ID(), ts.Nodes()...)
 		ts.AssertUniqueCommitmentChain(ts.Nodes()...)
 		ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
 		ts.AssertCommitmentsOrphaned(ultimateCommitmentsP2, true, ts.Nodes()...)
 
-		// When the test is slow on the CI, the eviction of a commitment might be delayed, so here we account for that.
-		if oldestNonEvictedCommitment >= 14 {
-			ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
-		} else {
-			ts.AssertCommitmentsOrphaned(commitmentsMainChain, true, ts.Nodes()...)
-		}
+		ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
 
 		ts.AssertCommitmentsOnChain(commitmentsMainChain, ts.CommitmentOfMainEngine(nodesP1[0], oldestNonEvictedCommitment).ID(), ts.Nodes()...)
 		// EmptyCommitmentID as ChainID means that the chain on those commitments should be set to nil.
@@ -466,7 +441,7 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 	node2 := ts.AddValidatorNode("node2")
 	node3 := ts.AddValidatorNode("node3")
 
-	const expectedCommittedSlotAfterPartitionMerge = 18
+	const expectedCommittedSlotAfterPartitionMerge = 19
 	nodesP1 := []*mock.Node{node0, node1, node2}
 	nodesP2 := []*mock.Node{node3}
 
@@ -499,10 +474,6 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 		"node2": nodeOpts,
 		"node3": nodeOpts,
 	})
-
-	ts.Node("node0").Protocol.SetLogLevel(log.LevelTrace)
-	ts.Node("node0").Protocol.Engines.Main.Get().SetLogLevel(log.LevelDebug)
-	ts.Node("node0").Protocol.Blocks.SetLogLevel(log.LevelDebug)
 
 	// Verify that nodes have the expected states after startup.
 	{
@@ -668,26 +639,14 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 		ts.MergePartitionsToMain()
 		fmt.Println("\n=========================\nMerged network partitions\n=========================")
 
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		defer cancel()
-
-		ctxP1, ctxP1Cancel := context.WithCancel(ctx)
-		ctxP2, ctxP2Cancel := context.WithCancel(ctx)
-
-		wg := &sync.WaitGroup{}
-
-		// Issue blocks on both partitions after merging the networks.
-		node0.Validator.IssueActivity(ctxP1, wg, 21, node0)
-		node1.Validator.IssueActivity(ctxP1, wg, 21, node1)
-		node2.Validator.IssueActivity(ctxP1, wg, 21, node2)
-
-		node3.Validator.IssueActivity(ctxP2, wg, 21, node3)
+		ts.IssueBlocksAtSlots("P2-merge:", []iotago.SlotIndex{20, 21}, 4, "P2:20.3", nodesP2, true, true)
 
 		// P1 finalized until slot 16. We do not expect any forks here because our CW is higher than the other partition's.
 		ts.AssertForkDetectedCount(0, nodesP1...)
 		// P1's chain is heavier, they should not consider switching the chain.
 		ts.AssertCandidateEngineActivatedCount(0, nodesP1...)
-		ctxP2Cancel() // we can stop issuing on P2.
+
+		ts.IssueBlocksAtSlots("P1-merge:", []iotago.SlotIndex{20, 21, 22}, 4, "P1:20.3", nodesP1, true, true)
 
 		// Nodes from P2 should switch the chain.
 		ts.AssertForkDetectedCount(1, nodesP2...)
@@ -697,10 +656,10 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 		ts.AssertMainEngineSwitchedCount(1, nodesP2...)
 
 		// Make sure that enough activity messages are issued so that a block in slot 21 gets accepted and triggers commitment of slot 18.
-		time.Sleep(3 * time.Second)
+		//time.Sleep(3 * time.Second)
 
-		ctxP1Cancel()
-		wg.Wait()
+		//ctxP1Cancel()
+		//wg.Wait()
 	}
 
 	// Make sure that nodes that switched their engine still have blocks with prefix P0 from before the fork.
@@ -778,7 +737,7 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 			),
 		),
 
-		testsuite.WithWaitFor(60*time.Second),
+		testsuite.WithWaitFor(15*time.Second),
 	)
 	defer ts.Shutdown()
 
@@ -850,9 +809,6 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 	}
 
 	ts.Run(false, nodesOptions)
-
-	nodes[0].Protocol.SetLogLevel(log.LevelTrace)
-	nodes[1].Protocol.SetLogLevel(log.LevelTrace)
 
 	expectedCommittee := []iotago.AccountID{nodes[0].Validator.AccountID, nodes[1].Validator.AccountID, nodes[2].Validator.AccountID}
 
@@ -1029,6 +985,13 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 
 	var mainPartition []*mock.Node
 	var otherPartitions []*mock.Node
+
+	partitionsInOrder := []*types.Tuple[int, *model.Commitment]{types.NewTuple(1, commitment140), types.NewTuple(2, commitment141), types.NewTuple(3, commitment142)}
+	slices.SortFunc(partitionsInOrder, func(a, b *types.Tuple[int, *model.Commitment]) int {
+		return bytes.Compare(lo.PanicOnErr(a.B.ID().Bytes()), lo.PanicOnErr(b.B.ID().Bytes()))
+	})
+	fmt.Println(partitionsInOrder)
+
 	switch commitmentWithLargestID(commitment140, commitment141, commitment142) {
 	case commitment140:
 		mainPartition = nodes[0:1]
@@ -1060,32 +1023,19 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 
 	// Make sure the nodes switch their engines.
 	{
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		defer cancel()
-
-		ctxP1, ctxP1Cancel := context.WithCancel(ctx)
-		ctxP2, ctxP2Cancel := context.WithCancel(ctx)
-		ctxP3, ctxP3Cancel := context.WithCancel(ctx)
-
-		wg := &sync.WaitGroup{}
-
-		// Issue blocks on all partitions after merging the networks.
-		nodes[0].Validator.IssueActivity(ctxP1, wg, 21, nodes[0])
-		nodes[1].Validator.IssueActivity(ctxP2, wg, 21, nodes[1])
-		nodes[2].Validator.IssueActivity(ctxP3, wg, 21, nodes[2])
+		// We need to issue in order, so that after merging the network we issue from the lowest partition,
+		// to make sure that the two losing nodes don't switch engines before they learn about the partition that should win in the end.
+		for _, partition := range partitionsInOrder {
+			// Tuple contains partition index.
+			ts.IssueBlocksAtSlots(fmt.Sprintf("P%d-merge:", partition.A), []iotago.SlotIndex{20}, 1, slotPrefix(partition.A, 20)+strconv.Itoa(20)+".3", nodes[partition.A-1:partition.A], false, true)
+		}
 
 		ts.AssertMainEngineSwitchedCount(0, mainPartition...)
-		ts.AssertMainEngineSwitchedCount(1, otherPartitions...)
-
-		ctxP1Cancel()
-		ctxP2Cancel()
-		ctxP3Cancel()
-		wg.Wait()
-
+		ts.AssertMainEngineSwitchedCountGreaterEqualThan(1, otherPartitions...)
 		ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
 	}
 
-	oldestNonEvictedCommitment := mainPartition[0].Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot() - maxCommittableAge
+	oldestNonEvictedCommitment := iotago.SlotIndex(6)
 
 	commitmentsMainChain = ts.CommitmentsOfMainEngine(mainPartition[0], oldestNonEvictedCommitment, expectedCommittedSlotAfterPartitionMerge)
 	ultimateCommitmentsP2 := lo.Filter(engineCommitmentsP2, func(commitment *model.Commitment) bool {
@@ -1097,6 +1047,10 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 
 	{
 		ts.AssertUniqueCommitmentChain(ts.Nodes()...)
+
+		ts.AssertMainChain(ts.CommitmentOfMainEngine(mainPartition[0], 6).ID(), mainPartition...)
+		ts.AssertMainChain(ts.CommitmentOfMainEngine(mainPartition[0], forkingSlot).ID(), otherPartitions...)
+
 		ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
 
 		// We have not evicted the slot below the forking point, so chains are not yet orphaned.
@@ -1129,38 +1083,26 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 		ts.AssertCommitmentsAndChainsEvicted(5, ts.Nodes()...)
 	}
 
+	fmt.Println("---------------------")
 	// Finalize further slot and make sure the nodes have the same state of chains.
 	{
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		defer cancel()
+		//ts.CommitUntilSlot(forkingSlot+maxCommittableAge+2, ts.BlockIDsWithPrefix(fmt.Sprintf("P%d-merge:", mainPartitionIndex))...)
 
-		ctxP1, ctxP1Cancel := context.WithCancel(ctx)
-		ctxP2, ctxP2Cancel := context.WithCancel(ctx)
-		ctxP3, ctxP3Cancel := context.WithCancel(ctx)
+		ts.IssueBlocksAtSlots("P0-merge:", []iotago.SlotIndex{20, 21, 22}, 3, slotPrefix(partitionsInOrder[len(partitionsInOrder)-1].A, 20)+strconv.Itoa(20)+".2", ts.Nodes(), true, true)
 
-		wg := &sync.WaitGroup{}
+		oldestNonEvictedCommitment = 19 - maxCommittableAge
+		commitmentsMainChain = ts.CommitmentsOfMainEngine(mainPartition[0], oldestNonEvictedCommitment, 20)
 
-		// Issue blocks on all partitions after merging the networks.
-		nodes[0].Validator.IssueActivity(ctxP1, wg, nodes[0].Protocol.Engines.Main.Get().Storage.Settings().LatestStoredSlot()+1, nodes[0])
-		nodes[1].Validator.IssueActivity(ctxP2, wg, nodes[1].Protocol.Engines.Main.Get().Storage.Settings().LatestStoredSlot()+1, nodes[1])
-		nodes[2].Validator.IssueActivity(ctxP3, wg, nodes[2].Protocol.Engines.Main.Get().Storage.Settings().LatestStoredSlot()+1, nodes[2])
+		ts.AssertLatestFinalizedSlot(19, ts.Nodes()...)
 
-		ts.AssertFinalizedCommitmentAtLeastSlotIndex(forkingSlot+maxCommittableAge+1, ts.Nodes()...)
-
-		ctxP1Cancel()
-		ctxP2Cancel()
-		ctxP3Cancel()
-		wg.Wait()
-
-		oldestNonEvictedCommitment = mainPartition[0].Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot() - maxCommittableAge
-		commitmentsMainChain = ts.CommitmentsOfMainEngine(mainPartition[0], oldestNonEvictedCommitment, mainPartition[0].Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot())
+		ts.AssertMainChain(ts.CommitmentOfMainEngine(mainPartition[0], forkingSlot+1).ID(), ts.Nodes()...)
 
 		ts.AssertUniqueCommitmentChain(ts.Nodes()...)
 		ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
-		ts.AssertCommitmentsAndChainsEvicted(forkingSlot+1, ts.Nodes()...)
+		ts.AssertCommitmentsAndChainsEvicted(forkingSlot, ts.Nodes()...)
 
 		ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
-		ts.AssertCommitmentsOnChain(commitmentsMainChain, ts.CommitmentOfMainEngine(mainPartition[0], oldestNonEvictedCommitment).ID(), mainPartition...)
+		ts.AssertCommitmentsOnChain(commitmentsMainChain, ts.CommitmentOfMainEngine(mainPartition[len(mainPartition)-1], oldestNonEvictedCommitment).ID(), mainPartition...)
 
 		// The oldest commitment is in the slices are should already be evicted, so we only need to check the newer ones.
 		ts.AssertCommitmentsOrphaned(ultimateCommitmentsP2[2:], true, ts.Nodes()...)
