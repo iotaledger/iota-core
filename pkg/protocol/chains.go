@@ -243,6 +243,10 @@ func attachEngineLogs(instance *engine.Engine) func() {
 				instance.LogTrace("MemPool.TransactionBooked", "tx", transactionMetadata.ID())
 			})
 
+			transactionMetadata.OnConflicting(func() {
+				instance.LogTrace("MemPool.TransactionConflicting", "tx", transactionMetadata.ID())
+			})
+
 			transactionMetadata.OnAccepted(func() {
 				instance.LogTrace("MemPool.TransactionAccepted", "tx", transactionMetadata.ID())
 			})

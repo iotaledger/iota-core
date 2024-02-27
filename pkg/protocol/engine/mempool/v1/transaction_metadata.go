@@ -35,6 +35,7 @@ type TransactionMetadata struct {
 	// predecessors for acceptance
 	unacceptedInputsCount uint64
 	allInputsAccepted     reactive.Variable[bool]
+	conflicting           reactive.Event
 	conflictAccepted      reactive.Event
 
 	// attachments
@@ -81,6 +82,7 @@ func NewTransactionMetadata(transaction mempool.Transaction, referencedInputs []
 
 		unacceptedInputsCount: uint64(len(referencedInputs)),
 		allInputsAccepted:     reactive.NewVariable[bool](),
+		conflicting:           reactive.NewEvent(),
 		conflictAccepted:      reactive.NewEvent(),
 
 		signingTransactions: reactive.NewSet[*SignedTransactionMetadata](),
@@ -216,6 +218,14 @@ func (t *TransactionMetadata) Commit() {
 	t.committedSlot.Set(t.earliestIncludedValidAttachment.Get().Slot())
 }
 
+func (t *TransactionMetadata) IsConflicting() bool {
+	return t.conflicting.WasTriggered()
+}
+
+func (t *TransactionMetadata) OnConflicting(callback func()) {
+	t.conflicting.OnTrigger(callback)
+}
+
 func (t *TransactionMetadata) IsConflictAccepted() bool {
 	return t.conflictAccepted.WasTriggered()
 }
@@ -276,6 +286,14 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 }
 
 func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
+	cancelConflictInheritance := t.spenderIDs.InheritFrom(t.parentSpenderIDs)
+
+	t.OnConflicting(func() {
+		cancelConflictInheritance()
+
+		t.spenderIDs.Replace(ds.NewSet(t.id))
+	})
+
 	t.allValidAttachmentsEvicted.OnUpdate(func(_ iotago.SlotIndex, slot iotago.SlotIndex) {
 		if !lo.Return2(t.CommittedSlot()) {
 			t.orphanedSlot.Set(slot)

@@ -35,6 +35,10 @@ type TransactionMetadata interface {
 
 	OnBooked(func())
 
+	IsConflicting() bool
+
+	OnConflicting(func())
+
 	ValidAttachments() []iotago.BlockID
 
 	EarliestIncludedAttachment() iotago.BlockID
