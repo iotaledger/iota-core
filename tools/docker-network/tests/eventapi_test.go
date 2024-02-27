@@ -227,8 +227,8 @@ func test_AccountTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 	{
 		implicitAccount := d.CreateImplicitAccount(ctx)
 
-		// prepare account transaction block to send
-		account, outputId, blk := d.CreateAccountBlockFromInput(implicitAccount.OutputID)
+		// prepare fullAccount transaction block to send
+		fullAccount, outputId, blk := d.CreateAccountBlockFromInput(implicitAccount.OutputID)
 		expectedBlocks := map[string]*iotago.Block{
 			blk.MustID().ToHex(): blk,
 		}
@@ -243,7 +243,7 @@ func test_AccountTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 		// d.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID(), finish)
 		// d.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID(), finish)
 
-		d.AssertAccountOutput(ctx, eventClt, account.ID, finish)
+		d.AssertAccountOutput(ctx, eventClt, fullAccount.ID, finish)
 		d.AssertOutput(ctx, eventClt, outputId, finish)
 
 		accountOutput := d.wallet.Output(outputId)
@@ -261,6 +261,9 @@ func test_AccountTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 				d.SubmitBlock(context.Background(), blk)
 			}
 		}()
+
+		// update full account information
+		d.wallet.AddAccount(fullAccount.ID, fullAccount)
 
 		// wait until all topics receives all expected objects
 		err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)

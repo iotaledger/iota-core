@@ -37,7 +37,7 @@ type DockerWallet struct {
 type Output struct {
 	// ID is the unique identifier of the output.
 	ID iotago.OutputID
-	// Output is the iotago output.
+	// Output is the iotago Output.
 	Output iotago.Output
 	// Address is the address of the output.
 	Address iotago.Address
@@ -47,11 +47,16 @@ type Output struct {
 
 // Account holds the details of an account that can be used to issue a block or account transition.
 type Account struct {
-	ID           iotago.AccountID
+	// ID is the unique identifier of the account.
+	ID iotago.AccountID
+	// AddressIndex is the index of the address in the keyManager.
 	AddressIndex uint32
-	Address      *iotago.AccountAddress
-	Output       *iotago.AccountOutput
-	OutputID     iotago.OutputID
+	// Address is the address of the account.
+	Address *iotago.AccountAddress
+	// Output is the latest iotago AccountOutput of the account.
+	Output *iotago.AccountOutput
+	// OutputID is the unique identifier of the Output.
+	OutputID iotago.OutputID
 }
 
 func NewDockerWallet(t *testing.T) *DockerWallet {
