@@ -177,7 +177,7 @@ func (t *TestSuite) AssertCommitmentsAndChainsEvicted(expectedEvictedSlot iotago
 	}
 }
 
-func (t *TestSuite) AssertCommitmentsOrphaned(expectedCommitments []*model.Commitment, expectedOrphaned bool, nodes ...*mock.Node) {
+func (t *TestSuite) AssertCommitmentsOnEvictedChain(expectedCommitments []*model.Commitment, expectedOrphaned bool, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	for _, node := range nodes {
@@ -185,11 +185,11 @@ func (t *TestSuite) AssertCommitmentsOrphaned(expectedCommitments []*model.Commi
 			for _, expectedCommitment := range expectedCommitments {
 				commitment, err := node.Protocol.Commitments.Get(expectedCommitment.ID(), false)
 				if err != nil {
-					return ierrors.Wrapf(err, "AssertCommitmentsOrphaned: %s: expected commitment %s not found", node.Name, expectedCommitment.ID())
+					return ierrors.Wrapf(err, "AssertCommitmentsOnEvictedChain: %s: expected commitment %s not found", node.Name, expectedCommitment.ID())
 				}
 
 				if chain := commitment.Chain.Get(); expectedOrphaned != (chain == nil || chain.IsEvicted.Get()) {
-					return ierrors.Errorf("AssertCommitmentsOrphaned: %s: expected commitment %s to be orphaned %t, got %t", node.Name, expectedCommitment.ID(), expectedOrphaned, chain == nil || chain.IsEvicted.Get())
+					return ierrors.Errorf("AssertCommitmentsOnEvictedChain: %s: expected commitment %s to be on evicted chain %t, got %t", node.Name, expectedCommitment.ID(), expectedOrphaned, chain == nil || chain.IsEvicted.Get())
 				}
 			}
 

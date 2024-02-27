@@ -239,16 +239,16 @@ func (c *Chain) deriveWarpSyncMode() func() {
 }
 
 // deriveChildChains defines how a chain determines its ChildChains (by adding each child to the set).
-func (c *Chain) deriveChildChains(child *Chain) func() {
-	if child == c {
-		return nil
+func (c *Chain) deriveChildChains(child *Chain) (teardown func()) {
+	if child != c {
+		c.ChildChains.Add(child)
+
+		teardown = func() {
+			c.ChildChains.Delete(child)
+		}
 	}
 
-	c.ChildChains.Add(child)
-
-	return func() {
-		c.ChildChains.Delete(child)
-	}
+	return
 }
 
 // deriveParentChain defines how a chain determines its parent chain from its forking point (it inherits the Chain from

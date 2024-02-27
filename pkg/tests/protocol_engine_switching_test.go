@@ -271,7 +271,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ts.AssertLatestEngineCommitmentOnMainChain(nodesP1...)
 		ts.AssertUniqueCommitmentChain(nodesP1...)
 		ts.AssertCommitmentsOnChain(ts.CommitmentsOfMainEngine(nodesP1[0], 13, 18), ts.CommitmentOfMainEngine(nodesP1[0], 13).ID(), nodesP1...)
-		ts.AssertCommitmentsOrphaned(ts.CommitmentsOfMainEngine(nodesP1[0], 13, 18), false, nodesP1...)
+		ts.AssertCommitmentsOnEvictedChain(ts.CommitmentsOfMainEngine(nodesP1[0], 13, 18), false, nodesP1...)
 		ts.AssertCommitmentsAndChainsEvicted(12, nodesP1...)
 
 		// Make sure the tips are properly set.
@@ -303,7 +303,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ts.AssertLatestEngineCommitmentOnMainChain(nodesP2...)
 		ts.AssertUniqueCommitmentChain(nodesP2...)
 		ts.AssertCommitmentsOnChain(engineCommitmentsP2, ts.CommitmentOfMainEngine(nodesP1[0], 6).ID(), nodesP2...)
-		ts.AssertCommitmentsOrphaned(engineCommitmentsP2, false, nodesP2...)
+		ts.AssertCommitmentsOnEvictedChain(engineCommitmentsP2, false, nodesP2...)
 		ts.AssertCommitmentsAndChainsEvicted(5, nodesP2...)
 
 		for _, slot := range []iotago.SlotIndex{12, 13, 14, 15} {
@@ -397,9 +397,9 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ts.AssertMainChain(ts.CommitmentOfMainEngine(nodesP1[0], oldestNonEvictedCommitment).ID(), ts.Nodes()...)
 		ts.AssertUniqueCommitmentChain(ts.Nodes()...)
 		ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
-		ts.AssertCommitmentsOrphaned(ultimateCommitmentsP2, true, ts.Nodes()...)
+		ts.AssertCommitmentsOnEvictedChain(ultimateCommitmentsP2, true, ts.Nodes()...)
 
-		ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
+		ts.AssertCommitmentsOnEvictedChain(commitmentsMainChain, false, ts.Nodes()...)
 
 		ts.AssertCommitmentsOnChain(commitmentsMainChain, ts.CommitmentOfMainEngine(nodesP1[0], oldestNonEvictedCommitment).ID(), ts.Nodes()...)
 		// TODO: check that its not on the main chain
@@ -579,7 +579,7 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 		ts.AssertLatestEngineCommitmentOnMainChain(nodesP1...)
 		ts.AssertUniqueCommitmentChain(nodesP1...)
 		ts.AssertCommitmentsOnChain(engineCommitmentsP1, ts.CommitmentOfMainEngine(node0, 12).ID(), nodesP1...)
-		ts.AssertCommitmentsOrphaned(engineCommitmentsP1, false, nodesP1...)
+		ts.AssertCommitmentsOnEvictedChain(engineCommitmentsP1, false, nodesP1...)
 		ts.AssertCommitmentsAndChainsEvicted(11, nodesP1...)
 	}
 
@@ -630,7 +630,7 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 		ts.AssertLatestEngineCommitmentOnMainChain(nodesP2...)
 		ts.AssertUniqueCommitmentChain(nodesP2...)
 		ts.AssertCommitmentsOnChain(engineCommitmentsP2, ts.CommitmentOfMainEngine(node0, 0).ID(), nodesP2...)
-		ts.AssertCommitmentsOrphaned(engineCommitmentsP2, false, nodesP2...)
+		ts.AssertCommitmentsOnEvictedChain(engineCommitmentsP2, false, nodesP2...)
 		// We only finalized until slot 4, and maxCommittableAge=5. Thus, we don't expect any evictions on chains/commmitments yet.
 	}
 
@@ -703,8 +703,8 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 	{
 		ts.AssertUniqueCommitmentChain(ts.Nodes()...)
 		ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
-		ts.AssertCommitmentsOrphaned(ultimateCommitmentsP2, true, ts.Nodes()...)
-		ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
+		ts.AssertCommitmentsOnEvictedChain(ultimateCommitmentsP2, true, ts.Nodes()...)
+		ts.AssertCommitmentsOnEvictedChain(commitmentsMainChain, false, ts.Nodes()...)
 		ts.AssertCommitmentsOnChain(commitmentsMainChain, ts.CommitmentOfMainEngine(nodesP1[0], oldestNonEvictedCommitment).ID(), ts.Nodes()...)
 		// TODO: check that its not on the main chain
 		// ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, iotago.EmptyCommitmentID, ts.Nodes()...)
@@ -942,7 +942,7 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 	ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
 
 	commitmentsMainChain := ts.CommitmentsOfMainEngine(nodes[0], 6, 11)
-	ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
+	ts.AssertCommitmentsOnEvictedChain(commitmentsMainChain, false, ts.Nodes()...)
 	ts.AssertCommitmentsOnChain(commitmentsMainChain, commitmentsMainChain[0].ID(), ts.Nodes()...)
 	ts.AssertCommitmentsAndChainsEvicted(5, ts.Nodes()...)
 
@@ -1052,9 +1052,9 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 		ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
 
 		// We have not evicted the slot below the forking point, so chains are not yet orphaned.
-		ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
-		ts.AssertCommitmentsOrphaned(ultimateCommitmentsP2, false, ts.Nodes()...)
-		ts.AssertCommitmentsOrphaned(ultimateCommitmentsP3, false, ts.Nodes()...)
+		ts.AssertCommitmentsOnEvictedChain(commitmentsMainChain, false, ts.Nodes()...)
+		ts.AssertCommitmentsOnEvictedChain(ultimateCommitmentsP2, false, ts.Nodes()...)
+		ts.AssertCommitmentsOnEvictedChain(ultimateCommitmentsP3, false, ts.Nodes()...)
 
 		// The Main partition should have all commitments on the old chain, because it did not switch chains.
 		ts.AssertCommitmentsOnChain(commitmentsMainChain, ts.CommitmentOfMainEngine(mainPartition[0], oldestNonEvictedCommitment).ID(), mainPartition...)
@@ -1099,12 +1099,12 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 		ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
 		ts.AssertCommitmentsAndChainsEvicted(forkingSlot, ts.Nodes()...)
 
-		ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
+		ts.AssertCommitmentsOnEvictedChain(commitmentsMainChain, false, ts.Nodes()...)
 		ts.AssertCommitmentsOnChain(commitmentsMainChain, ts.CommitmentOfMainEngine(mainPartition[len(mainPartition)-1], oldestNonEvictedCommitment).ID(), mainPartition...)
 
 		// The oldest commitment is in the slices are should already be evicted, so we only need to check the newer ones.
-		ts.AssertCommitmentsOrphaned(ultimateCommitmentsP2[2:], true, ts.Nodes()...)
-		ts.AssertCommitmentsOrphaned(ultimateCommitmentsP3[2:], true, ts.Nodes()...)
+		ts.AssertCommitmentsOnEvictedChain(ultimateCommitmentsP2[2:], true, ts.Nodes()...)
+		ts.AssertCommitmentsOnEvictedChain(ultimateCommitmentsP3[2:], true, ts.Nodes()...)
 	}
 }
 
