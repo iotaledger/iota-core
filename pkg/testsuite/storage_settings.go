@@ -95,25 +95,6 @@ func (t *TestSuite) AssertLatestCommitmentSlotIndex(slot iotago.SlotIndex, nodes
 	}
 }
 
-func (t *TestSuite) AssertFinalizedCommitmentAtLeastSlotIndex(slot iotago.SlotIndex, nodes ...*mock.Node) {
-	mustNodes(nodes)
-
-	for _, node := range nodes {
-		t.Eventually(func() error {
-			latestFinalizedSlotSettings := node.Protocol.Engines.Main.Get().Storage.Settings().LatestFinalizedSlot()
-			if slot > latestFinalizedSlotSettings {
-				return ierrors.Errorf("AssertFinalizedCommitmentAtLeastSlotIndex: %s: expected at least %v, got %v in settings", node.Name, slot, latestFinalizedSlotSettings)
-			}
-			latestFinalizedSlotSyncManager := node.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot()
-			if slot > latestFinalizedSlotSyncManager {
-				return ierrors.Errorf("AssertFinalizedCommitmentAtLeastSlotIndex: %s: expected at least %v, got %v in sync manager", node.Name, slot, latestFinalizedSlotSyncManager)
-			}
-
-			return nil
-		})
-	}
-}
-
 func (t *TestSuite) AssertLatestCommitmentCumulativeWeight(cw uint64, nodes ...*mock.Node) {
 	mustNodes(nodes)
 

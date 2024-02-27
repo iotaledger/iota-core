@@ -276,11 +276,7 @@ func (c *Commitments) initCommitment(commitment *Commitment, slotEvicted reactiv
 	// solidify the parent of the commitment
 	if root := c.Root.Get(); root != nil && commitment.Slot() > root.Slot() {
 		c.cachedRequest(commitment.PreviousCommitmentID(), true).OnSuccess(func(parent *Commitment) {
-			commitment.Parent.Set(parent)
-
-			parent.IsEvicted.OnTrigger(func() {
-				commitment.Parent.Set(nil)
-			})
+			parent.IsEvicted.OnTrigger(commitment.Parent.ToggleValue(parent))
 		})
 	}
 
