@@ -247,9 +247,9 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 				c.CumulativeWeight.Set(c.Commitment.CumulativeWeight())
 			}
 
-			return lo.BatchReverse(
-				parent.deriveChildren(c),
+			parent.registerChild(c)
 
+			return lo.BatchReverse(
 				c.deriveChain(parent),
 
 				c.deriveCumulativeAttestedWeight(parent),
@@ -278,8 +278,9 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 	)
 }
 
-// deriveChildren derives the children of this Commitment by adding the given child to the Children set.
-func (c *Commitment) deriveChildren(child *Commitment) (unregisterChild func()) {
+// registerChild adds the given Commitment as a child of this Commitment and sets it as the main child if it is the
+// first child of this Commitment.
+func (c *Commitment) registerChild(child *Commitment) {
 	c.MainChild.Compute(func(mainChild *Commitment) *Commitment {
 		if !c.Children.Add(child) || mainChild != nil {
 			return mainChild
@@ -287,17 +288,6 @@ func (c *Commitment) deriveChildren(child *Commitment) (unregisterChild func()) 
 
 		return child
 	})
-
-	return func() {
-		c.MainChild.Compute(func(mainChild *Commitment) *Commitment {
-			if !c.Children.Delete(child) || child != mainChild {
-				return mainChild
-			}
-
-			// When removing the commitment, we need to set the main child back to nil when cleaning up children to avoid inconsistent state with MainChild being set to a random value, which then triggers other reactive events.
-			return nil
-		})
-	}
 }
 
 // deriveChain derives the Chain of this Commitment which is either inherited from the parent if we are the main child
