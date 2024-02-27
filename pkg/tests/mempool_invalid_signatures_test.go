@@ -103,14 +103,12 @@ func transitionAccountWithInvalidSignature(ts *testsuite.TestSuite) iotago.Accou
 	block3 := ts.IssueBasicBlockWithOptions("block3", newUserWallet, tx4, mock.WithStrongParents(latestParents...))
 	latestParents = ts.CommitUntilSlot(block3Slot, block3.ID())
 
-	fullAccountOutputID := newUserWallet.Output("TX4:0").OutputID()
-	allotted := iotago.BlockIssuanceCredits(tx4.Transaction.Allotments.Get(implicitAccountID))
 	burned := iotago.BlockIssuanceCredits(block3.WorkScore()) * iotago.BlockIssuanceCredits(block2Commitment.ReferenceManaCost)
-	// the implicit account should now have been transitioned to a full account in the accounts ledger.
+	// the implicit account transition should fail, so the burned amount should be deducted from BIC, but no allotment made.
 	ts.AssertAccountDiff(implicitAccountID, block3Slot, &model.AccountDiff{
-		BICChange:             allotted - burned,
+		BICChange:             -burned,
 		PreviousUpdatedSlot:   block2Slot,
-		NewOutputID:           fullAccountOutputID,
+		NewOutputID:           implicitAccountOutputID,
 		PreviousOutputID:      implicitAccountOutputID,
 		PreviousExpirySlot:    iotago.MaxSlotIndex,
 		NewExpirySlot:         iotago.MaxSlotIndex,
@@ -122,9 +120,9 @@ func transitionAccountWithInvalidSignature(ts *testsuite.TestSuite) iotago.Accou
 
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              implicitAccountID,
-		Credits:         accounts.NewBlockIssuanceCredits(allotted-burned, block3Slot),
+		Credits:         accounts.NewBlockIssuanceCredits(-burned, block3Slot),
 		ExpirySlot:      iotago.MaxSlotIndex,
-		OutputID:        fullAccountOutputID,
+		OutputID:        implicitAccountOutputID,
 		BlockIssuerKeys: iotago.NewBlockIssuerKeys(implicitBlockIssuerKey),
 	}, ts.Nodes()...)
 
