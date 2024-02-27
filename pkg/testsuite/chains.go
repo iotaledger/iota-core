@@ -38,7 +38,7 @@ func (t *TestSuite) AssertCommitmentsOnChain(expectedCommitments []*model.Commit
 		t.Eventually(func() error {
 			var selectedChain *protocol.Chain
 			_ = node.Protocol.Chains.Set.ForEach(func(chain *protocol.Chain) error {
-				if chain.ForkingPoint.Get().ID() == chainID {
+				if forkingPoint := chain.ForkingPoint.Get(); forkingPoint != nil && forkingPoint.ID() == chainID {
 					selectedChain = chain
 				}
 
