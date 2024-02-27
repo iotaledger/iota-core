@@ -59,11 +59,11 @@ func (c *Chains) Inspect(session ...inspection.Session) inspection.InspectedObje
 	}
 
 	return inspection.NewInspectedObject(c, func(o inspection.InspectedObject) {
-		o.AddChild("Set", c.Set, inspectSet)
 		o.AddChild("Main", c.Main.Get())
 		o.AddChild("HeaviestClaimedCandidate", c.HeaviestClaimedCandidate.Get())
 		o.AddChild("HeaviestAttestedCandidate", c.HeaviestAttestedCandidate.Get())
 		o.AddChild("HeaviestAttestedCandidate", c.HeaviestAttestedCandidate.Get())
+		o.AddChild("Set", c.Set, inspectSet)
 	}, session...)
 }
 
