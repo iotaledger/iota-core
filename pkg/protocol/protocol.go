@@ -14,7 +14,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/core/traversed"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
@@ -141,13 +140,6 @@ func (p *Protocol) CommittedAPI() iotago.API {
 // LatestAPI returns the latest API.
 func (p *Protocol) LatestAPI() iotago.API {
 	return p.Engines.Main.Get().LatestAPI()
-}
-
-func (p *Protocol) Traverse(seenObjects ...traversed.SeenElements) *traversed.Object {
-	return traversed.NewObject("Protocol", p.LogName(), func(o *traversed.Object) {
-		o.AddTraversable("Commitments", p.Commitments)
-		o.AddTraversable("Chains", p.Chains)
-	}, seenObjects...)
 }
 
 // initSubcomponents initializes the subcomponents of the protocol and returns a function that shuts them down.

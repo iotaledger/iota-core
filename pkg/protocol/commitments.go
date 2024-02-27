@@ -1,8 +1,6 @@
 package protocol
 
 import (
-	"fmt"
-
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
@@ -13,7 +11,6 @@ import (
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
-	"github.com/iotaledger/iota-core/pkg/core/traversed"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -73,7 +70,7 @@ func newCommitments(protocol *Protocol) *Commitments {
 func (c *Commitments) Get(commitmentID iotago.CommitmentID, requestIfMissing ...bool) (commitment *Commitment, err error) {
 	cachedRequest, exists := c.cachedRequests.Get(commitmentID)
 	if !exists && lo.First(requestIfMissing) {
-		if cachedRequest = c.cachedRequest(commitmentID, true, true); cachedRequest.WasRejected() {
+		if cachedRequest = c.cachedRequest(commitmentID, true); cachedRequest.WasRejected() {
 			return nil, ierrors.Wrapf(cachedRequest.Err(), "failed to request commitment %s", commitmentID)
 		}
 	}
@@ -98,26 +95,6 @@ func (c *Commitments) API(commitmentID iotago.CommitmentID) (commitmentAPI *engi
 	}
 
 	return commitment.TargetEngine().CommitmentAPI(commitmentID)
-}
-
-func (c *Commitments) Traverse(seenObjects ...traversed.SeenElements) *traversed.Object {
-	return traversed.NewObject("Commitments", c.LogName(), func(o *traversed.Object) {
-		o.AddNewObject("Set", "Set", fmt.Sprintf("%p", c.Set), func(set *traversed.Object) {
-			c.Range(func(commitment *Commitment) {
-				set.AddTraversable(commitment.LogName(), commitment)
-			})
-		})
-
-		o.AddNewObject("cachedRequests", "ShrinkingMap", "ShrinkingMap", func(cachedRequests *traversed.Object) {
-			c.cachedRequests.ForEach(func(commitmentID iotago.CommitmentID, cachedRequest *promise.Promise[*Commitment]) bool {
-				if commitment := cachedRequest.Result(); commitment != nil {
-					cachedRequests.AddTraversable(commitmentID.String(), commitment)
-				}
-
-				return true
-			})
-		})
-	}, seenObjects...)
 }
 
 // initLogger initializes the logger for this component.
@@ -164,7 +141,7 @@ func (c *Commitments) initRequester() (shutdown func()) {
 // publishRootCommitment publishes the root commitment of the main engine.
 func (c *Commitments) publishRootCommitment(mainChain *Chain, mainEngine *engine.Engine) func() {
 	return mainEngine.RootCommitment.OnUpdate(func(_ *model.Commitment, rootCommitment *model.Commitment) {
-		publishedCommitment, published, err := c.publishCommitment(rootCommitment, false)
+		publishedCommitment, published, err := c.publishCommitment(rootCommitment)
 		if err != nil {
 			c.LogError("failed to publish new root commitment", "id", rootCommitment.ID(), "error", err)
 
@@ -210,7 +187,7 @@ func (c *Commitments) publishEngineCommitments(chain *Chain, engine *engine.Engi
 			}
 
 			// publish the commitment
-			publishedCommitment, _, err := c.publishCommitment(commitment, true)
+			publishedCommitment, _, err := c.publishCommitment(commitment)
 			if err != nil {
 				c.LogError("failed to publish commitment from engine", "engine", engine.LogName(), "commitment", commitment, "err", err)
 
@@ -229,9 +206,9 @@ func (c *Commitments) publishEngineCommitments(chain *Chain, engine *engine.Engi
 // publishCommitment publishes the given commitment and returns the singleton Commitment instance that is used to
 // represent it in our data structure (together with a boolean that indicates if we were the first goroutine to publish
 // the commitment).
-func (c *Commitments) publishCommitment(commitment *model.Commitment, solidify bool) (publishedCommitment *Commitment, published bool, err error) {
+func (c *Commitments) publishCommitment(commitment *model.Commitment) (publishedCommitment *Commitment, published bool, err error) {
 	// retrieve promise and abort if it was already rejected
-	cachedRequest := c.cachedRequest(commitment.ID(), solidify)
+	cachedRequest := c.cachedRequest(commitment.ID())
 	if cachedRequest.WasRejected() {
 		return nil, false, ierrors.Wrapf(cachedRequest.Err(), "failed to request commitment %s", commitment.ID())
 	}
@@ -250,7 +227,7 @@ func (c *Commitments) publishCommitment(commitment *model.Commitment, solidify b
 // cachedRequest returns a singleton Promise for the given commitmentID. If the Promise does not exist yet, it will be
 // created and optionally requested from the network if missing. Once the promise is resolved, the Commitment is
 // initialized and provided to the consumers.
-func (c *Commitments) cachedRequest(commitmentID iotago.CommitmentID, solidify bool, requestIfMissing ...bool) *promise.Promise[*Commitment] {
+func (c *Commitments) cachedRequest(commitmentID iotago.CommitmentID, requestIfMissing ...bool) *promise.Promise[*Commitment] {
 	// handle evicted slots
 	slotEvicted := c.protocol.EvictionEvent(commitmentID.Index())
 	if slotEvicted.WasTriggered() {
@@ -274,7 +251,7 @@ func (c *Commitments) cachedRequest(commitmentID iotago.CommitmentID, solidify b
 
 	// handle successful resolutions
 	cachedRequest.OnSuccess(func(commitment *Commitment) {
-		c.initCommitment(commitment, solidify, slotEvicted)
+		c.initCommitment(commitment, slotEvicted)
 	})
 
 	// handle failed resolutions
@@ -293,12 +270,12 @@ func (c *Commitments) cachedRequest(commitmentID iotago.CommitmentID, solidify b
 }
 
 // initCommitment initializes the given commitment in the protocol.
-func (c *Commitments) initCommitment(commitment *Commitment, solidify bool, slotEvicted reactive.Event) {
+func (c *Commitments) initCommitment(commitment *Commitment, slotEvicted reactive.Event) {
 	commitment.LogDebug("created", "id", commitment.ID())
 
 	// solidify the parent of the commitment
-	if solidify {
-		c.cachedRequest(commitment.PreviousCommitmentID(), true, true).OnSuccess(func(parent *Commitment) {
+	if root := c.Root.Get(); root != nil && commitment.Slot() > root.Slot() {
+		c.cachedRequest(commitment.PreviousCommitmentID(), true).OnSuccess(func(parent *Commitment) {
 			commitment.Parent.Set(parent)
 
 			parent.IsEvicted.OnTrigger(func() {
@@ -374,7 +351,7 @@ func (c *Commitments) processResponse(commitment *model.Commitment, from peer.ID
 			return
 		}
 
-		if publishedCommitment, published, err := c.protocol.Commitments.publishCommitment(commitment, false); err != nil {
+		if publishedCommitment, published, err := c.protocol.Commitments.publishCommitment(commitment); err != nil {
 			c.LogError("failed to process commitment", "fromPeer", from, "err", err)
 		} else if published {
 			c.LogTrace("received response", "commitment", publishedCommitment.LogName(), "fromPeer", from)

@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"cmp"
-	"fmt"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -12,7 +11,6 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/core/account"
-	"github.com/iotaledger/iota-core/pkg/core/traversed"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -296,16 +294,6 @@ func (c *Chains) WithInitializedEngines(callback func(chain *Chain, engine *engi
 			return callback(chain, engine)
 		})
 	})
-}
-
-func (c *Chains) Traverse(seenObjects ...traversed.SeenElements) *traversed.Object {
-	return traversed.NewObject("Chains", c.LogName(), func(o *traversed.Object) {
-		o.AddNewObject("Set", "Set", fmt.Sprintf("%p", c.Set), func(set *traversed.Object) {
-			c.Range(func(chain *Chain) {
-				set.AddTraversable(chain.LogName(), chain)
-			})
-		})
-	}, seenObjects...)
 }
 
 // initLogger initializes the logger for this component.

@@ -1,15 +1,12 @@
 package protocol
 
 import (
-	"fmt"
-
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
-	"github.com/iotaledger/iota-core/pkg/core/traversed"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -129,6 +126,10 @@ func (c *Chain) LastCommonSlot() iotago.SlotIndex {
 func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (dispatched bool) {
 	if c == nil {
 		return false
+	} else if c.IsEvicted.Get() {
+		c.LogTrace("discard for evicted chain", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID())
+
+		return true
 	}
 
 	dispatched = c.dispatchBlockToSpawnedEngine(block, src)
@@ -168,19 +169,6 @@ func (c *Chain) LatestEngine() *engine.Engine {
 	return currentEngine
 }
 
-func (c *Chain) Traverse(seenObjects ...traversed.SeenElements) *traversed.Object {
-	return traversed.NewObject("Chain", c.LogName(), func(chain *traversed.Object) {
-		chain.AddTraversable("ForkingPoint", c.ForkingPoint.Get())
-		chain.AddTraversable("ParentChain", c.ParentChain.Get())
-
-		chain.AddNewObject("ChildChains", "Set", fmt.Sprintf("%p", c.ChildChains), func(childChains *traversed.Object) {
-			c.ChildChains.Range(func(childChain *Chain) {
-				childChains.AddTraversable(childChain.LogName(), childChain)
-			})
-		})
-	}, seenObjects...)
-}
-
 // initLogger initializes the Logger of this chain.
 func (c *Chain) initLogger() (shutdown func()) {
 	c.Logger = c.chains.NewChildLogger("", true)
@@ -204,16 +192,35 @@ func (c *Chain) initLogger() (shutdown func()) {
 
 // initDerivedProperties initializes the behavior of this chain by setting up the relations between its properties.
 func (c *Chain) initDerivedProperties() (shutdown func()) {
+	markChainEvicted := func() {
+		// TODO: MOVE TO DEDICATED WORKER
+		go c.IsEvicted.Trigger()
+	}
+
 	return lo.Batch(
 		c.deriveWarpSyncMode(),
 
 		c.ForkingPoint.WithValue(func(forkingPoint *Commitment) (teardown func()) {
 			return lo.Batch(
+				func() (teardown func()) {
+					if forkingPoint == nil {
+						return
+					}
+
+					return forkingPoint.IsEvicted.OnTrigger(markChainEvicted)
+				}(),
+
 				c.deriveParentChain(forkingPoint),
-				c.deriveIsEvicted(forkingPoint),
 			)
 		}),
-		c.ParentChain.WithNonEmptyValue(lo.Bind(c, (*Chain).deriveChildChains)),
+
+		c.ParentChain.WithNonEmptyValue(func(parent *Chain) (teardown func()) {
+			return lo.Batch(
+				//parent.IsEvicted.OnTrigger(markChainEvicted),
+
+				parent.deriveChildChains(c),
+			)
+		}),
 		c.Engine.WithNonEmptyValue(c.deriveOutOfSyncThreshold),
 	)
 }
@@ -262,31 +269,6 @@ func (c *Chain) deriveParentChain(forkingPoint *Commitment) (shutdown func()) {
 	c.ParentChain.Set(nil)
 
 	return nil
-}
-
-func (c *Chain) deriveIsEvicted(forkingPoint *Commitment) (shutdown func()) {
-	if forkingPoint == nil {
-		return
-	}
-
-	// TODO: this might be cleaner but deadlocks
-	// return c.IsEvicted.DeriveValueFrom(reactive.NewDerivedVariable2(func(currentValue bool, forkingPointIsOrphaned bool, forkingPointIsEvicted bool) bool {
-	// 	if currentValue {
-	// 		return true
-	// 	}
-	//
-	// 	return forkingPointIsOrphaned || forkingPointIsEvicted
-	// }, forkingPoint.IsOrphaned, forkingPoint.IsEvicted))
-
-	return lo.Batch(
-		forkingPoint.IsEvicted.OnTrigger(func() {
-			// TODO: MOVE TO DEDICATED WORKER
-			go c.IsEvicted.Trigger()
-		}),
-		forkingPoint.IsOrphaned.OnTrigger(func() {
-			go c.IsEvicted.Trigger()
-		}),
-	)
 }
 
 // deriveOutOfSyncThreshold defines how a chain determines its "out of sync" threshold (the latest seen slot minus 2
