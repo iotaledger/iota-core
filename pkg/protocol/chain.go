@@ -192,16 +192,35 @@ func (c *Chain) initLogger() (shutdown func()) {
 
 // initDerivedProperties initializes the behavior of this chain by setting up the relations between its properties.
 func (c *Chain) initDerivedProperties() (shutdown func()) {
+	markChainEvicted := func() {
+		// TODO: MOVE TO DEDICATED WORKER
+		go c.IsEvicted.Trigger()
+	}
+
 	return lo.Batch(
 		c.deriveWarpSyncMode(),
 
 		c.ForkingPoint.WithValue(func(forkingPoint *Commitment) (teardown func()) {
 			return lo.Batch(
+				func() (teardown func()) {
+					if forkingPoint == nil {
+						return
+					}
+
+					return forkingPoint.IsEvicted.OnTrigger(markChainEvicted)
+				}(),
+
 				c.deriveParentChain(forkingPoint),
-				c.deriveIsEvicted(forkingPoint),
 			)
 		}),
-		c.ParentChain.WithNonEmptyValue(lo.Bind(c, (*Chain).deriveChildChains)),
+
+		c.ParentChain.WithNonEmptyValue(func(parent *Chain) (teardown func()) {
+			return lo.Batch(
+				parent.IsEvicted.OnTrigger(markChainEvicted),
+
+				parent.deriveChildChains(c),
+			)
+		}),
 		c.Engine.WithNonEmptyValue(c.deriveOutOfSyncThreshold),
 	)
 }
@@ -250,26 +269,6 @@ func (c *Chain) deriveParentChain(forkingPoint *Commitment) (shutdown func()) {
 	c.ParentChain.Set(nil)
 
 	return nil
-}
-
-func (c *Chain) deriveIsEvicted(forkingPoint *Commitment) (shutdown func()) {
-	if forkingPoint == nil {
-		return
-	}
-
-	// TODO: this might be cleaner but deadlocks
-	// return c.IsEvicted.DeriveValueFrom(reactive.NewDerivedVariable2(func(currentValue bool, forkingPointIsOrphaned bool, forkingPointIsEvicted bool) bool {
-	// 	if currentValue {
-	// 		return true
-	// 	}
-	//
-	// 	return forkingPointIsOrphaned || forkingPointIsEvicted
-	// }, forkingPoint.IsOrphaned, forkingPoint.IsEvicted))
-
-	return forkingPoint.IsEvicted.OnTrigger(func() {
-		// TODO: MOVE TO DEDICATED WORKER
-		go c.IsEvicted.Trigger()
-	})
 }
 
 // deriveOutOfSyncThreshold defines how a chain determines its "out of sync" threshold (the latest seen slot minus 2
