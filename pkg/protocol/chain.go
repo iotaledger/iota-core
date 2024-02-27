@@ -216,7 +216,7 @@ func (c *Chain) initDerivedProperties() (shutdown func()) {
 
 		c.ParentChain.WithNonEmptyValue(func(parent *Chain) (teardown func()) {
 			return lo.Batch(
-				parent.IsEvicted.OnTrigger(markChainEvicted),
+				//parent.IsEvicted.OnTrigger(markChainEvicted),
 
 				parent.deriveChildChains(c),
 			)
