@@ -116,7 +116,7 @@ func TestProtocol_Eviction(t *testing.T) {
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
 			testsuite.WithLatestCommitment(genesisCommitment),
 			testsuite.WithLatestFinalizedSlot(0),
-			testsuite.WithChainID(genesisCommitment.MustID()),
+			testsuite.WithMainChainID(genesisCommitment.MustID()),
 			testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment}),
 
 			testsuite.WithSybilProtectionCommittee(0, []iotago.AccountID{node.Validator.AccountID}),

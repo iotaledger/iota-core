@@ -155,7 +155,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
 			testsuite.WithLatestCommitment(genesisCommitment),
 			testsuite.WithLatestFinalizedSlot(0),
-			testsuite.WithChainID(genesisCommitment.MustID()),
+			testsuite.WithMainChainID(genesisCommitment.MustID()),
 			testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment}),
 
 			testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
@@ -484,7 +484,7 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
 			testsuite.WithLatestCommitment(genesisCommitment),
 			testsuite.WithLatestFinalizedSlot(0),
-			testsuite.WithChainID(genesisCommitment.MustID()),
+			testsuite.WithMainChainID(genesisCommitment.MustID()),
 			testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment}),
 
 			testsuite.WithSybilProtectionCommittee(0, ts.AccountsOfNodes("node0", "node1", "node2", "node3")),
@@ -656,10 +656,10 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 		ts.AssertMainEngineSwitchedCount(1, nodesP2...)
 
 		// Make sure that enough activity messages are issued so that a block in slot 21 gets accepted and triggers commitment of slot 18.
-		//time.Sleep(3 * time.Second)
+		// time.Sleep(3 * time.Second)
 
-		//ctxP1Cancel()
-		//wg.Wait()
+		// ctxP1Cancel()
+		// wg.Wait()
 	}
 
 	// Make sure that nodes that switched their engine still have blocks with prefix P0 from before the fork.
@@ -831,7 +831,7 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
 			testsuite.WithLatestCommitment(genesisCommitment),
 			testsuite.WithLatestFinalizedSlot(0),
-			testsuite.WithChainID(genesisCommitment.MustID()),
+			testsuite.WithMainChainID(genesisCommitment.MustID()),
 			testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment}),
 
 			testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
@@ -1084,7 +1084,7 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 	fmt.Println("---------------------")
 	// Finalize further slot and make sure the nodes have the same state of chains.
 	{
-		//ts.CommitUntilSlot(forkingSlot+maxCommittableAge+2, ts.BlockIDsWithPrefix(fmt.Sprintf("P%d-merge:", mainPartitionIndex))...)
+		// ts.CommitUntilSlot(forkingSlot+maxCommittableAge+2, ts.BlockIDsWithPrefix(fmt.Sprintf("P%d-merge:", mainPartitionIndex))...)
 
 		ts.IssueBlocksAtSlots("P0-merge:", []iotago.SlotIndex{20, 21, 22}, 3, slotPrefix(partitionsInOrder[len(partitionsInOrder)-1].A, 20)+strconv.Itoa(20)+".2", ts.Nodes(), true, true)
 
