@@ -605,8 +605,21 @@ func (m *Manager) updateSlotDiffWithBurns(slot iotago.SlotIndex, accountDiffs ma
 	}
 	for id, burn := range burns {
 		accountDiff, exists := accountDiffs[id]
+		// if diff doesn't already exist, that means the account output was not updated, so we need to preserve the previous state in the diff.
 		if !exists {
 			accountDiff = model.NewAccountDiff()
+			accountData, exists, err := m.account(id, slot-1)
+			if err != nil {
+				panic(ierrors.Errorf("error loading account %s in slot %d: %w", id, slot-1, err))
+			}
+			if !exists {
+				panic(ierrors.Errorf("trying to burn Mana from account %s which is not present in slot %d", id, slot-1))
+			}
+			accountDiff.PreviousUpdatedSlot = accountData.Credits.UpdateSlot
+			accountDiff.NewExpirySlot = accountData.ExpirySlot
+			accountDiff.PreviousExpirySlot = accountData.ExpirySlot
+			accountDiff.NewOutputID = accountData.OutputID
+			accountDiff.PreviousOutputID = accountData.OutputID
 		}
 
 		accountDiff.BICChange -= iotago.BlockIssuanceCredits(burn)

@@ -621,6 +621,7 @@ func (m *MemPool[VoteRank]) setupSignedTransaction(signedTransactionMetadata *Si
 		executionContext, err := m.vm.ValidateSignatures(signedTransactionMetadata.SignedTransaction(), lo.Map(signedTransactionMetadata.transactionMetadata.inputs, (*StateMetadata).State))
 		if err != nil {
 			_ = signedTransactionMetadata.signaturesInvalid.Set(err)
+
 			return
 		}
 
