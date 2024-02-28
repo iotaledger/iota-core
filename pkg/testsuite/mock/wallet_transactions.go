@@ -1132,7 +1132,9 @@ func (w *Wallet) TransitionNFTWithTransactionOpts(transactionName string, inputN
 func (w *Wallet) createSignedTransactionWithOptions(transactionName string, addressIndexes []uint32, opts ...options.Option[builder.TransactionBuilder]) *iotago.SignedTransaction {
 	currentAPI := w.Node.Protocol.CommittedAPI()
 
-	txBuilder := builder.NewTransactionBuilder(currentAPI)
+	addressSigner := w.AddressSigner(addressIndexes...)
+
+	txBuilder := builder.NewTransactionBuilder(currentAPI, addressSigner)
 	// Use the wallet's current slot as creation slot by default.
 	txBuilder.SetCreationSlot(w.currentSlot)
 	// Set the transaction capabilities to be able to do anything.
@@ -1141,8 +1143,7 @@ func (w *Wallet) createSignedTransactionWithOptions(transactionName string, addr
 	randomPayload := tpkg.Rand12ByteArray()
 	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: randomPayload[:], Data: randomPayload[:]})
 
-	addressSigner := w.AddressSigner(addressIndexes...)
-	signedTransaction := lo.PanicOnErr(options.Apply(txBuilder, opts).Build(addressSigner))
+	signedTransaction := lo.PanicOnErr(options.Apply(txBuilder, opts).Build())
 
 	// register the outputs in the wallet
 	w.registerOutputs(transactionName, signedTransaction.Transaction, addressIndexes...)
