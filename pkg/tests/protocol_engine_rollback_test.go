@@ -116,7 +116,7 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
 			testsuite.WithLatestCommitment(genesisCommitment),
 			testsuite.WithLatestFinalizedSlot(0),
-			testsuite.WithChainID(genesisCommitment.MustID()),
+			testsuite.WithMainChainID(genesisCommitment.MustID()),
 			testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment}),
 
 			testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
@@ -303,7 +303,7 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
 			testsuite.WithLatestCommitment(genesisCommitment),
 			testsuite.WithLatestFinalizedSlot(0),
-			testsuite.WithChainID(genesisCommitment.MustID()),
+			testsuite.WithMainChainID(genesisCommitment.MustID()),
 			testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment}),
 
 			testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
@@ -497,7 +497,7 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
 			testsuite.WithLatestCommitment(genesisCommitment),
 			testsuite.WithLatestFinalizedSlot(0),
-			testsuite.WithChainID(genesisCommitment.MustID()),
+			testsuite.WithMainChainID(genesisCommitment.MustID()),
 			testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment}),
 
 			testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
@@ -691,7 +691,7 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
 			testsuite.WithLatestCommitment(genesisCommitment),
 			testsuite.WithLatestFinalizedSlot(0),
-			testsuite.WithChainID(genesisCommitment.MustID()),
+			testsuite.WithMainChainID(genesisCommitment.MustID()),
 			testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment}),
 
 			testsuite.WithSybilProtectionCommittee(0, expectedCommittee),

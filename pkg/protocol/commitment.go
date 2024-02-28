@@ -299,7 +299,8 @@ func (c *Commitment) deriveChain(parent *Commitment) func() {
 			return currentChain
 		}
 
-		// if we are not the main child of our parent, we spawn a new chain
+		// If we are not the main child of our parent, we spawn a new chain.
+		// Here we basically move commitments to a new chain if there's a fork.
 		if c != mainChild {
 			if currentChain == nil || currentChain == parentChain {
 				currentChain = c.commitments.protocol.Chains.newChain()
@@ -309,9 +310,10 @@ func (c *Commitment) deriveChain(parent *Commitment) func() {
 			return currentChain
 		}
 
-		// if we are the main child of our parent, and our chain is not the parent chain (that we are supposed to
-		// inherit), then we evict our current chain (we will spawn a new one if we ever change back to not being the
-		// main child)
+		// If we are the main child of our parent, and our chain is not the parent chain,
+		// then we inherit the parent chain and evict the current one.
+		// We will spawn a new one if we ever change back to not being the main child.
+		// Here we basically move commitments to the parent chain.
 		if currentChain != nil && currentChain != parentChain {
 			currentChain.IsEvicted.Trigger()
 		}

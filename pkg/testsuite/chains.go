@@ -31,7 +31,7 @@ func (t *TestSuite) AssertLatestEngineCommitmentOnMainChain(nodes ...*mock.Node)
 	}
 }
 
-func (t *TestSuite) AssertCommitmentsOnChain(expectedCommitments []*model.Commitment, chainID iotago.CommitmentID, nodes ...*mock.Node) {
+func (t *TestSuite) AssertCommitmentsOnChainAndChainHasCommitments(expectedCommitments []*model.Commitment, chainID iotago.CommitmentID, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	for _, node := range nodes {
@@ -46,7 +46,7 @@ func (t *TestSuite) AssertCommitmentsOnChain(expectedCommitments []*model.Commit
 			})
 
 			if chainID != iotago.EmptyCommitmentID && selectedChain == nil {
-				return ierrors.Errorf("AssertCommitmentsOnChain: %s: chain with forking point %s not found", node.Name, chainID)
+				return ierrors.Errorf("AssertCommitmentsOnChainAndChainHasCommitments: %s: chain with forking point %s not found", node.Name, chainID)
 			}
 
 			for _, expectedCommitment := range expectedCommitments {
@@ -54,15 +54,15 @@ func (t *TestSuite) AssertCommitmentsOnChain(expectedCommitments []*model.Commit
 				{
 					protocolCommitment, err := node.Protocol.Commitments.Get(expectedCommitment.ID(), false)
 					if err != nil {
-						return ierrors.Wrapf(err, "AssertCommitmentsOnChain: %s: expected commitment %s on chain %s not found", node.Name, expectedCommitment.ID(), chainID)
+						return ierrors.Wrapf(err, "AssertCommitmentsOnChainAndChainHasCommitments: %s: expected commitment %s on chain %s not found", node.Name, expectedCommitment.ID(), chainID)
 					}
 
 					if protocolCommitment.Chain.Get() != selectedChain {
 						if selectedChain == nil {
-							return ierrors.Errorf("AssertCommitmentsOnChain: %s: commitment %s not on correct chain, expected nil, got %s (pointer: %p, name: %s)", node.Name, expectedCommitment.ID(), protocolCommitment.Chain.Get().ForkingPoint.Get().ID(), protocolCommitment.Chain.Get(), protocolCommitment.Chain.Get().LogName())
+							return ierrors.Errorf("AssertCommitmentsOnChainAndChainHasCommitments: %s: commitment %s not on correct chain, expected nil, got %s (pointer: %p, name: %s)", node.Name, expectedCommitment.ID(), protocolCommitment.Chain.Get().ForkingPoint.Get().ID(), protocolCommitment.Chain.Get(), protocolCommitment.Chain.Get().LogName())
 						}
 
-						return ierrors.Errorf("AssertCommitmentsOnChain: %s: commitment %s not on correct chain, expected %s (pointer: %p, name: %s), got %s (pointer: %p, name: %s)", node.Name, expectedCommitment.ID(), chainID, selectedChain, selectedChain.LogName(), protocolCommitment.Chain.Get().ForkingPoint.Get().ID(), protocolCommitment.Chain.Get(), protocolCommitment.Chain.Get().LogName())
+						return ierrors.Errorf("AssertCommitmentsOnChainAndChainHasCommitments: %s: commitment %s not on correct chain, expected %s (pointer: %p, name: %s), got %s (pointer: %p, name: %s)", node.Name, expectedCommitment.ID(), chainID, selectedChain, selectedChain.LogName(), protocolCommitment.Chain.Get().ForkingPoint.Get().ID(), protocolCommitment.Chain.Get(), protocolCommitment.Chain.Get().LogName())
 					}
 				}
 
@@ -70,11 +70,41 @@ func (t *TestSuite) AssertCommitmentsOnChain(expectedCommitments []*model.Commit
 				if selectedChain != nil {
 					commitment, exists := selectedChain.Commitment(expectedCommitment.Slot())
 					if !exists {
-						return ierrors.Errorf("AssertCommitmentsOnChain: %s: commitment for slot %d does not exist on the selected chain %s", node.Name, expectedCommitment.Slot(), chainID)
+						return ierrors.Errorf("AssertCommitmentsOnChainAndChainHasCommitments: %s: commitment for slot %d does not exist on the selected chain %s", node.Name, expectedCommitment.Slot(), chainID)
 					}
 
 					if expectedCommitment.ID() != commitment.ID() {
-						return ierrors.Errorf("AssertCommitmentsOnChain: %s: commitment on chain does not match, expected %s, got %s", node.Name, expectedCommitment, commitment.ID())
+						return ierrors.Errorf("AssertCommitmentsOnChainAndChainHasCommitments: %s: commitment on chain does not match, expected %s, got %s", node.Name, expectedCommitment, commitment.ID())
+					}
+				}
+			}
+
+			return nil
+		})
+	}
+}
+
+func (t *TestSuite) AssertCommitmentsOnChain(expectedCommitments []*model.Commitment, expectedChainID iotago.CommitmentID, nodes ...*mock.Node) {
+	mustNodes(nodes)
+
+	for _, node := range nodes {
+		t.Eventually(func() error {
+			for _, expectedCommitment := range expectedCommitments {
+				// Check that passed commitments have the correct chain assigned.
+				{
+					protocolCommitment, err := node.Protocol.Commitments.Get(expectedCommitment.ID(), false)
+					if err != nil {
+						return ierrors.Wrapf(err, "AssertCommitmentsOnChainAndChainHasCommitments: %s: expected commitment %s on chain %s not found", node.Name, expectedCommitment.ID(), expectedChainID)
+					}
+
+					if protocolCommitment.Chain.Get() == nil {
+						if expectedChainID != iotago.EmptyCommitmentID {
+							return ierrors.Errorf("AssertCommitmentsOnChainAndChainHasCommitments: %s: commitment %s (name: %s) not on correct chain, expected %s, got nil", node.Name, expectedCommitment.ID(), protocolCommitment.LogName(), expectedChainID)
+						}
+					} else {
+						if expectedChainID != protocolCommitment.Chain.Get().ForkingPoint.Get().ID() {
+							return ierrors.Errorf("AssertCommitmentsOnChainAndChainHasCommitments: %s: commitment %s not on correct chain, expected %s, got %s (pointer: %p, name: %s)", node.Name, expectedCommitment.ID(), expectedChainID, protocolCommitment.Chain.Get().ForkingPoint.Get().ID(), protocolCommitment.Chain.Get(), protocolCommitment.Chain.Get().LogName())
+						}
 					}
 				}
 			}
