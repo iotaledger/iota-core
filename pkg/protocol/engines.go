@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/ioutils"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -52,6 +53,8 @@ func newEngines(protocol *Protocol) *Engines {
 
 	protocol.Constructed.OnTrigger(func() {
 		shutdown := lo.Batch(
+			e.initLogger(protocol.NewChildLogger("Engines")),
+
 			e.syncMainEngineFromMainChain(),
 			e.syncMainEngineInfoFile(),
 			e.injectEngineInstances(),
@@ -69,6 +72,17 @@ func newEngines(protocol *Protocol) *Engines {
 	e.Constructed.Trigger()
 
 	return e
+}
+
+// initLogger initializes the logger for this component.
+func (e *Engines) initLogger(logger log.Logger) (shutdown func()) {
+	e.Logger = logger
+
+	return lo.Batch(
+		e.Main.LogUpdates(e, log.LevelTrace, "Main", (*engine.Engine).LogName),
+
+		logger.UnsubscribeFromParentLogger,
+	)
 }
 
 // ForkAtSlot creates a new engine instance that forks from the main engine at the given slot.
