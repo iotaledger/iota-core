@@ -57,6 +57,9 @@ type Chain struct {
 	// IsEvicted contains a flag that indicates whether this chain was evicted.
 	IsEvicted reactive.Event
 
+	// shouldEvict contains a flag that indicates whether this chain should be evicted.
+	shouldEvict reactive.Event
+
 	// chains contains a reference to the Chains instance that this chain belongs to.
 	chains *Chains
 
@@ -83,6 +86,7 @@ func newChain(chains *Chains) *Chain {
 		StartEngine:              reactive.NewVariable[bool](),
 		Engine:                   reactive.NewVariable[*engine.Engine](),
 		IsEvicted:                reactive.NewEvent(),
+		shouldEvict:              reactive.NewEvent(),
 
 		chains:      chains,
 		commitments: shrinkingmap.New[iotago.SlotIndex, *Commitment](),
@@ -185,6 +189,7 @@ func (c *Chain) initLogger() (shutdown func()) {
 		c.StartEngine.LogUpdates(c, log.LevelDebug, "StartEngine"),
 		c.Engine.LogUpdates(c, log.LevelTrace, "Engine", (*engine.Engine).LogName),
 		c.IsEvicted.LogUpdates(c, log.LevelTrace, "IsEvicted"),
+		c.shouldEvict.LogUpdates(c, log.LevelTrace, "shouldEvict"),
 
 		c.Logger.UnsubscribeFromParentLogger,
 	)
@@ -192,37 +197,47 @@ func (c *Chain) initLogger() (shutdown func()) {
 
 // initDerivedProperties initializes the behavior of this chain by setting up the relations between its properties.
 func (c *Chain) initDerivedProperties() (shutdown func()) {
-	markChainEvicted := func() {
-		// TODO: MOVE TO DEDICATED WORKER
-		go c.IsEvicted.Trigger()
-	}
-
-	return lo.Batch(
+	return lo.BatchReverse(
 		c.deriveWarpSyncMode(),
 
-		c.ForkingPoint.WithValue(func(forkingPoint *Commitment) (teardown func()) {
-			return lo.Batch(
-				func() (teardown func()) {
-					if forkingPoint == nil {
-						return
-					}
+		c.shouldEvict.OnTrigger(func() { go c.IsEvicted.Trigger() }),
 
-					return forkingPoint.IsEvicted.OnTrigger(markChainEvicted)
-				}(),
+		lo.BatchReverse(
+			c.ForkingPoint.WithNonEmptyValue(func(forkingPoint *Commitment) (teardown func()) {
+				return lo.BatchReverse(
+					c.deriveParentChain(forkingPoint),
 
-				c.deriveParentChain(forkingPoint),
-			)
-		}),
+					c.ParentChain.WithValue(func(parentChain *Chain) (teardown func()) {
+						return lo.BatchReverse(
+							parentChain.deriveChildChains(c),
 
-		c.ParentChain.WithNonEmptyValue(func(parent *Chain) (teardown func()) {
-			return lo.Batch(
-				//parent.IsEvicted.OnTrigger(markChainEvicted),
+							c.deriveShouldEvict(forkingPoint, parentChain),
+						)
+					}),
+				)
+			}),
+		),
 
-				parent.deriveChildChains(c),
-			)
-		}),
 		c.Engine.WithNonEmptyValue(c.deriveOutOfSyncThreshold),
 	)
+}
+
+// deriveShouldEvict defines how a chain determines whether it should be evicted (if it is not the main chain and either
+// its forking point or its parent chain is evicted).
+func (c *Chain) deriveShouldEvict(forkingPoint *Commitment, parentChain *Chain) (shutdown func()) {
+	if forkingPoint != nil && parentChain != nil {
+		return c.shouldEvict.DeriveValueFrom(reactive.NewDerivedVariable2(func(_, forkingPointIsEvicted bool, parentChainIsEvicted bool) bool {
+			return c.chains.Main.Get() != c && (forkingPointIsEvicted || parentChainIsEvicted)
+		}, forkingPoint.IsEvicted, parentChain.IsEvicted))
+	}
+
+	if forkingPoint != nil {
+		return c.shouldEvict.DeriveValueFrom(reactive.NewDerivedVariable(func(_, forkingPointIsEvicted bool) bool {
+			return c.chains.Main.Get() != c && forkingPointIsEvicted
+		}, forkingPoint.IsEvicted))
+	}
+
+	return
 }
 
 // deriveWarpSyncMode defines how a chain determines whether it is in warp sync mode or not.
@@ -240,7 +255,7 @@ func (c *Chain) deriveWarpSyncMode() func() {
 
 // deriveChildChains defines how a chain determines its ChildChains (by adding each child to the set).
 func (c *Chain) deriveChildChains(child *Chain) (teardown func()) {
-	if child != c {
+	if c != nil && c != child {
 		c.ChildChains.Add(child)
 
 		teardown = func() {
