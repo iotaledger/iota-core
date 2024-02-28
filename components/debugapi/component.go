@@ -8,8 +8,8 @@ import (
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
+	"github.com/iotaledger/hive.go/db"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
-	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -78,7 +78,7 @@ func configure() error {
 
 	blocksPerSlot = shrinkingmap.New[iotago.SlotIndex, []*blocks.Block]()
 	blocksPrunableStorage = prunable.NewBucketManager(database.Config{
-		Engine:    hivedb.EngineRocksDB,
+		Engine:    db.EngineRocksDB,
 		Directory: ParamsDebugAPI.Database.Path,
 
 		Version:      1,

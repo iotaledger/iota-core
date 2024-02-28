@@ -401,7 +401,7 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 	require.NoError(d.Testing, err)
 
 	implicitAddrSigner := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForImplicitAccountCreationAddress(receiverAddr.(*iotago.ImplicitAccountCreationAddress), implicitPrivateKey))
-	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot, implicitAddrSigner).
 		AddInput(&builder.TxInput{
 			UnlockTarget: receiverAddr,
 			InputID:      implicitOutputID,
@@ -412,7 +412,7 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
 		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: accountID}).
 		AllotAllMana(currentSlot, accountID, 0).
-		Build(implicitAddrSigner)
+		Build()
 	require.NoError(d.Testing, err)
 
 	blkID := d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(accountID, implicitPrivateKey), congestionResp, issuerResp)
@@ -458,7 +458,7 @@ func (d *DockerTestFramework) DelegateToValidator(from *Account, validator *Node
 		StartEpoch(getDelegationStartEpoch(apiForSlot, issuerResp.LatestCommitment.Slot)).
 		DelegatedAmount(fundsUTXOOutput.BaseTokenAmount()).MustBuild()
 
-	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot, fundsAddrSigner).
 		AddInput(&builder.TxInput{
 			UnlockTarget: fundsAddr,
 			InputID:      fundsOutputID,
@@ -468,7 +468,7 @@ func (d *DockerTestFramework) DelegateToValidator(from *Account, validator *Node
 		SetCreationSlot(currentSlot).
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
 		AllotAllMana(currentSlot, from.AccountID, 0).
-		Build(fundsAddrSigner)
+		Build()
 	require.NoError(d.Testing, err)
 
 	_ = d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(from.AccountID, from.BlockIssuerKey), congestionResp, issuerResp)
@@ -500,7 +500,7 @@ func (d *DockerTestFramework) IncreaseBIC(to *Account) {
 	basicOutput, err := builder.NewBasicOutputBuilder(fundsAddr, fundsUTXOOutput.BaseTokenAmount()).Build()
 	require.NoError(d.Testing, err)
 
-	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot, fundsAddrSigner).
 		AddInput(&builder.TxInput{
 			UnlockTarget: fundsAddr,
 			InputID:      fundsOutputID,
@@ -508,7 +508,7 @@ func (d *DockerTestFramework) IncreaseBIC(to *Account) {
 		}).
 		AddOutput(basicOutput).
 		AllotAllMana(currentSlot, to.AccountID, 0).
-		Build(fundsAddrSigner)
+		Build()
 
 	blkID := d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(to.AccountID, to.BlockIssuerKey), congestionResp, issuerResp)
 
@@ -552,7 +552,7 @@ func (d *DockerTestFramework) AllotManaTo(from *Account, to *Account, manaToAllo
 	congestionResp, err := clt.Congestion(ctx, from.AccountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
 	require.NoError(d.Testing, err)
 
-	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot, fundsAddrSigner).
 		AddInput(&builder.TxInput{
 			UnlockTarget: fundsAddr,
 			InputID:      fundsOutputID,
@@ -562,7 +562,7 @@ func (d *DockerTestFramework) AllotManaTo(from *Account, to *Account, manaToAllo
 		AddOutput(basicOutput).
 		SetCreationSlot(currentSlot).
 		AllotAllMana(currentSlot, from.AccountID, 0).
-		Build(fundsAddrSigner)
+		Build()
 	require.NoError(d.Testing, err)
 
 	blkID := d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(from.AccountID, from.BlockIssuerKey), congestionResp, issuerResp)
@@ -614,7 +614,7 @@ func (d *DockerTestFramework) CreateNativeToken(from *Account, mintedAmount iota
 	congestionResp, err := clt.Congestion(ctx, from.AccountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
 	require.NoError(d.Testing, err)
 
-	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot, signer).
 		AddInput(&builder.TxInput{
 			UnlockTarget: fundsAddr,
 			InputID:      fundsOutputID,
@@ -631,7 +631,7 @@ func (d *DockerTestFramework) CreateNativeToken(from *Account, mintedAmount iota
 		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: from.AccountID}).
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
 		AllotAllMana(currentSlot, from.AccountID, 0).
-		Build(signer)
+		Build()
 	require.NoError(d.Testing, err)
 
 	blkID := d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(from.AccountID, from.BlockIssuerKey), congestionResp, issuerResp)

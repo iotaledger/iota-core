@@ -19,29 +19,29 @@ func EqualOutput(t *testing.T, expected *utxoledger.Output, actual *utxoledger.O
 	require.Equal(t, expected.SlotCreated(), actual.SlotCreated())
 	require.Equal(t, expected.OutputType(), actual.OutputType())
 
-	var expectedIdent iotago.Address
+	var expectedOwner iotago.Address
 	switch output := expected.Output().(type) {
-	case iotago.TransIndepIdentOutput:
-		expectedIdent = output.Ident()
-	case iotago.TransDepIdentOutput:
-		expectedIdent = output.ChainID().ToAddress()
+	case iotago.OwnerTransitionIndependentOutput:
+		expectedOwner = output.Owner()
+	case iotago.OwnerTransitionDependentOutput:
+		expectedOwner = output.ChainID().ToAddress()
 	default:
 		require.Fail(t, "unsupported output type")
 	}
 
-	var actualIdent iotago.Address
+	var actualOwner iotago.Address
 	switch output := actual.Output().(type) {
-	case iotago.TransIndepIdentOutput:
-		actualIdent = output.Ident()
-	case iotago.TransDepIdentOutput:
-		actualIdent = output.ChainID().ToAddress()
+	case iotago.OwnerTransitionIndependentOutput:
+		actualOwner = output.Owner()
+	case iotago.OwnerTransitionDependentOutput:
+		actualOwner = output.ChainID().ToAddress()
 	default:
 		require.Fail(t, "unsupported output type")
 	}
 
-	require.NotNil(t, expectedIdent)
-	require.NotNil(t, actualIdent)
-	require.True(t, expectedIdent.Equal(actualIdent))
+	require.NotNil(t, expectedOwner)
+	require.NotNil(t, actualOwner)
+	require.True(t, expectedOwner.Equal(actualOwner))
 	require.Equal(t, expected.BaseTokenAmount(), actual.BaseTokenAmount())
 	require.EqualValues(t, expected.Output(), actual.Output())
 }

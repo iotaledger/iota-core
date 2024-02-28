@@ -227,7 +227,7 @@ func (t *TransactionMetadata) OnConflicting(callback func()) {
 }
 
 func (t *TransactionMetadata) IsConflictAccepted() bool {
-	return !t.IsConflicting() || t.conflictAccepted.WasTriggered()
+	return t.conflictAccepted.WasTriggered()
 }
 
 func (t *TransactionMetadata) OnConflictAccepted(callback func()) {
@@ -301,10 +301,7 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 	})
 
 	t.OnEarliestIncludedAttachmentUpdated(func(previousBlockID iotago.BlockID, newBlockID iotago.BlockID) {
-		if previousBlockID.Empty() && !newBlockID.Empty() {
-			if t.invalid.Get() != nil || !t.IsConflictAccepted() || !t.AllInputsAccepted() {
-				return
-			}
+		if previousBlockID.Empty() && !newBlockID.Empty() && t.invalid.Get() == nil && t.IsConflictAccepted() && t.AllInputsAccepted() {
 			t.accepted.Set(true)
 		}
 	})
