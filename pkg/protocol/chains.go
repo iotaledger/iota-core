@@ -345,8 +345,14 @@ func (c *Chains) trackHeaviestCandidates(chain *Chain) (teardown func()) {
 
 		if evictionEvent := c.protocol.EvictionEvent(targetSlot); !evictionEvent.WasTriggered() {
 			c.HeaviestClaimedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
-			c.HeaviestAttestedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
-			c.HeaviestVerifiedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
+
+			latestCommitment.IsAttested.OnTrigger(func() {
+				c.HeaviestAttestedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
+			})
+
+			latestCommitment.IsVerified.OnTrigger(func() {
+				c.HeaviestVerifiedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
+			})
 		}
 	})
 }
