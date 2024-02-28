@@ -57,6 +57,15 @@ type Node struct {
 	IssueCandidacyPayload bool
 }
 
+func (n *Node) AccountAddress(t *testing.T) *iotago.AccountAddress {
+	_, addr, err := iotago.ParseBech32(n.AccountAddressBech32)
+	require.NoError(t, err)
+	accAddress, ok := addr.(*iotago.AccountAddress)
+	require.True(t, ok)
+
+	return accAddress
+}
+
 type DockerTestFramework struct {
 	Testing *testing.T
 
@@ -365,6 +374,35 @@ func (d *DockerTestFramework) CreateTaggedDataBlock(issuerId iotago.AccountID, t
 	return d.CreateBlock(ctx, &iotago.TaggedData{
 		Tag: tag,
 	}, issuerId, congestionResp, issuerResp)
+}
+
+func (d *DockerTestFramework) CreateValueBlock(nodeAlias string) (*iotago.Block, *iotago.SignedTransaction, iotago.Output) {
+	ctx := context.Background()
+	clt := d.Node(nodeAlias).Client
+	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	apiForSlot := clt.APIForSlot(currentSlot)
+
+	fundsOutputID := d.RequestFaucetFunds(ctx, iotago.AddressEd25519)
+
+	_, ed25519Addr := d.wallet.Address()
+	input := d.wallet.Output(fundsOutputID)
+	basicOutput := builder.NewBasicOutputBuilder(ed25519Addr, input.Output.BaseTokenAmount()).MustBuild()
+
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+		AddInput(&builder.TxInput{
+			UnlockTarget: input.Address,
+			InputID:      input.ID,
+			Input:        input.Output,
+		}).
+		AddOutput(basicOutput).
+		SetCreationSlot(currentSlot).
+		Build(d.wallet.AddressSigner(input.AddressIndex))
+	require.NoError(d.wallet.Testing, err)
+
+	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, d.Node(nodeAlias).AccountAddress(d.Testing))
+	block := d.CreateBlock(ctx, signedTx, d.Node(nodeAlias).AccountAddress(d.Testing).AccountID(), congestionResp, issuerResp)
+
+	return block, signedTx, basicOutput
 }
 
 // CreateDelegationBlockFromInput consumes the given basic output, then build a block of a transaction that includes a delegation output, in order to delegate the given validator.
