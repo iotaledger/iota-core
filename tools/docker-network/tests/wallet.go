@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	hiveEd25519 "github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
@@ -18,7 +20,6 @@ import (
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/nodeclient"
 	"github.com/iotaledger/iota.go/v4/wallet"
-	"github.com/stretchr/testify/require"
 )
 
 // DockerWallet holds a keyManager, created outputs and accounts details.
@@ -29,12 +30,12 @@ type DockerWallet struct {
 
 	lastUsedIndex atomic.Uint32
 
-	outputs  map[iotago.OutputID]*Output
-	accounts map[iotago.AccountID]*Account
+	outputs  map[iotago.OutputID]*OutputData
+	accounts map[iotago.AccountID]*AccountData
 }
 
-// Output holds the details of an output that can be used to build a transaction.
-type Output struct {
+// OutputData holds the details of an output that can be used to build a transaction.
+type OutputData struct {
 	// ID is the unique identifier of the output.
 	ID iotago.OutputID
 	// Output is the iotago Output.
@@ -45,8 +46,8 @@ type Output struct {
 	AddressIndex uint32
 }
 
-// Account holds the details of an account that can be used to issue a block or account transition.
-type Account struct {
+// AccountData holds the details of an account that can be used to issue a block or account transition.
+type AccountData struct {
 	// ID is the unique identifier of the account.
 	ID iotago.AccountID
 	// AddressIndex is the index of the address in the keyManager.
@@ -62,21 +63,21 @@ type Account struct {
 func NewDockerWallet(t *testing.T) *DockerWallet {
 	return &DockerWallet{
 		Testing:    t,
-		outputs:    make(map[iotago.OutputID]*Output),
-		accounts:   make(map[iotago.AccountID]*Account),
+		outputs:    make(map[iotago.OutputID]*OutputData),
+		accounts:   make(map[iotago.AccountID]*AccountData),
 		keyManager: lo.PanicOnErr(wallet.NewKeyManagerFromRandom(wallet.DefaultIOTAPath)),
 	}
 }
 
-func (w *DockerWallet) AddOutput(outputId iotago.OutputID, output *Output) {
+func (w *DockerWallet) AddOutput(outputId iotago.OutputID, output *OutputData) {
 	w.outputs[outputId] = output
 }
 
-func (w *DockerWallet) AddAccount(accountId iotago.AccountID, data *Account) {
+func (w *DockerWallet) AddAccount(accountId iotago.AccountID, data *AccountData) {
 	w.accounts[accountId] = data
 }
 
-func (w *DockerWallet) Output(outputName iotago.OutputID) *Output {
+func (w *DockerWallet) Output(outputName iotago.OutputID) *OutputData {
 	output, exists := w.outputs[outputName]
 	if !exists {
 		panic(ierrors.Errorf("output %s not registered in wallet", outputName))
@@ -85,7 +86,7 @@ func (w *DockerWallet) Output(outputName iotago.OutputID) *Output {
 	return output
 }
 
-func (w *DockerWallet) Account(accountId iotago.AccountID) *Account {
+func (w *DockerWallet) Account(accountId iotago.AccountID) *AccountData {
 	acc, exists := w.accounts[accountId]
 	if !exists {
 		panic(ierrors.Errorf("account %s not registered in wallet", accountId.ToHex()))
@@ -157,7 +158,7 @@ func (w *DockerWallet) AllotManaFromAccount(clt *nodeclient.Client, fromId iotag
 	require.NoError(w.Testing, err)
 
 	allotmentOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
-	w.AddOutput(allotmentOutputId, &Output{
+	w.AddOutput(allotmentOutputId, &OutputData{
 		ID:           allotmentOutputId,
 		Output:       basicOutput,
 		Address:      input.Address,
@@ -189,7 +190,7 @@ func (w *DockerWallet) AllotManaFromInput(clt *nodeclient.Client, toId iotago.Ac
 		Build(w.AddressSigner(input.AddressIndex))
 
 	delegationOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
-	w.AddOutput(delegationOutputId, &Output{
+	w.AddOutput(delegationOutputId, &OutputData{
 		ID:           delegationOutputId,
 		Output:       basicOutput,
 		Address:      input.Address,
@@ -199,7 +200,7 @@ func (w *DockerWallet) AllotManaFromInput(clt *nodeclient.Client, toId iotago.Ac
 	return signedTx
 }
 
-func (w *DockerWallet) TransitionImplicitAccountToAccountOutput(clt *nodeclient.Client, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse, opts ...options.Option[builder.AccountOutputBuilder]) (*Account, *iotago.SignedTransaction) {
+func (w *DockerWallet) TransitionImplicitAccountToAccountOutput(clt *nodeclient.Client, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse, opts ...options.Option[builder.AccountOutputBuilder]) (*AccountData, *iotago.SignedTransaction) {
 	input := w.Output(inputId)
 
 	accountID := iotago.AccountIDFromOutputID(input.ID)
@@ -233,7 +234,7 @@ func (w *DockerWallet) TransitionImplicitAccountToAccountOutput(clt *nodeclient.
 		Build(w.AddressSigner(input.AddressIndex))
 	require.NoError(w.Testing, err)
 
-	accountInfo := &Account{
+	accountInfo := &AccountData{
 		ID:           accountID,
 		Address:      accountAddress,
 		AddressIndex: accEd25519AddrIndex,
@@ -272,7 +273,7 @@ func (w *DockerWallet) CreateDelegationFromInput(clt *nodeclient.Client, issuerI
 	require.NoError(w.Testing, err)
 
 	delegationOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
-	w.AddOutput(delegationOutputId, &Output{
+	w.AddOutput(delegationOutputId, &OutputData{
 		ID:           delegationOutputId,
 		Output:       delegationOutput,
 		Address:      input.Address,
@@ -329,13 +330,13 @@ func (w *DockerWallet) CreateFoundryAndNativeTokensFromInput(clt *nodeclient.Cli
 	require.NoError(w.Testing, err)
 
 	foundryOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 1)
-	w.AddOutput(foundryOutputId, &Output{
+	w.AddOutput(foundryOutputId, &OutputData{
 		ID:      foundryOutputId,
 		Output:  foundryOutput,
 		Address: issuer.Address,
 	})
 
-	w.AddAccount(issuerId, &Account{
+	w.AddAccount(issuerId, &AccountData{
 		ID:           issuerId,
 		Address:      issuer.Address,
 		AddressIndex: issuer.AddressIndex,
@@ -400,13 +401,13 @@ func (w *DockerWallet) TransitionFoundry(clt *nodeclient.Client, issuerId iotago
 	require.NoError(w.Testing, err)
 
 	foundryOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 1)
-	w.AddOutput(foundryOutputId, &Output{
+	w.AddOutput(foundryOutputId, &OutputData{
 		ID:      foundryOutputId,
 		Output:  outputFoundry,
 		Address: issuer.Address,
 	})
 
-	w.AddAccount(issuerId, &Account{
+	w.AddAccount(issuerId, &AccountData{
 		ID:           issuerId,
 		Address:      issuer.Address,
 		AddressIndex: issuer.AddressIndex,
@@ -443,7 +444,7 @@ func (w *DockerWallet) CreateNFTFromInput(clt *nodeclient.Client, issuerId iotag
 	require.NoError(w.Testing, err)
 
 	nftOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
-	w.AddOutput(nftOutputId, &Output{
+	w.AddOutput(nftOutputId, &OutputData{
 		ID:           nftOutputId,
 		Output:       nftOutput,
 		Address:      nftAddress,

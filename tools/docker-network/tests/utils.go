@@ -55,7 +55,7 @@ func (d *DockerTestFramework) CheckAccountStatus(ctx context.Context, blkID iota
 	require.NoError(d.Testing, err)
 }
 
-func (d *DockerTestFramework) AssertIndexerAccount(account *Account) {
+func (d *DockerTestFramework) AssertIndexerAccount(account *AccountData) {
 	d.Eventually(func() error {
 		ctx := context.TODO()
 		indexerClt, err := d.Node("V1").Client.Indexer(ctx)

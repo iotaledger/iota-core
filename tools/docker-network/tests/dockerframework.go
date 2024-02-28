@@ -434,7 +434,7 @@ func (d *DockerTestFramework) CreateFoundryTransitionBlockFromInput(issuerId iot
 }
 
 // CreateAccountBlockFromInput consumes the given output, which should be either an basic output with implicit address, then build block with the given account output options. Note that after the returned transaction is issued, remember to update the account information in the wallet with AddAccount().
-func (d *DockerTestFramework) CreateAccountBlockFromInput(inputId iotago.OutputID, opts ...options.Option[builder.AccountOutputBuilder]) (*Account, iotago.OutputID, *iotago.Block) {
+func (d *DockerTestFramework) CreateAccountBlockFromInput(inputId iotago.OutputID, opts ...options.Option[builder.AccountOutputBuilder]) (*AccountData, iotago.OutputID, *iotago.Block) {
 	ctx := context.TODO()
 	clt := d.Node("V1").Client
 	input := d.wallet.Output(inputId)
@@ -457,7 +457,7 @@ func (d *DockerTestFramework) CreateAccountBlockFromInput(inputId iotago.OutputI
 }
 
 // CreateImplicitAccount requests faucet funds and creates an implicit account. It already wait until the transaction is committed and the created account is useable.
-func (d *DockerTestFramework) CreateImplicitAccount(ctx context.Context) *Account {
+func (d *DockerTestFramework) CreateImplicitAccount(ctx context.Context) *AccountData {
 	fundsOutputID := d.RequestFaucetFunds(ctx, iotago.AddressImplicitAccountCreation)
 
 	accountID := iotago.AccountIDFromOutputID(fundsOutputID)
@@ -465,7 +465,7 @@ func (d *DockerTestFramework) CreateImplicitAccount(ctx context.Context) *Accoun
 	require.True(d.Testing, ok)
 
 	// Note: the implicit account output is not an AccountOutput, thus we ignore the Output here.
-	accountInfo := &Account{
+	accountInfo := &AccountData{
 		ID:           accountID,
 		Address:      accountAddress,
 		AddressIndex: d.wallet.Output(fundsOutputID).AddressIndex,
@@ -480,7 +480,7 @@ func (d *DockerTestFramework) CreateImplicitAccount(ctx context.Context) *Accoun
 }
 
 // CreateAccount creates an new account from implicit one to full one, it already wait until the transaction is committed and the created account is useable.
-func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.AccountOutputBuilder]) *Account {
+func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.AccountOutputBuilder]) *AccountData {
 	// create an implicit account by requesting faucet funds
 	ctx := context.TODO()
 	implicitAccount := d.CreateImplicitAccount(ctx)
@@ -642,7 +642,7 @@ func (d *DockerTestFramework) RequestFaucetFunds(ctx context.Context, addressTyp
 	outputID, output, err := d.AwaitAddressUnspentOutputAccepted(ctx, address)
 	require.NoError(d.Testing, err)
 
-	d.wallet.AddOutput(outputID, &Output{
+	d.wallet.AddOutput(outputID, &OutputData{
 		ID:           outputID,
 		Address:      address,
 		AddressIndex: addrIndex,
