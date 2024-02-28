@@ -133,7 +133,7 @@ func New(
 			e.ReactiveModule = e.initReactiveModule(logger)
 
 			e.errorHandler = func(err error) {
-				e.LogTrace("engine error", "err", err)
+				e.LogError("engine error", "err", err)
 			}
 
 			// Import the settings from the snapshot file if needed.

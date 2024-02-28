@@ -125,7 +125,7 @@ func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.S
 			}
 
 			if accountDiff.BICChange != actualAccountDiff.BICChange {
-				return ierrors.Errorf("AssertAccountDiff: %s: expected change %d but actual %d for account %s at slot %d", node.Name, accountDiff.BICChange, actualAccountDiff.BICChange, accountID, index)
+				return ierrors.Errorf("AssertAccountDiff: %s: BIC expected change %d but actual %d for account %s at slot %d", node.Name, accountDiff.BICChange, actualAccountDiff.BICChange, accountID, index)
 			}
 
 			if accountDiff.PreviousUpdatedSlot != actualAccountDiff.PreviousUpdatedSlot {
