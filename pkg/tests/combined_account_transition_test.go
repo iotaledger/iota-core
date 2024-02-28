@@ -153,7 +153,7 @@ func createImplicitToFullAccount(ts *testsuite.TestSuite) iotago.AccountID {
 	block3Slot := ts.CurrentSlot()
 	tx4 := newUserWallet.TransitionImplicitAccountToAccountOutput(
 		"TX4",
-		[]string{"TX3:0"},
+		[]string{"TX3:0", "TX3:1"},
 		mock.WithBlockIssuerFeature(
 			iotago.BlockIssuerKeys{implicitBlockIssuerKey},
 			iotago.MaxSlotIndex,
