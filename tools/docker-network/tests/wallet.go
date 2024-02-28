@@ -26,6 +26,9 @@ import (
 type DockerWallet struct {
 	Testing *testing.T
 
+	// a map of clients for each node in the network
+	Clients map[string]*nodeclient.Client
+
 	keyManager *wallet.KeyManager
 
 	lastUsedIndex atomic.Uint32

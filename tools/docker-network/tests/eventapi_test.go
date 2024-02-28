@@ -53,7 +53,7 @@ func test_Commitments(t *testing.T, d *DockerTestFramework) {
 	finish := make(chan struct{})
 
 	// get event API client ready
-	clt := d.Node("V1").Client
+	clt := d.wallet.Clients["V1"]
 	ctx, cancel := context.WithCancel(context.Background())
 	eventClt, err := clt.EventAPI(ctx)
 	require.NoError(t, err)
@@ -89,7 +89,7 @@ func test_ValidationBlocks(t *testing.T, d *DockerTestFramework) {
 	finish := make(chan struct{})
 
 	// get event API client ready
-	clt := d.Node("V1").Client
+	clt := d.wallet.Clients["V1"]
 	ctx, cancel := context.WithCancel(context.Background())
 	eventClt, err := clt.EventAPI(ctx)
 	require.NoError(t, err)
@@ -115,7 +115,7 @@ func test_ValidationBlocks(t *testing.T, d *DockerTestFramework) {
 
 func test_BasicTaggedDataBlocks(t *testing.T, d *DockerTestFramework) {
 	// get event API client ready
-	clt := d.Node("V1").Client
+	clt := d.wallet.Clients["V1"]
 	ctx, cancel := context.WithCancel(context.Background())
 	eventClt, err := clt.EventAPI(ctx)
 	require.NoError(t, err)
@@ -161,7 +161,7 @@ func test_BasicTaggedDataBlocks(t *testing.T, d *DockerTestFramework) {
 
 func test_DelegationTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 	// get event API client ready
-	clt := d.Node("V1").Client
+	clt := d.wallet.Clients["V1"]
 	ctx, cancel := context.WithCancel(context.Background())
 	eventClt, err := clt.EventAPI(ctx)
 	require.NoError(t, err)
@@ -215,7 +215,7 @@ func test_DelegationTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 
 func test_AccountTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 	// get event API client ready
-	clt := d.Node("V1").Client
+	clt := d.wallet.Clients["V1"]
 	ctx, cancel := context.WithCancel(context.Background())
 	eventClt, err := clt.EventAPI(ctx)
 	require.NoError(t, err)
@@ -273,7 +273,7 @@ func test_AccountTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 
 func test_FoundryTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 	// get event API client ready
-	clt := d.Node("V1").Client
+	clt := d.wallet.Clients["V1"]
 	ctx, cancel := context.WithCancel(context.Background())
 	eventClt, err := clt.EventAPI(ctx)
 	require.NoError(t, err)
@@ -330,7 +330,7 @@ func test_FoundryTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 
 func test_NFTTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 	// get event API client ready
-	clt := d.Node("V1").Client
+	clt := d.wallet.Clients["V1"]
 	ctx, cancel := context.WithCancel(context.Background())
 	eventClt, err := clt.EventAPI(ctx)
 	require.NoError(t, err)
