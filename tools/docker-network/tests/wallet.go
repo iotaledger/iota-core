@@ -72,6 +72,10 @@ func NewDockerWallet(t *testing.T) *DockerWallet {
 	}
 }
 
+func (w *DockerWallet) DefaultClient() *nodeclient.Client {
+	return w.Clients["V1"]
+}
+
 func (w *DockerWallet) AddOutput(outputId iotago.OutputID, output *OutputData) {
 	w.outputs[outputId] = output
 }
