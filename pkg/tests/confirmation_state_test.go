@@ -79,7 +79,7 @@ func TestConfirmationFlags(t *testing.T) {
 		testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
 		testsuite.WithLatestCommitment(genesisCommitment),
 		testsuite.WithLatestFinalizedSlot(0),
-		testsuite.WithChainID(genesisCommitment.MustID()),
+		testsuite.WithMainChainID(genesisCommitment.MustID()),
 		testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment}),
 		testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
 		testsuite.WithSybilProtectionOnlineCommittee(lo.Return1(lo.Return1(nodeA.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountID))),

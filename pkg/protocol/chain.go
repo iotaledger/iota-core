@@ -57,6 +57,9 @@ type Chain struct {
 	// IsEvicted contains a flag that indicates whether this chain was evicted.
 	IsEvicted reactive.Event
 
+	// shouldEvict contains a flag that indicates whether this chain should be evicted.
+	shouldEvict reactive.Event
+
 	// chains contains a reference to the Chains instance that this chain belongs to.
 	chains *Chains
 
@@ -83,6 +86,7 @@ func newChain(chains *Chains) *Chain {
 		StartEngine:              reactive.NewVariable[bool](),
 		Engine:                   reactive.NewVariable[*engine.Engine](),
 		IsEvicted:                reactive.NewEvent(),
+		shouldEvict:              reactive.NewEvent(),
 
 		chains:      chains,
 		commitments: shrinkingmap.New[iotago.SlotIndex, *Commitment](),
@@ -126,6 +130,10 @@ func (c *Chain) LastCommonSlot() iotago.SlotIndex {
 func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (dispatched bool) {
 	if c == nil {
 		return false
+	} else if c.IsEvicted.Get() {
+		c.LogTrace("discard for evicted chain", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID())
+
+		return true
 	}
 
 	dispatched = c.dispatchBlockToSpawnedEngine(block, src)
@@ -146,7 +154,7 @@ func (c *Chain) Commitment(slot iotago.SlotIndex) (commitment *Commitment, exist
 		case slot > forkingPoint.Slot():
 			return currentChain.commitments.Get(slot)
 		default:
-			currentChain = c.ParentChain.Get()
+			currentChain = currentChain.ParentChain.Get()
 		}
 	}
 
@@ -181,6 +189,7 @@ func (c *Chain) initLogger() (shutdown func()) {
 		c.StartEngine.LogUpdates(c, log.LevelDebug, "StartEngine"),
 		c.Engine.LogUpdates(c, log.LevelTrace, "Engine", (*engine.Engine).LogName),
 		c.IsEvicted.LogUpdates(c, log.LevelTrace, "IsEvicted"),
+		c.shouldEvict.LogUpdates(c, log.LevelTrace, "shouldEvict"),
 
 		c.Logger.UnsubscribeFromParentLogger,
 	)
@@ -188,13 +197,47 @@ func (c *Chain) initLogger() (shutdown func()) {
 
 // initDerivedProperties initializes the behavior of this chain by setting up the relations between its properties.
 func (c *Chain) initDerivedProperties() (shutdown func()) {
-	return lo.Batch(
+	return lo.BatchReverse(
 		c.deriveWarpSyncMode(),
 
-		c.ForkingPoint.WithValue(c.deriveParentChain),
-		c.ParentChain.WithNonEmptyValue(lo.Bind(c, (*Chain).deriveChildChains)),
+		c.shouldEvict.OnTrigger(func() { go c.IsEvicted.Trigger() }),
+
+		lo.BatchReverse(
+			c.ForkingPoint.WithNonEmptyValue(func(forkingPoint *Commitment) (teardown func()) {
+				return lo.BatchReverse(
+					c.deriveParentChain(forkingPoint),
+
+					c.ParentChain.WithValue(func(parentChain *Chain) (teardown func()) {
+						return lo.BatchReverse(
+							parentChain.deriveChildChains(c),
+
+							c.deriveShouldEvict(forkingPoint, parentChain),
+						)
+					}),
+				)
+			}),
+		),
+
 		c.Engine.WithNonEmptyValue(c.deriveOutOfSyncThreshold),
 	)
+}
+
+// deriveShouldEvict defines how a chain determines whether it should be evicted (if it is not the main chain and either
+// its forking point or its parent chain is evicted).
+func (c *Chain) deriveShouldEvict(forkingPoint *Commitment, parentChain *Chain) (shutdown func()) {
+	if forkingPoint != nil && parentChain != nil {
+		return c.shouldEvict.DeriveValueFrom(reactive.NewDerivedVariable2(func(_, forkingPointIsEvicted bool, parentChainIsEvicted bool) bool {
+			return c.chains.Main.Get() != c && (forkingPointIsEvicted || parentChainIsEvicted)
+		}, forkingPoint.IsEvicted, parentChain.IsEvicted))
+	}
+
+	if forkingPoint != nil {
+		return c.shouldEvict.DeriveValueFrom(reactive.NewDerivedVariable(func(_, forkingPointIsEvicted bool) bool {
+			return c.chains.Main.Get() != c && forkingPointIsEvicted
+		}, forkingPoint.IsEvicted))
+	}
+
+	return
 }
 
 // deriveWarpSyncMode defines how a chain determines whether it is in warp sync mode or not.
@@ -211,12 +254,16 @@ func (c *Chain) deriveWarpSyncMode() func() {
 }
 
 // deriveChildChains defines how a chain determines its ChildChains (by adding each child to the set).
-func (c *Chain) deriveChildChains(child *Chain) func() {
-	c.ChildChains.Add(child)
+func (c *Chain) deriveChildChains(child *Chain) (teardown func()) {
+	if c != nil && c != child {
+		c.ChildChains.Add(child)
 
-	return func() {
-		c.ChildChains.Delete(child)
+		teardown = func() {
+			c.ChildChains.Delete(child)
+		}
 	}
+
+	return
 }
 
 // deriveParentChain defines how a chain determines its parent chain from its forking point (it inherits the Chain from
@@ -261,6 +308,10 @@ func (c *Chain) addCommitment(newCommitment *Commitment) (shutdown func()) {
 		newCommitment.IsAttested.OnTrigger(func() { c.LatestAttestedCommitment.Set(newCommitment) }),
 		newCommitment.IsVerified.OnTrigger(func() { c.LatestProducedCommitment.Set(newCommitment) }),
 		newCommitment.IsSynced.OnTrigger(func() { c.LatestSyncedSlot.Set(newCommitment.Slot()) }),
+
+		func() {
+			c.commitments.Delete(newCommitment.Slot())
+		},
 	)
 }
 
