@@ -5,6 +5,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/sajari/regression"
+
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -14,7 +16,6 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
-	"github.com/sajari/regression"
 )
 
 const (
@@ -405,7 +406,7 @@ func allotments(t *testing.T, numAllotments int) (float64, []float64) {
 			})
 			var accountIDs []iotago.AccountID
 			for i := 0; i < numAllotments; i++ {
-				accountOutput := ts.AccountOutput(fmt.Sprintf("Genesis:%d", i+3)).Output().(*iotago.AccountOutput)
+				accountOutput := ts.AccountOutput(fmt.Sprintf("Genesis:%d", i+3)).Output.(*iotago.AccountOutput)
 				accountIDs = append(accountIDs, accountOutput.AccountID)
 			}
 			tx1 := ts.DefaultWallet().AllotManaFromBasicOutput(

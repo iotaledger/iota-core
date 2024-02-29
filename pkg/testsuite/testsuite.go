@@ -138,13 +138,13 @@ func (t *TestSuite) Block(alias string) *blocks.Block {
 	return block
 }
 
-func (t *TestSuite) AccountOutput(alias string) *utxoledger.Output {
+func (t *TestSuite) AccountOutput(alias string) *mock.OutputData {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	output := t.DefaultWallet().Output(alias)
+	output := t.DefaultWallet().OutputData(alias)
 
-	if _, ok := output.Output().(*iotago.AccountOutput); !ok {
+	if _, ok := output.Output.(*iotago.AccountOutput); !ok {
 		panic(fmt.Sprintf("output %s is not an account", alias))
 	}
 
@@ -542,7 +542,7 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 	if _, firstNode, exists := t.nodes.Head(); exists {
 		t.wallets.ForEach(func(_ string, wallet *mock.Wallet) bool {
 			if err := firstNode.Protocol.Engines.Main.Get().Ledger.ForEachUnspentOutput(func(output *utxoledger.Output) bool {
-				wallet.AddOutput(fmt.Sprintf("Genesis:%d", output.OutputID().Index()), output)
+				wallet.AddOutput(fmt.Sprintf("Genesis:%d", output.OutputID().Index()), mock.OutputDataFromUTXOLedgerOutput(output))
 				return true
 			}); err != nil {
 				panic(err)

@@ -12,6 +12,24 @@ import (
 	"github.com/iotaledger/iota.go/v4/wallet"
 )
 
+type OutputData struct {
+	// ID is the unique identifier of the output.
+	ID iotago.OutputID
+	// Output is the iotago Output.
+	Output iotago.Output
+	// Address is the address of the output.
+	Address iotago.Address
+	// AddressIndex is the index of the address in the keyManager.
+	AddressIndex uint32
+}
+
+func OutputDataFromUTXOLedgerOutput(output *utxoledger.Output) *OutputData {
+	return &OutputData{
+		ID:     output.OutputID(),
+		Output: output.Output(),
+	}
+}
+
 // Wallet is an object representing a wallet (similar to a FireFly wallet) capable of the following:
 // - hierarchical deterministic key management
 // - signing transactions
@@ -28,7 +46,7 @@ type Wallet struct {
 
 	BlockIssuer *BlockIssuer
 
-	outputs      map[string]*utxoledger.Output
+	outputs      map[string]*OutputData
 	transactions map[string]*iotago.Transaction
 	currentSlot  iotago.SlotIndex
 }
@@ -45,7 +63,7 @@ func NewWallet(t *testing.T, name string, node *Node, keyManager ...*wallet.KeyM
 		Testing:      t,
 		Name:         name,
 		Node:         node,
-		outputs:      make(map[string]*utxoledger.Output),
+		outputs:      make(map[string]*OutputData),
 		transactions: make(map[string]*iotago.Transaction),
 		keyManager:   km,
 		BlockIssuer:  NewBlockIssuer(t, name, km, iotago.EmptyAccountID, false),
@@ -73,20 +91,20 @@ func (w *Wallet) SetCurrentSlot(slot iotago.SlotIndex) {
 	w.currentSlot = slot
 }
 
-func (w *Wallet) AddOutput(outputName string, output *utxoledger.Output) {
+func (w *Wallet) AddOutput(outputName string, output *OutputData) {
 	w.outputs[outputName] = output
 }
 
 func (w *Wallet) Balance() iotago.BaseToken {
 	var balance iotago.BaseToken
-	for _, output := range w.outputs {
-		balance += output.BaseTokenAmount()
+	for _, outputData := range w.outputs {
+		balance += outputData.Output.BaseTokenAmount()
 	}
 
 	return balance
 }
 
-func (w *Wallet) Output(outputName string) *utxoledger.Output {
+func (w *Wallet) OutputData(outputName string) *OutputData {
 	output, exists := w.outputs[outputName]
 	if !exists {
 		panic(ierrors.Errorf("output %s not registered in wallet %s", outputName, w.Name))
@@ -95,9 +113,9 @@ func (w *Wallet) Output(outputName string) *utxoledger.Output {
 	return output
 }
 
-func (w *Wallet) AccountOutput(outputName string) *utxoledger.Output {
-	output := w.Output(outputName)
-	if _, ok := output.Output().(*iotago.AccountOutput); !ok {
+func (w *Wallet) AccountOutputData(outputName string) *OutputData {
+	output := w.OutputData(outputName)
+	if _, ok := output.Output.(*iotago.AccountOutput); !ok {
 		panic(ierrors.Errorf("output %s is not an account output", outputName))
 	}
 

@@ -41,7 +41,7 @@ func setupRewardTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *mock
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              node1.Validator.AccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.MaxBlockIssuanceCredits/2, 0),
-		OutputID:        validatorAccountOutput.OutputID(),
+		OutputID:        validatorAccountOutput.ID,
 		ExpirySlot:      iotago.MaxSlotIndex,
 		BlockIssuerKeys: node1.Validator.BlockIssuerKeys(),
 		StakeEndEpoch:   iotago.MaxEpochIndex,
@@ -52,7 +52,7 @@ func setupRewardTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *mock
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              wallet.BlockIssuer.AccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.MaxBlockIssuanceCredits/2, 0),
-		OutputID:        blockIssuerAccountOutput.OutputID(),
+		OutputID:        blockIssuerAccountOutput.ID,
 		ExpirySlot:      iotago.MaxSlotIndex,
 		BlockIssuerKeys: wallet.BlockIssuer.BlockIssuerKeys(),
 	}, ts.Nodes()...)
@@ -185,13 +185,13 @@ func Test_Account_RemoveStakingFeatureWithoutRewards(t *testing.T) {
 
 	ts.AssertTransactionsExist([]*iotago.Transaction{tx2.Transaction}, true, node1)
 	ts.AssertTransactionsInCacheAccepted([]*iotago.Transaction{tx2.Transaction}, true, node1)
-	accountOutput := ts.DefaultWallet().Output("TX2:0")
-	accountID := accountOutput.Output().(*iotago.AccountOutput).AccountID
+	accountOutput := ts.DefaultWallet().OutputData("TX2:0")
+	accountID := accountOutput.Output.(*iotago.AccountOutput).AccountID
 
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              accountID,
 		Credits:         &accounts.BlockIssuanceCredits{Value: 0, UpdateSlot: block1Slot},
-		OutputID:        accountOutput.OutputID(),
+		OutputID:        accountOutput.ID,
 		ExpirySlot:      blockIssuerFeatExpirySlot,
 		BlockIssuerKeys: iotago.BlockIssuerKeys{blockIssuerFeatKey},
 		StakeEndEpoch:   0,
@@ -203,8 +203,8 @@ func Test_Account_RemoveStakingFeatureWithoutRewards(t *testing.T) {
 		PreviousUpdatedSlot:    0,
 		NewExpirySlot:          blockIssuerFeatExpirySlot,
 		PreviousExpirySlot:     blockIssuerFeatExpirySlot,
-		NewOutputID:            accountOutput.OutputID(),
-		PreviousOutputID:       ts.DefaultWallet().Output("TX1:0").OutputID(),
+		NewOutputID:            accountOutput.ID,
+		PreviousOutputID:       ts.DefaultWallet().OutputData("TX1:0").ID,
 		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(),
 		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(),
 		ValidatorStakeChange:   -int64(stakedAmount),
@@ -284,8 +284,8 @@ func Test_Account_StakeAmountCalculation(t *testing.T) {
 	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
 	latestParents := ts.CommitUntilSlot(block1Slot, block1.ID())
 
-	account := ts.DefaultWallet().Output("TX1:0")
-	accountID := iotago.AccountIDFromOutputID(account.OutputID())
+	account := ts.DefaultWallet().OutputData("TX1:0")
+	accountID := iotago.AccountIDFromOutputID(account.ID)
 	accountAddress := iotago.AccountAddress(accountID[:])
 
 	ts.AssertAccountStake(accountID, 0, 0, ts.Nodes()...)

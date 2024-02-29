@@ -308,12 +308,12 @@ func validatorTest(t *testing.T, test ValidatorTest) {
 	retentionPeriod := iotago.EpochIndex(ts.API.ProtocolParameters().RewardsParameters().RetentionPeriod)
 
 	for _, validatorAccount := range []string{"Genesis:1", "Genesis:2"} {
-		output := ts.DefaultWallet().Output(validatorAccount)
-		accountID := output.Output().(*iotago.AccountOutput).AccountID
+		output := ts.DefaultWallet().OutputData(validatorAccount)
+		accountID := output.Output.(*iotago.AccountOutput).AccountID
 
 		rewardMana, _, _, err := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().SybilProtection.ValidatorReward(
 			accountID,
-			output.Output().FeatureSet().Staking(),
+			output.Output.FeatureSet().Staking(),
 			claimingEpoch,
 		)
 		if err != nil {

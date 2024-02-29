@@ -66,8 +66,8 @@ func transitionAccountWithInvalidSignature(ts *testsuite.TestSuite) iotago.Accou
 	block2Slot := block2.ID().Slot()
 	latestParents := ts.CommitUntilSlot(block2Slot, block2.ID())
 
-	implicitAccountOutput := newUserWallet.Output("TX3:0")
-	implicitAccountOutputID := implicitAccountOutput.OutputID()
+	implicitAccountOutput := newUserWallet.OutputData("TX3:0")
+	implicitAccountOutputID := implicitAccountOutput.ID
 	implicitAccountID := iotago.AccountIDFromOutputID(implicitAccountOutputID)
 	var implicitBlockIssuerKey iotago.BlockIssuerKey = iotago.Ed25519PublicKeyHashBlockIssuerKeyFromImplicitAccountCreationAddress(newUserWallet.ImplicitAccountCreationAddress())
 
