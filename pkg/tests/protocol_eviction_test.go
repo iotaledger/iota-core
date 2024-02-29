@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -188,6 +187,4 @@ func TestProtocol_Eviction(t *testing.T) {
 	memConsumptionEnd := memsize.Scan(node.Protocol).Total
 
 	require.Less(t, float64(lo.Return1(memConsumptionEnd)), 1.05*float64(memConsumptionStart), "memory consumption should not grow by more than 5%")
-
-	fmt.Println(node.Protocol.Inspect())
 }
