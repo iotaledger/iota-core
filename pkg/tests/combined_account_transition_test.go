@@ -126,7 +126,7 @@ func createImplicitToFullAccount(ts *testsuite.TestSuite) iotago.AccountID {
 
 	// CREATE IMPLICIT ACCOUNT FROM GENESIS BASIC UTXO, SENT TO A NEW USER WALLET.
 	// a default wallet, already registered in the ledger, will issue the transaction and block.
-	tx3 := ts.DefaultWallet().CreateImplicitAccountFromInput(
+	tx3 := ts.DefaultWallet().CreateImplicitAccountAndBasicOutputFromInput(
 		"TX3",
 		"TX1:1",
 		newUserWallet,
@@ -153,12 +153,11 @@ func createImplicitToFullAccount(ts *testsuite.TestSuite) iotago.AccountID {
 	block3Slot := ts.CurrentSlot()
 	tx4 := newUserWallet.TransitionImplicitAccountToAccountOutput(
 		"TX4",
-		"TX3:0",
+		[]string{"TX3:0", "TX3:1"},
 		mock.WithBlockIssuerFeature(
 			iotago.BlockIssuerKeys{implicitBlockIssuerKey},
 			iotago.MaxSlotIndex,
 		),
-		mock.WithAccountAmount(mock.MinIssuerAccountAmount(ts.API.ProtocolParameters())),
 	)
 	block2Commitment := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
 	block3 := ts.IssueBasicBlockWithOptions("block3", newUserWallet, tx4, mock.WithStrongParents(latestParents...))

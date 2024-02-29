@@ -29,8 +29,8 @@ func (t *TestSuite) AssertNodeState(nodes []*mock.Node, opts ...options.Option[N
 	if state.latestFinalizedSlot != nil {
 		t.AssertLatestFinalizedSlot(*state.latestFinalizedSlot, nodes...)
 	}
-	if state.chainID != nil {
-		t.AssertChainID(*state.chainID, nodes...)
+	if state.mainChainID != nil {
+		t.AssertMainChain(*state.mainChainID, nodes...)
 	}
 	if state.sybilProtectionCommitteeEpoch != nil && state.sybilProtectionCommittee != nil {
 		t.AssertSybilProtectionCommittee(*state.sybilProtectionCommitteeEpoch, *state.sybilProtectionCommittee, nodes...)
@@ -57,7 +57,7 @@ func (t *TestSuite) AssertNodeState(nodes []*mock.Node, opts ...options.Option[N
 		t.AssertEvictedSlot(*state.evictedSlot, nodes...)
 	}
 	if state.chainManagerSolid != nil && *state.chainManagerSolid {
-		t.AssertChainManagerIsSolid(nodes...)
+		t.AssertLatestEngineCommitmentOnMainChain(nodes...)
 	}
 }
 
@@ -68,7 +68,7 @@ type NodeState struct {
 	latestCommitmentSlot             *iotago.SlotIndex
 	latestCommitmentCumulativeWeight *uint64
 	latestFinalizedSlot              *iotago.SlotIndex
-	chainID                          *iotago.CommitmentID
+	mainChainID                      *iotago.CommitmentID
 
 	sybilProtectionCommitteeEpoch  *iotago.EpochIndex
 	sybilProtectionCommittee       *[]iotago.AccountID
@@ -129,9 +129,9 @@ func WithLatestFinalizedSlot(slot iotago.SlotIndex) options.Option[NodeState] {
 	}
 }
 
-func WithChainID(chainID iotago.CommitmentID) options.Option[NodeState] {
+func WithMainChainID(chainID iotago.CommitmentID) options.Option[NodeState] {
 	return func(state *NodeState) {
-		state.chainID = &chainID
+		state.mainChainID = &chainID
 	}
 }
 

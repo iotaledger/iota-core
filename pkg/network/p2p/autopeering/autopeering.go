@@ -3,6 +3,7 @@ package autopeering
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -183,19 +184,38 @@ func (m *Manager) discoveryLoop() {
 	}
 }
 
+func randomSubset[T any](slice []T, n int) []T {
+	if n >= len(slice) {
+		rand.Shuffle(len(slice), func(i, j int) {
+			slice[i], slice[j] = slice[j], slice[i]
+		})
+
+		return slice
+	}
+
+	subset := make([]T, n)
+	indices := rand.Perm(len(slice)) // Get a slice of random unique indices
+	for i := 0; i < n; i++ {
+		subset[i] = slice[indices[i]]
+	}
+
+	return subset
+}
+
 func (m *Manager) discoverAndDialPeers() {
 	autopeeringNeighbors := m.networkManager.AutopeeringNeighbors()
 	peersToFind := m.maxPeers - len(autopeeringNeighbors)
 	if peersToFind == 0 {
-		m.logger.LogDebugf("%d autopeering peers connected, not discovering new ones. (max %d)", len(autopeeringNeighbors), m.maxPeers)
+		m.logger.LogDebugf("%d autopeering neighbors connected, not discovering new ones. (max %d)", len(autopeeringNeighbors), m.maxPeers)
 		return
 	}
 
 	if peersToFind < 0 {
-		m.logger.LogDebugf("Too many autopeering peers connected %d, disconnecting some", -peersToFind)
-		for i := peersToFind; i < 0; i++ {
-			if err := m.networkManager.DropNeighbor(autopeeringNeighbors[i].Peer().ID); err != nil {
-				m.logger.LogDebugf("Failed to disconnect neighbor %s", autopeeringNeighbors[i].Peer().ID)
+		neighborsToDrop := randomSubset(autopeeringNeighbors, -peersToFind)
+		m.logger.LogDebugf("Too many autopeering neighbors connected %d, disconnecting some", len(neighborsToDrop))
+		for _, peer := range neighborsToDrop {
+			if err := m.networkManager.DropNeighbor(peer.Peer().ID); err != nil {
+				m.logger.LogDebugf("Failed to disconnect neighbor %s", peer.Peer().ID)
 			}
 		}
 
@@ -205,7 +225,7 @@ func (m *Manager) discoverAndDialPeers() {
 	findCtx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
 	defer cancel()
 
-	m.logger.LogDebugf("%d autopeering peers connected. Discovering new peers for namespace %s", len(autopeeringNeighbors), m.namespace)
+	m.logger.LogDebugf("%d autopeering neighbors connected. Discovering new peers for namespace %s", len(autopeeringNeighbors), m.namespace)
 	peerChan, err := m.routingDiscovery.FindPeers(findCtx, m.namespace)
 	if err != nil {
 		m.logger.LogWarnf("Failed to find peers: %s", err)
