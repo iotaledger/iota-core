@@ -5,6 +5,7 @@ go 1.22.0
 replace github.com/goccy/go-graphviz => github.com/alexsporn/go-graphviz v0.0.0-20231011102718-04f10f0a9b59
 
 require (
+	github.com/fjl/memsize v0.0.2
 	github.com/goccy/go-graphviz v0.1.2
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/uuid v1.6.0
@@ -25,7 +26,7 @@ require (
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20240223142044-12ffcb37c413
 	github.com/iotaledger/hive.go/stringify v0.0.0-20240223142044-12ffcb37c413
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20240216141618-d7dfe94bdc1e
-	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20240216141023-6d5f4ef12ac5
+	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20240229132256-596800e0c870
 	github.com/iotaledger/iota-crypto-demo v0.0.0-20240216103559-27ca8dffd1e7
 	github.com/iotaledger/iota.go/v4 v4.0.0-20240228104340-25491bf70f39
 	github.com/labstack/echo/v4 v4.11.4
@@ -66,7 +67,6 @@ require (
 	github.com/ethereum/go-ethereum v1.13.13 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/felixge/fgprof v0.9.3 // indirect
-	github.com/fjl/memsize v0.0.2 // indirect
 	github.com/flynn/noise v1.1.0 // indirect
 	github.com/fogleman/gg v1.3.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect

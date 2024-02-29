@@ -31,6 +31,7 @@ func inxNodeStatus(status *syncmanager.SyncStatus) *inx.NodeStatus {
 		LatestCommitment:          inxCommitment(status.LatestCommitment),
 		LatestFinalizedCommitment: inxCommitment(finalizedCommitment),
 		PruningEpoch:              uint32(status.LastPrunedEpoch),
+		HasPruned:                 status.HasPruned,
 	}
 }
 
