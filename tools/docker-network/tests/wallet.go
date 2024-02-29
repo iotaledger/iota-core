@@ -68,6 +68,7 @@ func NewDockerWallet(t *testing.T) *DockerWallet {
 		Testing:    t,
 		outputs:    make(map[iotago.OutputID]*OutputData),
 		accounts:   make(map[iotago.AccountID]*AccountData),
+		Clients:    make(map[string]*nodeclient.Client),
 		keyManager: lo.PanicOnErr(wallet.NewKeyManagerFromRandom(wallet.DefaultIOTAPath)),
 	}
 }
