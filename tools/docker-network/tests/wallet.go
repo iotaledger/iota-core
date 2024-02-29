@@ -242,12 +242,20 @@ func (w *DockerWallet) TransitionImplicitAccountToAccountOutput(inputId iotago.O
 		Build()
 	require.NoError(w.Testing, err)
 
+	accountOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
+	w.AddOutput(accountOutputId, &OutputData{
+		ID:           accountOutputId,
+		Output:       accountOutput,
+		Address:      accEd25519Addr,
+		AddressIndex: accEd25519AddrIndex,
+	})
+
 	accountInfo := &AccountData{
 		ID:           accountID,
 		Address:      accountAddress,
 		AddressIndex: accEd25519AddrIndex,
 		Output:       accountOutput,
-		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0),
+		OutputID:     accountOutputId,
 	}
 
 	return accountInfo, signedTx
