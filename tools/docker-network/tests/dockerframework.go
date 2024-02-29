@@ -374,12 +374,10 @@ func (d *DockerTestFramework) CreateDelegationBlockFromInput(issuerId iotago.Acc
 	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, issuer.Address)
 
 	signedTx := d.wallet.CreateDelegationFromInput(issuerId, validator, inputId, issuerResp)
-	delegationOutput := signedTx.Transaction.Outputs[0].(*iotago.DelegationOutput)
-	txId, err := signedTx.Transaction.ID()
-	require.NoError(d.Testing, err)
+	outputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
 
-	return delegationOutput.DelegationID,
-		iotago.OutputIDFromTransactionIDAndIndex(txId, 0),
+	return iotago.DelegationIDFromOutputID(outputId),
+		outputId,
 		d.CreateBlock(ctx, signedTx, issuerId, congestionResp, issuerResp)
 }
 
@@ -407,11 +405,10 @@ func (d *DockerTestFramework) CreateNFTBlockFromInput(issuerId iotago.AccountID,
 
 	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, issuer.Address)
 	signedTx := d.wallet.CreateNFTFromInput(issuerId, inputId, issuerResp, opts...)
-	txId, err := signedTx.Transaction.ID()
-	require.NoError(d.Testing, err)
+	outputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
 
-	return signedTx.Transaction.Outputs[0].(*iotago.NFTOutput).NFTID,
-		iotago.OutputIDFromTransactionIDAndIndex(txId, 0),
+	return iotago.NFTIDFromOutputID(outputId),
+		outputId,
 		d.CreateBlock(ctx, signedTx, issuerId, congestionResp, issuerResp)
 }
 
@@ -440,7 +437,7 @@ func (d *DockerTestFramework) CreateAccountBlockFromInput(inputId iotago.OutputI
 	// check if the given input is an BasicOutput with implicit address
 	implicitOutput, ok := input.Output.(*iotago.BasicOutput)
 	require.True(d.Testing, ok)
-	require.Equal(d.Testing, iotago.AddressImplicitAccountCreation, implicitOutput.UnlockConditionSet().Address().Type())
+	require.Equal(d.Testing, iotago.AddressImplicitAccountCreation, implicitOutput.UnlockConditionSet().Address().Address.Type())
 	accAddress := iotago.AccountAddressFromOutputID(inputId)
 
 	// enable skipBICCheck, bc the implicit account has 0 BIC, but it'll get BIC after the account transition.

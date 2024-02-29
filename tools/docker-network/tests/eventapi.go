@@ -284,7 +284,12 @@ func (d *DockerTestFramework) AssertDelegationOutput(ctx context.Context, eventC
 		d.assertOutputMetadataTopics(ctx, "AssertDelegationOutput", outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
 			if resp.Output.Type() == iotago.OutputDelegation {
 				o := resp.Output.(*iotago.DelegationOutput)
-				return delegationId.Matches(o.DelegationID)
+				actualDelegationID := o.DelegationID
+				if actualDelegationID.Empty() {
+					actualDelegationID = iotago.DelegationIDFromOutputID(resp.Metadata.OutputID)
+				}
+
+				return delegationId.Matches(actualDelegationID)
 			}
 			return false
 		}, finishChan)
@@ -316,6 +321,10 @@ func (d *DockerTestFramework) AssertAccountOutput(ctx context.Context, eventClt 
 		d.assertOutputMetadataTopics(ctx, "AssertAccountOutput", outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
 			if resp.Output.Type() == iotago.OutputAccount {
 				o := resp.Output.(*iotago.AccountOutput)
+				actualAccountID := o.AccountID
+				if actualAccountID.Empty() {
+					actualAccountID = iotago.AccountIDFromOutputID(resp.Metadata.OutputID)
+				}
 				return accountId.Matches(o.AccountID)
 			}
 			return false
@@ -332,6 +341,10 @@ func (d *DockerTestFramework) AssertAnchorOutput(ctx context.Context, eventClt *
 		d.assertOutputMetadataTopics(ctx, "AssertNFTOutput", outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
 			if resp.Output.Type() == iotago.OutputAnchor {
 				o := resp.Output.(*iotago.AnchorOutput)
+				actualAnchorID := o.AnchorID
+				if actualAnchorID.Empty() {
+					actualAnchorID = iotago.AnchorIDFromOutputID(resp.Metadata.OutputID)
+				}
 				return anchorId.Matches(o.AnchorID)
 			}
 			return false
@@ -348,7 +361,11 @@ func (d *DockerTestFramework) AssertNFTOutput(ctx context.Context, eventClt *nod
 		d.assertOutputMetadataTopics(ctx, "AssertNFTOutput", outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
 			if resp.Output.Type() == iotago.OutputNFT {
 				o := resp.Output.(*iotago.NFTOutput)
-				return nftId.Matches(o.NFTID)
+				actualNFTID := o.NFTID
+				if actualNFTID.Empty() {
+					actualNFTID = iotago.NFTIDFromOutputID(resp.Metadata.OutputID)
+				}
+				return nftId.Matches(actualNFTID)
 			}
 			return false
 		}, finishChan)

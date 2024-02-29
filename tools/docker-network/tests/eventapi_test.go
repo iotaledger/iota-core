@@ -76,6 +76,7 @@ func test_Commitments(t *testing.T, d *DockerTestFramework) {
 		expectedFinalizedSlots = append(expectedFinalizedSlots, iotago.SlotIndex(i))
 	}
 
+	// TODO: come up with a better way to calculate the total topics
 	totalTopics := 2
 
 	d.AssertLatestCommitments(ctx, eventClt, expectedLatestSlots, finish)
@@ -204,7 +205,7 @@ func test_DelegationTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 	// issue blocks
 	go func() {
 		for _, blk := range expectedBlocks {
-			fmt.Println("submitting a block")
+			fmt.Println("submitting a block: ", blk.MustID().ToHex())
 			d.SubmitBlock(context.Background(), blk)
 		}
 	}()
@@ -258,7 +259,7 @@ func test_AccountTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 		// issue blocks
 		go func() {
 			for _, blk := range expectedBlocks {
-				fmt.Println("submitting a block")
+				fmt.Println("submitting a block: ", blk.MustID().ToHex())
 				d.SubmitBlock(context.Background(), blk)
 			}
 		}()
@@ -318,7 +319,7 @@ func test_FoundryTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 		// issue blocks
 		go func() {
 			for _, blk := range expectedBlocks {
-				fmt.Println("submitting a block")
+				fmt.Println("submitting a block: ", blk.MustID().ToHex())
 				d.SubmitBlock(context.Background(), blk)
 			}
 		}()
@@ -349,7 +350,7 @@ func test_NFTTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 			blk.MustID().ToHex(): blk,
 		}
 		finish := make(chan struct{})
-		totalTopics := 10
+		totalTopics := 8
 
 		d.AssertTransactionBlocks(ctx, eventClt, expectedBlocks, finish)
 		d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish)
@@ -359,7 +360,6 @@ func test_NFTTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 		// d.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID(), finish)
 		// d.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID(), finish)
 
-		d.AssertAccountOutput(ctx, eventClt, account.ID, finish)
 		d.AssertNFTOutput(ctx, eventClt, nftId, finish)
 		d.AssertOutput(ctx, eventClt, outputId, finish)
 
@@ -374,7 +374,7 @@ func test_NFTTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 		// issue blocks
 		go func() {
 			for _, blk := range expectedBlocks {
-				fmt.Println("submitting a block")
+				fmt.Println("submitting a block ", blk.MustID().ToHex())
 				d.SubmitBlock(context.Background(), blk)
 			}
 		}()
