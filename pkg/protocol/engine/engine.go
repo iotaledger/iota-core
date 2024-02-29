@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -227,6 +228,72 @@ func New(
 				e.Reset()
 			}
 
+			// Check if consistency of commitment and ledger state in the storage;
+			// In addition, check the correctness of computing commitment
+			checkConsistentCommitmentAndLedgerState := true
+
+			//fmt.Println(importSnapshot)
+
+			// Don't perform the following if the state was imported from the snapshot
+			// As no necessary data from prunable storage in this case
+			if checkConsistentCommitmentAndLedgerState && !importSnapshot {
+				fmt.Println("Check is started")
+				// Get the latest commitment
+				latestCommitment := e.Storage.Settings().LatestCommitment()
+				latestCommitmentID := latestCommitment.ID()
+				latestCommittedSlotIndex := latestCommitment.Slot()
+
+				// Get the state root in the permanent storage (that corresponds to the last commitment)
+				latestStateRoot := e.Storage.Ledger().StateTreeRoot()
+
+				// Load root storage from prunable storage
+				rootsStorage, err := e.Storage.Roots(latestCommittedSlotIndex)
+				if err != nil {
+					panic(ierrors.Wrap(err, "failed to load roots storage"))
+				}
+				// Check the following only when the last committed slot index is after the genesis slot
+				if latestCommittedSlotIndex > e.CommittedAPI().ProtocolParameters().GenesisSlot() {
+					fmt.Println("last com slot ", latestCommittedSlotIndex, ", gen slot = ", e.CommittedAPI().ProtocolParameters().GenesisSlot())
+					// Load roots from prunable storage that correspond to the last committed slot index and commitment
+					roots, exists, err := rootsStorage.Load(latestCommitmentID)
+					if err != nil {
+						panic(ierrors.Wrap(err, "failed to load roots from prunable storage"))
+					} else if !exists {
+						panic(ierrors.Wrap(err, "roots not found"))
+					}
+
+					// Check the correctness of stored state root and the state root computed from the stored ledger state
+					if roots.StateRoot != latestStateRoot {
+						panic(ierrors.Wrap(err, "computed state root from storage does not correspond to stored state root"))
+					}
+
+					// Load the previous commitment
+					previousCommitment, err := e.Storage.Commitments().Load(latestCommittedSlotIndex - 1)
+					if err != nil {
+						panic(ierrors.Wrap(err, "failed to load previous commitment"))
+					}
+
+					// Recompute the commitment using roots.ID() from prunable storage and other information from permanent storage
+					computeCurrentCommitment := iotago.NewCommitment(
+						latestCommitment.Commitment().ProtocolVersion,
+						latestCommittedSlotIndex,
+						previousCommitment.ID(),
+						roots.ID(),
+						latestCommitment.CumulativeWeight(),
+						latestCommitment.ReferenceManaCost(),
+					)
+					computeCurrentCommitmentID := computeCurrentCommitment.MustID()
+
+					// Check if the computed commitment ID matches the stored one
+					if computeCurrentCommitmentID != latestCommitmentID {
+						panic(ierrors.Wrap(err, "Computed commitment ID is different from the stored one"))
+
+					}
+
+				}
+				fmt.Println("Check is done")
+			}
+
 			e.Initialized.Trigger()
 
 			e.LogTrace("initialized", "settings", e.Storage.Settings().String())
@@ -272,6 +339,64 @@ func (e *Engine) Reset() {
 
 func (e *Engine) BlockFromCache(id iotago.BlockID) (*blocks.Block, bool) {
 	return e.BlockCache.Block(id)
+}
+
+// Check whether the latest commitment is consistent with the ledger state.
+// It uses prunable, permanent storage and current state in SyncManager
+func (e *Engine) CheckConsistencyLatestCommitment() (correctness bool, err error) {
+
+	// Get the latest commitment and its ID
+	latestCommitment := e.SyncManager.LatestCommitment()
+	latestCommitmentID := latestCommitment.ID()
+
+	// Get the last committed slot index
+	lastCommittedSlotIndex := latestCommitment.Slot()
+
+	// Get the state root in the permanent storage (that corresponds to the last commitment)
+	lastStateRoot := e.Storage.Ledger().StateTreeRoot()
+
+	// Load root storage from prunable storage
+	rootsStorage, err := e.Storage.Roots(lastCommittedSlotIndex)
+	if err != nil {
+		return false, ierrors.Wrap(err, "failed to load roots storage")
+	}
+
+	// Load roots from prunable storage that correspond to the last committed slot index and commitment
+	roots, exists, err := rootsStorage.Load(latestCommitmentID)
+	if err != nil {
+		return false, ierrors.New("failed to load roots from prunable storage")
+	} else if !exists {
+		return false, ierrors.New("roots not found")
+	}
+
+	// Check the correctness of stored state root and the state root computed from the stored ledger state
+	if roots.StateRoot != lastStateRoot {
+		return false, ierrors.New("computed state root from storage does not correspond to stored state root")
+	}
+
+	// Load the previous commitment
+	previousCommitment, err := e.Storage.Commitments().Load(lastCommittedSlotIndex - 1)
+	if err != nil {
+		return false, ierrors.New("failed to load previous commitment")
+	}
+
+	// Recompute the commitment using roots.ID() from prunable storage and other information from permanent storage
+	computeCurrentCommitment := iotago.NewCommitment(
+		latestCommitment.Commitment().ProtocolVersion,
+		lastCommittedSlotIndex,
+		previousCommitment.ID(),
+		roots.ID(),
+		latestCommitment.CumulativeWeight(),
+		latestCommitment.ReferenceManaCost(),
+	)
+	computeCurrentCommitmentID := computeCurrentCommitment.MustID()
+
+	// Check if the computed commitment ID matches the stored one
+	if computeCurrentCommitmentID != latestCommitmentID {
+		return false, ierrors.New("Computed commitment ID is different from the stored one")
+	}
+
+	return true, nil
 }
 
 func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {
@@ -377,6 +502,8 @@ func (e *Engine) ImportContents(reader io.ReadSeeker) (err error) {
 		return ierrors.Wrap(err, "failed to import attestation state")
 	} else if err = e.UpgradeOrchestrator.Import(reader); err != nil {
 		return ierrors.Wrap(err, "failed to import upgrade orchestrator")
+	} else if err = e.Storage.ImportRoots(reader, e.Storage.Settings().LatestCommitment()); err != nil {
+		return ierrors.Wrap(err, "failed to import roots")
 	}
 
 	return
@@ -403,6 +530,8 @@ func (e *Engine) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err
 		return ierrors.Wrap(err, "failed to export attestation state")
 	} else if err = e.UpgradeOrchestrator.Export(writer, targetSlot); err != nil {
 		return ierrors.Wrap(err, "failed to export upgrade orchestrator")
+	} else if err = e.Storage.ExportRoots(writer, targetCommitment.Commitment()); err != nil {
+		return ierrors.Wrap(err, "failed to export roots")
 	}
 
 	return

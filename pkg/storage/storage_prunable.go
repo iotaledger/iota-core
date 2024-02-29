@@ -1,8 +1,12 @@
 package storage
 
 import (
+	"io"
+
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/serializer/v2"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
@@ -107,6 +111,166 @@ func (s *Storage) Roots(slot iotago.SlotIndex) (*slotstore.Store[iotago.Commitme
 	}
 
 	return s.prunable.Roots(slot)
+}
+
+func (s *Storage) ExportRoots(writer io.WriteSeeker, targetCommitment *iotago.Commitment) error {
+	slotIndex := targetCommitment.Slot
+	commitmentID, err := targetCommitment.ID()
+
+	if err != nil {
+		return ierrors.Wrap(err, "can not retrieve commitment id")
+	}
+	// Load root storage from prunable storage
+	rootsStorage, errRoots := s.Roots(slotIndex)
+
+	if errRoots != nil {
+		return ierrors.Wrap(err, "failed to load roots storage")
+	}
+
+	roots, exists, errLoad := rootsStorage.Load(commitmentID)
+	if errLoad != nil {
+		return ierrors.Wrap(err, "failed to load roots from prunable storage")
+	} else if !exists {
+		return ierrors.Wrap(err, "roots not found")
+	}
+
+	accountRootBytes, erAcc := roots.AccountRoot.Bytes()
+	if erAcc != nil {
+		return ierrors.Wrap(err, "failed to load account root bytes")
+	}
+
+	attestationRootBytes, erAtt := roots.AttestationsRoot.Bytes()
+	if erAtt != nil {
+		return ierrors.Wrap(err, "failed to load attestations root bytes")
+	}
+
+	committeeRootBytes, erCom := roots.CommitteeRoot.Bytes()
+	if erCom != nil {
+		return ierrors.Wrap(err, "failed to load committee root bytes")
+	}
+
+	protocolParametersHashBytes, erPro := roots.ProtocolParametersHash.Bytes()
+	if erPro != nil {
+		return ierrors.Wrap(err, "failed to load protocol parameters hash root bytes")
+	}
+
+	rewardsRootBytes, erRew := roots.RewardsRoot.Bytes()
+	if erRew != nil {
+		return ierrors.Wrap(err, "failed to load rewards root bytes")
+	}
+
+	stateMutationRootBytes, erStM := roots.StateMutationRoot.Bytes()
+	if erStM != nil {
+		return ierrors.Wrap(err, "failed to load state mutation root bytes")
+	}
+
+	stateRootBytes, erSt := roots.StateRoot.Bytes()
+	if erSt != nil {
+		return ierrors.Wrap(err, "failed to load state root bytes")
+	}
+
+	tangleRootBytes, erTan := roots.TangleRoot.Bytes()
+	if erTan != nil {
+		return ierrors.Wrap(err, "failed to load tangle root bytes")
+	}
+
+	if errWrite := stream.WriteBytesWithSize(writer, accountRootBytes, serializer.SeriLengthPrefixTypeAsUint32); errWrite != nil {
+		return ierrors.Wrapf(err, "failed to write account root bytes")
+	}
+	if errWrite := stream.WriteBytesWithSize(writer, attestationRootBytes, serializer.SeriLengthPrefixTypeAsUint32); errWrite != nil {
+		return ierrors.Wrapf(err, "failed to write attestation root bytes")
+	}
+	if errWrite := stream.WriteBytesWithSize(writer, committeeRootBytes, serializer.SeriLengthPrefixTypeAsUint32); errWrite != nil {
+		return ierrors.Wrapf(err, "failed to write committee root bytes")
+	}
+	if errWrite := stream.WriteBytesWithSize(writer, protocolParametersHashBytes, serializer.SeriLengthPrefixTypeAsUint32); errWrite != nil {
+		return ierrors.Wrapf(err, "failed to write protocol parameters hash root bytes")
+	}
+	if errWrite := stream.WriteBytesWithSize(writer, rewardsRootBytes, serializer.SeriLengthPrefixTypeAsUint32); errWrite != nil {
+		return ierrors.Wrapf(err, "failed to write rewards root bytes")
+	}
+	if errWrite := stream.WriteBytesWithSize(writer, stateMutationRootBytes, serializer.SeriLengthPrefixTypeAsUint32); errWrite != nil {
+		return ierrors.Wrapf(err, "failed to write state mutation root bytes")
+	}
+	if errWrite := stream.WriteBytesWithSize(writer, stateRootBytes, serializer.SeriLengthPrefixTypeAsUint32); errWrite != nil {
+		return ierrors.Wrapf(err, "failed to write state root bytes")
+	}
+	if errWrite := stream.WriteBytesWithSize(writer, tangleRootBytes, serializer.SeriLengthPrefixTypeAsUint32); errWrite != nil {
+		return ierrors.Wrapf(err, "failed to write tangle root bytes")
+	}
+
+	return err
+}
+
+func (s *Storage) ImportRoots(reader io.ReadSeeker, targetCommitment *model.Commitment) error {
+	accountRoot, err := stream.Read[iotago.Identifier](reader)
+	if err != nil {
+		return ierrors.Wrap(err, "can not retrieve account root")
+	}
+
+	attestationRoot, err := stream.Read[iotago.Identifier](reader)
+	if err != nil {
+		return ierrors.Wrap(err, "can not retrieve attestation root")
+	}
+
+	committeeRoot, err := stream.Read[iotago.Identifier](reader)
+	if err != nil {
+		return ierrors.Wrap(err, "can not retrieve committee root")
+	}
+
+	protocolParametersHash, err := stream.Read[iotago.Identifier](reader)
+	if err != nil {
+		return ierrors.Wrap(err, "can not retrieve protocol parameters hash")
+	}
+
+	rewardsRoot, err := stream.Read[iotago.Identifier](reader)
+	if err != nil {
+		return ierrors.Wrap(err, "can not retrieve rewards root")
+	}
+
+	stateMutationRoot, err := stream.Read[iotago.Identifier](reader)
+	if err != nil {
+		return ierrors.Wrap(err, "can not retrieve state mutation root")
+	}
+
+	stateRoot, err := stream.Read[iotago.Identifier](reader)
+	if err != nil {
+		return ierrors.Wrap(err, "can not retrieve state root")
+	}
+
+	tangleRoot, err := stream.Read[iotago.Identifier](reader)
+	if err != nil {
+		return ierrors.Wrap(err, "can not retrieve tangle root")
+	}
+
+	slotIndex := targetCommitment.Commitment().Slot
+	commitmentID, err := targetCommitment.Commitment().ID()
+
+	if err != nil {
+		return ierrors.Wrap(err, "can not retrieve commitment id")
+	}
+	// Load root storage from prunable storage
+	rootsStorage, errRoots := s.Roots(slotIndex)
+
+	if errRoots != nil {
+		return ierrors.Wrap(err, "failed to load roots storage")
+	}
+
+	roots := iotago.NewRoots(
+		tangleRoot,
+		stateMutationRoot,
+		attestationRoot,
+		stateRoot,
+		accountRoot,
+		committeeRoot,
+		rewardsRoot,
+		protocolParametersHash,
+	)
+
+	rootsStorage.Store(commitmentID, roots)
+
+	return nil
+
 }
 
 func (s *Storage) Retainer(slot iotago.SlotIndex) (*slotstore.Retainer, error) {

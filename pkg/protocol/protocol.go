@@ -83,18 +83,10 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 			p.Shutdown.OnTrigger(shutdown)
 		})
 
-		p.CheckCommitment()
-
 		p.Constructed.Trigger()
 
 		p.waitInitialized()
 	})
-}
-
-// Check whether the data base is consistent with the commitment.
-func (p *Protocol) CheckCommitment() error {
-
-	return nil
 }
 
 // IssueBlock issues a block to the node.
@@ -151,6 +143,7 @@ func (p *Protocol) LatestAPI() iotago.API {
 }
 
 // initSubcomponents initializes the subcomponents of the protocol and returns a function that shuts them down.
+
 func (p *Protocol) initSubcomponents(networkEndpoint network.Endpoint) (shutdown func()) {
 	p.Network = core.NewProtocol(networkEndpoint, p.Workers.CreatePool("NetworkProtocol"), p)
 	p.Blocks = newBlocks(p)
