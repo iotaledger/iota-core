@@ -344,15 +344,15 @@ func (c *Chains) trackHeaviestCandidates(chain *Chain) (teardown func()) {
 		targetSlot := latestCommitment.ID().Index()
 
 		if evictionEvent := c.protocol.EvictionEvent(targetSlot); !evictionEvent.WasTriggered() {
-			c.HeaviestClaimedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
+			c.HeaviestClaimedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent, "heaviestClaimedCandidate")
 
-			latestCommitment.IsAttested.OnTrigger(func() {
-				c.HeaviestAttestedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
-			})
+			// latestCommitment.IsAttested.OnTrigger(func() {
+			c.HeaviestAttestedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent, "heaviestAttestedCandidate")
+			// })
 
-			latestCommitment.IsVerified.OnTrigger(func() {
-				c.HeaviestVerifiedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
-			})
+			// latestCommitment.IsVerified.OnTrigger(func() {
+			c.HeaviestVerifiedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent, "heaviestVerifiedCandidate")
+			// })
 		}
 	})
 }
@@ -484,7 +484,7 @@ func (c *ChainsCandidate) measureAt(slot iotago.SlotIndex) (teardown func()) {
 
 // registerCommitment registers the given commitment for the given slot, which makes it become part of the weight
 // measurement process.
-func (c *ChainsCandidate) registerCommitment(slot iotago.SlotIndex, commitment *Commitment, evictionEvent reactive.Event) {
+func (c *ChainsCandidate) registerCommitment(slot iotago.SlotIndex, commitment *Commitment, evictionEvent reactive.Event, t string) {
 	sortedCommitments, slotCreated := c.sortedCommitmentsBySlot.GetOrCreate(slot, func() reactive.SortedSet[*Commitment] {
 		return reactive.NewSortedSet(c.weightVariable)
 	})
@@ -494,6 +494,8 @@ func (c *ChainsCandidate) registerCommitment(slot iotago.SlotIndex, commitment *
 	}
 
 	sortedCommitments.Add(commitment)
+
+	c.chains.LogDebug("registered commitment", "type", t, "slot", slot, "commitment", commitment.ID(), "commitments", lo.Map(sortedCommitments.ToSlice(), func(commitment *Commitment) string { return commitment.ID().String() }))
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
