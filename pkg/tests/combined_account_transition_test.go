@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
@@ -86,7 +87,7 @@ func createFullAccount(ts *testsuite.TestSuite) iotago.AccountID {
 		mock.WithAccountMana(mock.MaxBlockManaCost(ts.DefaultWallet().Node.Protocol.CommittedAPI().ProtocolParameters())),
 	)
 
-	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
+	block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1))
 	var block1Slot iotago.SlotIndex = block1.ID().Slot()
 
 	ts.CommitUntilSlot(block1Slot, block1.ID())
@@ -131,7 +132,7 @@ func createImplicitToFullAccount(ts *testsuite.TestSuite) iotago.AccountID {
 		"TX1:1",
 		newUserWallet,
 	)
-	block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx3)
+	block2 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx3))
 	block2Slot := block2.ID().Slot()
 	latestParents := ts.CommitUntilSlot(block2Slot, block2.ID())
 
@@ -160,7 +161,7 @@ func createImplicitToFullAccount(ts *testsuite.TestSuite) iotago.AccountID {
 		),
 	)
 	block2Commitment := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
-	block3 := ts.IssueBasicBlockWithOptions("block3", newUserWallet, tx4, mock.WithStrongParents(latestParents...))
+	block3 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block3", newUserWallet, tx4, mock.WithStrongParents(latestParents...)))
 	latestParents = ts.CommitUntilSlot(block3Slot, block3.ID())
 
 	fullAccountOutputID := newUserWallet.OutputData("TX4:0").ID

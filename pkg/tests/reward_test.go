@@ -76,13 +76,13 @@ func Test_Delegation_DestroyOutputWithoutRewards(t *testing.T) {
 		mock.WithDelegatedValidatorAddress(accountAddress),
 		mock.WithDelegationStartEpoch(1),
 	)
-	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
+	block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1))
 
 	latestParents := ts.CommitUntilSlot(block1Slot, block1.ID())
 
 	block2Slot := ts.CurrentSlot()
 	tx2 := ts.DefaultWallet().ClaimDelegatorRewards("TX2", "TX1:0")
-	block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(latestParents...))
+	block2 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(latestParents...)))
 
 	ts.CommitUntilSlot(block2Slot, block2.ID())
 
@@ -104,7 +104,7 @@ func Test_Delegation_DelayedClaimingDestroyOutputWithoutRewards(t *testing.T) {
 		mock.WithDelegatedValidatorAddress(accountAddress),
 		mock.WithDelegationStartEpoch(1),
 	)
-	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
+	block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1))
 
 	// TRANSITION TO DELAYED CLAIMING (IN THE SAME SLOT)
 	latestCommitment := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment()
@@ -120,13 +120,13 @@ func Test_Delegation_DelayedClaimingDestroyOutputWithoutRewards(t *testing.T) {
 	}
 
 	tx2 := ts.DefaultWallet().DelayedClaimingTransition("TX2", "TX1:0", delegationEndEpoch)
-	block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(block1.ID()))
+	block2 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(block1.ID())))
 	latestParents := ts.CommitUntilSlot(block1_2Slot, block2.ID())
 
 	// CLAIM ZERO REWARDS
 	block3Slot := ts.CurrentSlot()
 	tx3 := ts.DefaultWallet().ClaimDelegatorRewards("TX3", "TX2:0")
-	block3 := ts.IssueBasicBlockWithOptions("block3", ts.DefaultWallet(), tx3, mock.WithStrongParents(latestParents...))
+	block3 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block3", ts.DefaultWallet(), tx3, mock.WithStrongParents(latestParents...)))
 
 	ts.CommitUntilSlot(block3Slot, block3.ID())
 
@@ -166,7 +166,7 @@ func Test_Account_RemoveStakingFeatureWithoutRewards(t *testing.T) {
 		mock.WithAccountAmount(stakedAmount),
 	)
 
-	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
+	block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1))
 
 	latestParents := ts.CommitUntilSlot(block1Slot, block1.ID())
 
@@ -179,7 +179,7 @@ func Test_Account_RemoveStakingFeatureWithoutRewards(t *testing.T) {
 	// REMOVE STAKING FEATURE AND CLAIM ZERO REWARDS
 	block2Slot := ts.CurrentSlot()
 	tx2 := ts.DefaultWallet().ClaimValidatorRewards("TX2", "TX1:0")
-	block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(latestParents...))
+	block2 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(latestParents...)))
 
 	ts.CommitUntilSlot(block2Slot, block2.ID())
 
@@ -223,7 +223,7 @@ func Test_RewardInputCannotPointToNFTOutput(t *testing.T) {
 	ts.SetCurrentSlot(block1Slot)
 
 	tx1 := ts.DefaultWallet().CreateNFTFromInput("TX1", "Genesis:0")
-	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
+	block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1))
 
 	latestParents := ts.CommitUntilSlot(block1Slot, block1.ID())
 
@@ -281,7 +281,7 @@ func Test_Account_StakeAmountCalculation(t *testing.T) {
 		mock.WithAccountAmount(stakedAmount),
 	)
 
-	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
+	block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1))
 	latestParents := ts.CommitUntilSlot(block1Slot, block1.ID())
 
 	account := ts.DefaultWallet().OutputData("TX1:0")
@@ -302,7 +302,7 @@ func Test_Account_StakeAmountCalculation(t *testing.T) {
 		mock.WithDelegationStartEpoch(ts.DefaultWallet().DelegationStartFromSlot(block2Slot)),
 	)
 
-	block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(latestParents...))
+	block2 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(latestParents...)))
 	latestParents = ts.CommitUntilSlot(block2Slot, block2.ID())
 
 	ts.AssertAccountStake(accountID, 0, deleg1, ts.Nodes()...)
@@ -313,7 +313,7 @@ func Test_Account_StakeAmountCalculation(t *testing.T) {
 	tx3 := ts.DefaultWallet().TransitionAccount("TX3", "TX1:0",
 		mock.WithStakingFeature(stakedAmount, fixedCost, startEpoch, endEpoch),
 	)
-	block3 := ts.IssueBasicBlockWithOptions("block3", ts.DefaultWallet(), tx3, mock.WithStrongParents(latestParents...))
+	block3 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block3", ts.DefaultWallet(), tx3, mock.WithStrongParents(latestParents...)))
 
 	deleg2 := mock.MinDelegationAmount(ts.API.ProtocolParameters()) + 200
 	// Create another delegation.
@@ -325,7 +325,7 @@ func Test_Account_StakeAmountCalculation(t *testing.T) {
 		mock.WithDelegatedValidatorAddress(&accountAddress),
 		mock.WithDelegationStartEpoch(ts.DefaultWallet().DelegationStartFromSlot(block2Slot)),
 	)
-	block4 := ts.IssueBasicBlockWithOptions("block4", ts.DefaultWallet(), tx4, mock.WithStrongParents(block3.ID()))
+	block4 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block4", ts.DefaultWallet(), tx4, mock.WithStrongParents(block3.ID())))
 	latestParents = ts.CommitUntilSlot(block3_4Slot, block4.ID())
 
 	ts.AssertAccountStake(accountID, stakedAmount, deleg1+deleg2, ts.Nodes()...)
@@ -341,10 +341,10 @@ func Test_Account_StakeAmountCalculation(t *testing.T) {
 		mock.WithDelegatedValidatorAddress(&accountAddress),
 		mock.WithDelegationStartEpoch(ts.DefaultWallet().DelegationStartFromSlot(block5_6Slot)),
 	)
-	block5 := ts.IssueBasicBlockWithOptions("block5", ts.DefaultWallet(), tx5, mock.WithStrongParents(latestParents...))
+	block5 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block5", ts.DefaultWallet(), tx5, mock.WithStrongParents(latestParents...)))
 
 	tx6 := ts.DefaultWallet().DelayedClaimingTransition("TX6", "TX5:0", ts.DefaultWallet().DelegationEndFromSlot(block5_6Slot))
-	block6 := ts.IssueBasicBlockWithOptions("block6", ts.DefaultWallet(), tx6, mock.WithStrongParents(block5.ID()))
+	block6 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block6", ts.DefaultWallet(), tx6, mock.WithStrongParents(block5.ID())))
 
 	latestParents = ts.CommitUntilSlot(block5_6Slot, block6.ID())
 
@@ -362,10 +362,10 @@ func Test_Account_StakeAmountCalculation(t *testing.T) {
 		mock.WithDelegatedValidatorAddress(&accountAddress),
 		mock.WithDelegationStartEpoch(ts.DefaultWallet().DelegationStartFromSlot(block7_8Slot)),
 	)
-	block7 := ts.IssueBasicBlockWithOptions("block7", ts.DefaultWallet(), tx7, mock.WithStrongParents(latestParents...))
+	block7 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block7", ts.DefaultWallet(), tx7, mock.WithStrongParents(latestParents...)))
 
 	tx8 := ts.DefaultWallet().ClaimDelegatorRewards("TX8", "TX7:0")
-	block8 := ts.IssueBasicBlockWithOptions("block8", ts.DefaultWallet(), tx8, mock.WithStrongParents(block7.ID()))
+	block8 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block8", ts.DefaultWallet(), tx8, mock.WithStrongParents(block7.ID())))
 
 	latestParents = ts.CommitUntilSlot(block7_8Slot, block8.ID())
 
@@ -375,7 +375,7 @@ func Test_Account_StakeAmountCalculation(t *testing.T) {
 	// STEP 6: REMOVE A DELEGATION BY TRANSITIONING TO DELAYED CLAIMING.
 	block9Slot := ts.CurrentSlot()
 	tx9 := ts.DefaultWallet().DelayedClaimingTransition("TX9", "TX4:0", ts.DefaultWallet().DelegationEndFromSlot(block9Slot))
-	block9 := ts.IssueBasicBlockWithOptions("block9", ts.DefaultWallet(), tx9, mock.WithStrongParents(latestParents...))
+	block9 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block9", ts.DefaultWallet(), tx9, mock.WithStrongParents(latestParents...)))
 	// Commit until the claiming epoch so we can remove the staking feature from the account in the next step.
 	latestParents = ts.CommitUntilSlot(block9Slot, block9.ID())
 
@@ -384,7 +384,7 @@ func Test_Account_StakeAmountCalculation(t *testing.T) {
 	// STEP 7: DESTROY THE DELEGATION IN DELAYED CLAIMING STATE
 	// This is to ensure the delegated stake is not subtracted twice from the account.
 	tx10 := ts.DefaultWallet().ClaimDelegatorRewards("TX19", "TX9:0")
-	block10 := ts.IssueBasicBlockWithOptions("block10", ts.DefaultWallet(), tx10, mock.WithStrongParents(latestParents...))
+	block10 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block10", ts.DefaultWallet(), tx10, mock.WithStrongParents(latestParents...)))
 
 	// Commit until the claiming epoch so we can remove the staking feature from the account in the next step.
 	latestParents = ts.CommitUntilSlot(ts.API.TimeProvider().EpochStart(claimingEpoch), block10.ID())
@@ -394,7 +394,7 @@ func Test_Account_StakeAmountCalculation(t *testing.T) {
 	// STEP 8: DESTROY ACCOUNT.
 	block11Slot := ts.CurrentSlot()
 	tx11 := ts.DefaultWallet().ClaimValidatorRewards("TX11", "TX3:0")
-	block11 := ts.IssueBasicBlockWithOptions("block11", ts.DefaultWallet(), tx11, mock.WithStrongParents(latestParents...))
+	block11 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block11", ts.DefaultWallet(), tx11, mock.WithStrongParents(latestParents...)))
 	latestParents = ts.CommitUntilSlot(block11Slot, block11.ID())
 
 	ts.AssertAccountStake(accountID, 0, deleg1, ts.Nodes()...)
@@ -405,7 +405,7 @@ func Test_Account_StakeAmountCalculation(t *testing.T) {
 
 	block12Slot := ts.CurrentSlot()
 	tx12 := ts.DefaultWallet().DelayedClaimingTransition("TX12", "TX2:0", ts.DefaultWallet().DelegationEndFromSlot(block12Slot))
-	block12 := ts.IssueBasicBlockWithOptions("block12", ts.DefaultWallet(), tx12, mock.WithStrongParents(latestParents...))
+	block12 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block12", ts.DefaultWallet(), tx12, mock.WithStrongParents(latestParents...)))
 	ts.CommitUntilSlot(block12Slot, block12.ID())
 
 	ts.AssertAccountStake(accountID, 0, 0, ts.Nodes()...)

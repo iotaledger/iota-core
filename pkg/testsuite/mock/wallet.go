@@ -40,6 +40,8 @@ type Wallet struct {
 
 	Name string
 
+	Client Client
+
 	Node *Node
 
 	keyManager *wallet.KeyManager
@@ -62,6 +64,7 @@ func NewWallet(t *testing.T, name string, node *Node, keyManager ...*wallet.KeyM
 	return &Wallet{
 		Testing:      t,
 		Name:         name,
+		Client:       &TestClient{node},
 		Node:         node,
 		outputs:      make(map[string]*OutputData),
 		transactions: make(map[string]*iotago.Transaction),
@@ -84,6 +87,7 @@ func (w *Wallet) BlockIssuerKey() iotago.BlockIssuerKey {
 }
 
 func (w *Wallet) SetDefaultNode(node *Node) {
+	w.Client = &TestClient{node}
 	w.Node = node
 }
 

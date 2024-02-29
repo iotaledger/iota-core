@@ -61,7 +61,7 @@ func (t *TestSuite) registerBlock(blockName string, block *blocks.Block) {
 	block.ID().RegisterAlias(blockName)
 }
 
-func (t *TestSuite) IssueValidationBlockWithHeaderOptions(blockName string, node *mock.Node, blockHeaderOpts ...options.Option[mock.BlockHeaderParams]) *blocks.Block {
+func (t *TestSuite) IssueValidationBlockWithHeaderOptions(blockName string, node *mock.Node, blockHeaderOpts ...options.Option[mock.BlockHeaderParams]) (*blocks.Block, error) {
 	t.Wait(t.Nodes()...)
 	t.assertParentsExistFromBlockOptions(blockHeaderOpts, node)
 	t.assertParentsCommitmentExistFromBlockOptions(blockHeaderOpts, node)
@@ -74,11 +74,11 @@ func (t *TestSuite) IssueValidationBlockWithHeaderOptions(blockName string, node
 	// Prepend the issuing time so it can be overridden via the passed options.
 	blockHeaderOptions := append([]options.Option[mock.BlockHeaderParams]{mock.WithIssuingTime(issuingTime)}, blockHeaderOpts...)
 
-	block := node.IssueValidationBlock(context.Background(), blockName, mock.WithValidationBlockHeaderOptions(blockHeaderOptions...))
+	block, err := node.IssueValidationBlock(context.Background(), blockName, mock.WithValidationBlockHeaderOptions(blockHeaderOptions...))
 
 	t.registerBlock(blockName, block)
 
-	return block
+	return block, err
 }
 
 func (t *TestSuite) IssueExistingBlock(blockName string, wallet *mock.Wallet) {
@@ -92,18 +92,18 @@ func (t *TestSuite) IssueExistingBlock(blockName string, wallet *mock.Wallet) {
 	require.NoError(t.Testing, wallet.BlockIssuer.IssueBlock(block.ModelBlock(), wallet.Node))
 }
 
-func (t *TestSuite) IssueValidationBlockWithOptions(blockName string, node *mock.Node, blockOpts ...options.Option[mock.ValidationBlockParams]) *blocks.Block {
+func (t *TestSuite) IssueValidationBlockWithOptions(blockName string, node *mock.Node, blockOpts ...options.Option[mock.ValidationBlockParams]) (*blocks.Block, error) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	block := node.IssueValidationBlock(context.Background(), blockName, blockOpts...)
+	block, err := node.IssueValidationBlock(context.Background(), blockName, blockOpts...)
 
 	t.registerBlock(blockName, block)
 
-	return block
+	return block, err
 }
 
-func (t *TestSuite) IssueBasicBlockWithOptions(blockName string, wallet *mock.Wallet, payload iotago.Payload, blockOpts ...options.Option[mock.BlockHeaderParams]) *blocks.Block {
+func (t *TestSuite) IssueBasicBlockWithOptions(blockName string, wallet *mock.Wallet, payload iotago.Payload, blockOpts ...options.Option[mock.BlockHeaderParams]) (*blocks.Block, error) {
 	t.Wait(t.Nodes()...)
 	t.assertParentsExistFromBlockOptions(blockOpts, wallet.Node)
 	t.assertParentsCommitmentExistFromBlockOptions(blockOpts, wallet.Node)
@@ -115,14 +115,14 @@ func (t *TestSuite) IssueBasicBlockWithOptions(blockName string, wallet *mock.Wa
 	issuingTime := timeProvider.SlotStartTime(t.currentSlot).Add(time.Duration(t.uniqueBlockTimeCounter.Add(1)))
 	blockHeaderOptions := append(blockOpts, mock.WithIssuingTime(issuingTime))
 
-	block := wallet.IssueBasicBlock(context.Background(), blockName, mock.WithBasicBlockHeader(blockHeaderOptions...), mock.WithPayload(payload))
+	block, err := wallet.IssueBasicBlock(context.Background(), blockName, mock.WithBasicBlockHeader(blockHeaderOptions...), mock.WithPayload(payload))
 
 	t.registerBlock(blockName, block)
 
-	return block
+	return block, err
 }
 
-func (t *TestSuite) IssueCandidacyAnnouncementInSlot(alias string, slot iotago.SlotIndex, parentsPrefixAlias string, wallet *mock.Wallet, issuingOptions ...options.Option[mock.BlockHeaderParams]) *blocks.Block {
+func (t *TestSuite) IssueCandidacyAnnouncementInSlot(alias string, slot iotago.SlotIndex, parentsPrefixAlias string, wallet *mock.Wallet, issuingOptions ...options.Option[mock.BlockHeaderParams]) (*blocks.Block, error) {
 	t.SetCurrentSlot(slot)
 
 	return t.IssueBasicBlockWithOptions(
@@ -149,13 +149,15 @@ func (t *TestSuite) issueBlockRow(prefix string, row int, parentsPrefix string, 
 		issuingTime := timeProvider.SlotStartTime(t.currentSlot).Add(time.Duration(t.uniqueBlockTimeCounter.Add(1)))
 
 		var b *blocks.Block
+		var err error
 		// Only issue validation blocks if account has staking feature and is part of committee.
 		if node.Validator != nil && lo.Return1(node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(t.currentSlot)).HasAccount(node.Validator.AccountID) {
 			blockHeaderOptions := append(issuingOptionsCopy[node.Name], mock.WithIssuingTime(issuingTime))
 			t.assertParentsCommitmentExistFromBlockOptions(blockHeaderOptions, node)
 			t.assertParentsExistFromBlockOptions(blockHeaderOptions, node)
 
-			b = t.IssueValidationBlockWithOptions(blockName, node, mock.WithValidationBlockHeaderOptions(blockHeaderOptions...), mock.WithHighestSupportedVersion(node.HighestSupportedVersion()), mock.WithProtocolParametersHash(node.ProtocolParametersHash()))
+			b, err = t.IssueValidationBlockWithOptions(blockName, node, mock.WithValidationBlockHeaderOptions(blockHeaderOptions...), mock.WithHighestSupportedVersion(node.HighestSupportedVersion()), mock.WithProtocolParametersHash(node.ProtocolParametersHash()))
+			require.NoError(t.Testing, err)
 		} else {
 			//nolint:revive
 			txCount := t.automaticTransactionIssuingCounters.Compute(node.Partition, func(currentValue int, exists bool) int {
@@ -173,7 +175,8 @@ func (t *TestSuite) issueBlockRow(prefix string, row int, parentsPrefix string, 
 			t.assertParentsExistFromBlockOptions(issuingOptionsCopy[node.Name], node)
 
 			t.DefaultWallet().SetDefaultNode(node)
-			b = t.IssueBasicBlockWithOptions(blockName, t.DefaultWallet(), tx, issuingOptionsCopy[node.Name]...)
+			b, err = t.IssueBasicBlockWithOptions(blockName, t.DefaultWallet(), tx, issuingOptionsCopy[node.Name]...)
+			require.NoError(t.Testing, err)
 		}
 		blocksIssued = append(blocksIssued, b)
 	}
@@ -285,7 +288,7 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parents ...iotago.Blo
 			if committeeAtBlockSlot.HasAccount(node.Validator.AccountID) {
 				blockName := fmt.Sprintf("chain-%s-%d-%s", parents[0].Alias(), chainIndex, node.Name)
 				latestCommitment := node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment()
-				tips = []iotago.BlockID{t.IssueValidationBlockWithHeaderOptions(blockName, node, mock.WithSlotCommitment(latestCommitment), mock.WithStrongParents(tips...)).ID()}
+				tips = []iotago.BlockID{lo.PanicOnErr(t.IssueValidationBlockWithHeaderOptions(blockName, node, mock.WithSlotCommitment(latestCommitment), mock.WithStrongParents(tips...))).ID()}
 			}
 		}
 		// acceptance of nextBlockSlot
@@ -295,7 +298,7 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parents ...iotago.Blo
 			if committeeAtBlockSlot.HasAccount(node.Validator.AccountID) {
 				blockName := fmt.Sprintf("chain-%s-%d-%s", parents[0].Alias(), chainIndex+1, node.Name)
 				latestCommitment := node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment()
-				tips = []iotago.BlockID{t.IssueValidationBlockWithHeaderOptions(blockName, node, mock.WithSlotCommitment(latestCommitment), mock.WithStrongParents(tips...)).ID()}
+				tips = []iotago.BlockID{lo.PanicOnErr(t.IssueValidationBlockWithHeaderOptions(blockName, node, mock.WithSlotCommitment(latestCommitment), mock.WithStrongParents(tips...))).ID()}
 			}
 		}
 

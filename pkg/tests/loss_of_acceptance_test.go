@@ -51,7 +51,7 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 	// Revive chain on node0.
 	{
 		ts.SetCurrentSlot(50)
-		block0 := ts.IssueValidationBlockWithHeaderOptions("block0", node0)
+		block0 := lo.PanicOnErr(ts.IssueValidationBlockWithHeaderOptions("block0", node0))
 		require.EqualValues(t, 48, ts.Block("block0").SlotCommitmentID().Slot())
 		// Reviving the chain should select one parent from the last committed slot.
 		require.Len(t, block0.Parents(), 1)
@@ -161,7 +161,7 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 	// Revive chain on node0-restarted.
 	{
 		ts.SetCurrentSlot(20)
-		block0 := ts.IssueValidationBlockWithHeaderOptions("block0", node0restarted)
+		block0 := lo.PanicOnErr(ts.IssueValidationBlockWithHeaderOptions("block0", node0restarted))
 		require.EqualValues(t, 18, block0.SlotCommitmentID().Slot())
 		// Reviving the chain should select one parent from the last committed slot.
 		require.Len(t, block0.Parents(), 1)
@@ -251,7 +251,7 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 	// Revive chain on node0-restarted.
 	{
 		ts.SetCurrentSlot(20)
-		block0 := ts.IssueValidationBlockWithHeaderOptions("block0", node0restarted)
+		block0 := lo.PanicOnErr(ts.IssueValidationBlockWithHeaderOptions("block0", node0restarted))
 		require.EqualValues(t, 18, block0.SlotCommitmentID().Slot())
 		// Reviving the chain should select one parent from the last committed slot.
 		require.Len(t, block0.Parents(), 1)
@@ -327,7 +327,7 @@ func TestLossOfAcceptanceWithoutRestart(t *testing.T) {
 	// blocks anymore because when reviving a chain, we pick a parent from the last committed slot.
 	{
 		ts.SetCurrentSlot(20)
-		block0 := ts.IssueValidationBlockWithHeaderOptions("block0", node0)
+		block0 := lo.PanicOnErr(ts.IssueValidationBlockWithHeaderOptions("block0", node0))
 		require.EqualValues(t, 18, block0.SlotCommitmentID().Slot())
 		// Reviving the chain should select one parent from the last committed slot.
 		require.Len(t, block0.Parents(), 1)

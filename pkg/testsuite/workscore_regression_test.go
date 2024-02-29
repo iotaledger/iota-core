@@ -123,7 +123,7 @@ func getStandardBlock(t *testing.T) *iotago.Block {
 		mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{tpkg.RandBlockIssuerKey()}, iotago.MaxSlotIndex),
 	)
 	commitment := node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
-	block := ts.IssueBasicBlockWithOptions("block", ts.DefaultWallet(), tx, mock.WithSlotCommitment(commitment))
+	block := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block", ts.DefaultWallet(), tx, mock.WithSlotCommitment(commitment)))
 
 	return block.ProtocolBlock()
 }
@@ -180,7 +180,7 @@ func basicInBasicOut(t *testing.T, numIn int, numOut int, signatures bool) (floa
 				)
 			}
 			commitment := node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
-			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(commitment))
+			block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(commitment)))
 			block = block1.ProtocolBlock()
 			modelBlock := lo.PanicOnErr(model.BlockFromBlock(block))
 			node.Protocol.IssueBlock(modelBlock)
@@ -197,7 +197,7 @@ func basicInBasicOut(t *testing.T, numIn int, numOut int, signatures bool) (floa
 				numOut,
 			)
 			commitment = node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
-			block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithSlotCommitment(commitment))
+			block2 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithSlotCommitment(commitment)))
 			block = block2.ProtocolBlock()
 			modelBlock = lo.PanicOnErr(model.BlockFromBlock(block))
 			// measure time from issuance of the block to when it is scheduled
@@ -239,7 +239,7 @@ func basicInAccountOut(t *testing.T, numAccounts int, staking bool) (float64, []
 				opts...,
 			)
 			commitment := node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
-			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(commitment))
+			block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(commitment)))
 			block = block1.ProtocolBlock()
 			modelBlock := lo.PanicOnErr(model.BlockFromBlock(block))
 			// measure time from issuance of the block to when it is scheduled
@@ -287,7 +287,7 @@ func accountInAccountOut(t *testing.T, numAccounts int) (float64, []float64) {
 				mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{tpkg.RandBlockIssuerKey()}, iotago.MaxSlotIndex),
 			)
 			commitment := node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
-			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(commitment))
+			block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(commitment)))
 			block = block1.ProtocolBlock()
 			modelBlock := lo.PanicOnErr(model.BlockFromBlock(block))
 			// measure time from issuance of the block to when it is scheduled
@@ -324,7 +324,7 @@ func basicInNativeOut(t *testing.T, nNative int) (float64, []float64) {
 				addressIndexes...,
 			)
 			commitment := node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
-			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(commitment))
+			block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(commitment)))
 			block = block1.ProtocolBlock()
 			modelBlock := lo.PanicOnErr(model.BlockFromBlock(block))
 			// measure time from issuance of the block to when it is scheduled
@@ -356,7 +356,7 @@ func nativeInNativeOut(t *testing.T) (float64, []float64) {
 				"Genesis:2",
 			)
 			commitment := node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
-			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(commitment))
+			block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(commitment)))
 			block = block1.ProtocolBlock()
 			modelBlock := lo.PanicOnErr(model.BlockFromBlock(block))
 			node.Protocol.IssueBlock(modelBlock)
@@ -368,7 +368,7 @@ func nativeInNativeOut(t *testing.T) (float64, []float64) {
 				"tx1:1",
 			)
 			commitment = node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
-			block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithSlotCommitment(commitment))
+			block2 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithSlotCommitment(commitment)))
 			block = block2.ProtocolBlock()
 			modelBlock = lo.PanicOnErr(model.BlockFromBlock(block))
 			// measure time from issuance of the block to when it is scheduled
@@ -415,7 +415,7 @@ func allotments(t *testing.T, numAllotments int) (float64, []float64) {
 				accountIDs...,
 			)
 			commitment := node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
-			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(commitment))
+			block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(commitment)))
 			block = block1.ProtocolBlock()
 			modelBlock := lo.PanicOnErr(model.BlockFromBlock(block))
 			// measure time from issuance of the block to when it is scheduled

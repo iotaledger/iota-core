@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
@@ -62,7 +63,7 @@ func transitionAccountWithInvalidSignature(ts *testsuite.TestSuite) iotago.Accou
 		"TX1:0",
 		newUserWallet,
 	)
-	block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx3)
+	block2 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx3))
 	block2Slot := block2.ID().Slot()
 	latestParents := ts.CommitUntilSlot(block2Slot, block2.ID())
 
@@ -100,7 +101,7 @@ func transitionAccountWithInvalidSignature(ts *testsuite.TestSuite) iotago.Accou
 	}
 
 	block2Commitment := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
-	block3 := ts.IssueBasicBlockWithOptions("block3", newUserWallet, tx4, mock.WithStrongParents(latestParents...))
+	block3 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block3", newUserWallet, tx4, mock.WithStrongParents(latestParents...)))
 	latestParents = ts.CommitUntilSlot(block3Slot, block3.ID())
 
 	burned := iotago.BlockIssuanceCredits(block3.WorkScore()) * iotago.BlockIssuanceCredits(block2Commitment.ReferenceManaCost)

@@ -16,6 +16,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -50,9 +51,10 @@ type Node struct {
 	Testing *testing.T
 	logger  log.Logger
 
-	Name       string
-	Validator  *BlockIssuer
-	KeyManager *wallet.KeyManager
+	Name         string
+	Validator    *BlockIssuer
+	KeyManager   *wallet.KeyManager
+	BlockHandler *blockhandler.BlockHandler
 
 	ctx       context.Context
 	ctxCancel context.CancelFunc
@@ -131,6 +133,7 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 		n.Endpoint,
 		opts...,
 	)
+	n.BlockHandler = blockhandler.New(n.Protocol)
 
 	n.hookEvents()
 	n.hookEngineEvents(failOnBlockFiltered)
@@ -351,7 +354,7 @@ func (n *Node) AttachedBlocks() []*blocks.Block {
 	return n.attachedBlocks
 }
 
-func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...options.Option[ValidationBlockParams]) *blocks.Block {
+func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...options.Option[ValidationBlockParams]) (*blocks.Block, error) {
 	if n.Validator == nil {
 		panic("node is not a validator")
 	}

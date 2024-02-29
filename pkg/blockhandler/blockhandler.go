@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -56,7 +57,7 @@ func (i *BlockHandler) SubmitBlock(block *model.Block) error {
 
 // SubmitBlockAndAwaitEvent submits a block to be processed and waits for the event to be triggered.
 func (i *BlockHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *model.Block, evt *event.Event1[*blocks.Block]) error {
-	triggered := make(chan error, 1)
+	filtered := make(chan error, 1)
 	exit := make(chan struct{})
 	defer close(exit)
 
@@ -64,42 +65,48 @@ func (i *BlockHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *mode
 	// it will never trigger one of the below events.
 	processingCtx, processingCtxCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer processingCtxCancel()
-
 	// Calculate the blockID so that we don't capture the block pointer in the event handlers.
 	blockID := block.ID()
-
 	evtUnhook := evt.Hook(func(eventBlock *blocks.Block) {
 		if blockID != eventBlock.ID() {
 			return
 		}
 		select {
-		case triggered <- nil:
+		case filtered <- nil:
 		case <-exit:
 		}
 	}, event.WithWorkerPool(i.workerPool)).Unhook
-
 	prefilteredUnhook := i.protocol.Events.Engine.PreSolidFilter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
 		if blockID != event.Block.ID() {
 			return
 		}
 		select {
-		case triggered <- event.Reason:
+		case filtered <- event.Reason:
+		case <-exit:
+		}
+	}, event.WithWorkerPool(i.workerPool)).Unhook
+	postfilteredUnhook := i.protocol.Events.Engine.PostSolidFilter.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
+		if blockID != event.Block.ID() {
+			return
+		}
+		select {
+		case filtered <- event.Reason:
 		case <-exit:
 		}
 	}, event.WithWorkerPool(i.workerPool)).Unhook
 
 	defer lo.Batch(evtUnhook, prefilteredUnhook)()
+	defer lo.Batch(evtUnhook, postfilteredUnhook)()
 
 	if err := i.submitBlock(block); err != nil {
 		return ierrors.Wrapf(err, "failed to issue block %s", blockID)
 	}
-
 	select {
 	case <-processingCtx.Done():
 		return ierrors.Errorf("context canceled whilst waiting for event on block %s", blockID)
-	case err := <-triggered:
+	case err := <-filtered:
 		if err != nil {
-			return ierrors.Wrapf(err, "block filtered out %s", blockID)
+			return ierrors.Wrapf(err, "block filtered %s", blockID)
 		}
 
 		return nil

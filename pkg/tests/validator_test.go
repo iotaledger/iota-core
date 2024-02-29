@@ -274,11 +274,11 @@ func validatorTest(t *testing.T, test ValidatorTest) {
 					Add(issuancePeriod * time.Duration(subslotIdx)).
 					Add(time.Duration(subSlotBlockCounter))
 
-				validationBlock := ts.IssueValidationBlockWithHeaderOptions(blockName, node,
+				validationBlock := lo.PanicOnErr(ts.IssueValidationBlockWithHeaderOptions(blockName, node,
 					mock.WithSlotCommitment(latestCommitment),
 					mock.WithIssuingTime(issuingTime),
 					mock.WithStrongParents(tip),
-				)
+				))
 
 				tip = validationBlock.ID()
 				subSlotBlockCounter += 1
