@@ -133,7 +133,7 @@ func New(
 			e.ReactiveModule = e.initReactiveModule(logger)
 
 			e.errorHandler = func(err error) {
-				e.LogTrace("engine error", "err", err)
+				e.LogError("engine error", "err", err)
 			}
 
 			// Import the settings from the snapshot file if needed.
@@ -241,7 +241,9 @@ func (e *Engine) ProcessBlockFromPeer(block *model.Block, source peer.ID) {
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (e *Engine) Reset() {
-	e.LogDebug("resetting", "target-slot", e.Storage.Settings().LatestCommitment().Slot())
+	latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
+
+	e.LogDebug("resetting", "target-slot", latestCommittedSlot)
 
 	// Reset should be performed in the same order as Shutdown.
 	e.BlockRequester.Clear()
@@ -251,7 +253,7 @@ func (e *Engine) Reset() {
 	e.Attestations.Reset()
 	e.SyncManager.Reset()
 	e.Notarization.Reset()
-	e.SlotGadget.Reset()
+	e.SlotGadget.Reset(latestCommittedSlot)
 	e.BlockGadget.Reset()
 	e.UpgradeOrchestrator.Reset()
 	e.SybilProtection.Reset()
@@ -265,7 +267,6 @@ func (e *Engine) Reset() {
 	e.BlockCache.Reset()
 	e.Storage.Reset()
 
-	latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
 	latestCommittedTime := e.APIForSlot(latestCommittedSlot).TimeProvider().SlotEndTime(latestCommittedSlot)
 	e.Clock.Reset(latestCommittedTime)
 }

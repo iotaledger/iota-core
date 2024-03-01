@@ -414,7 +414,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 	block2Slot := ts.CurrentSlot()
 	tx2 := newUserWallet.TransitionImplicitAccountToAccountOutput(
 		"TX2",
-		"TX1:0",
+		[]string{"TX1:0"},
 		mock.WithBlockIssuerFeature(
 			iotago.BlockIssuerKeys{fullAccountBlockIssuerKey},
 			iotago.MaxSlotIndex,

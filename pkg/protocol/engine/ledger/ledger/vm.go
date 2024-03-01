@@ -174,13 +174,13 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 		RewardsInputSet:             rewardInputSet,
 	}
 
-	unlockedIdentities, err := nova.NewVirtualMachine().ValidateUnlocks(signedStardustTransaction, resolvedInputs)
+	unlockedAddresses, err := nova.NewVirtualMachine().ValidateUnlocks(signedStardustTransaction, resolvedInputs)
 	if err != nil {
 		return nil, err
 	}
 
 	executionContext = context.Background()
-	executionContext = context.WithValue(executionContext, ExecutionContextKeyUnlockedIdentities, unlockedIdentities)
+	executionContext = context.WithValue(executionContext, ExecutionContextKeyUnlockedAddresses, unlockedAddresses)
 	executionContext = context.WithValue(executionContext, ExecutionContextKeyResolvedInputs, resolvedInputs)
 
 	return executionContext, nil
@@ -197,9 +197,9 @@ func (v *VM) Execute(executionContext context.Context, transaction mempool.Trans
 		return nil, err
 	}
 
-	unlockedIdentities, ok := executionContext.Value(ExecutionContextKeyUnlockedIdentities).(iotagovm.UnlockedIdentities)
+	unlockedAddresses, ok := executionContext.Value(ExecutionContextKeyUnlockedAddresses).(iotagovm.UnlockedAddresses)
 	if !ok {
-		return nil, ierrors.Errorf("unlockedIdentities not found in execution context")
+		return nil, ierrors.Errorf("unlockedAddresses not found in execution context")
 	}
 
 	resolvedInputs, ok := executionContext.Value(ExecutionContextKeyResolvedInputs).(iotagovm.ResolvedInputs)
@@ -207,7 +207,7 @@ func (v *VM) Execute(executionContext context.Context, transaction mempool.Trans
 		return nil, ierrors.Errorf("resolvedInputs not found in execution context")
 	}
 
-	createdOutputs, err := nova.NewVirtualMachine().Execute(stardustTransaction, resolvedInputs, unlockedIdentities)
+	createdOutputs, err := nova.NewVirtualMachine().Execute(stardustTransaction, resolvedInputs, unlockedAddresses)
 	if err != nil {
 		return nil, err
 	}
@@ -237,8 +237,8 @@ func (v *VM) Execute(executionContext context.Context, transaction mempool.Trans
 type ExecutionContextKey uint8
 
 const (
-	// ExecutionContextKeyUnlockedIdentities is the key for the unlocked identities in the execution context.
-	ExecutionContextKeyUnlockedIdentities ExecutionContextKey = iota
+	// ExecutionContextKeyUnlockedAddresses is the key for the unlocked addresses in the execution context.
+	ExecutionContextKeyUnlockedAddresses ExecutionContextKey = iota
 
 	// ExecutionContextKeyResolvedInputs is the key for the resolved inputs in the execution context.
 	ExecutionContextKeyResolvedInputs

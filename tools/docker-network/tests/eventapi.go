@@ -20,8 +20,7 @@ func (d *DockerTestFramework) AssertLatestCommitments(ctx context.Context, event
 
 	go func() {
 		defer subInfo.Close()
-		d.assertCommitmentsTopics(ctx, commitmentChan, expectedSlots, finishChan)
-		fmt.Println("AssertLatestCommitments finished")
+		d.assertCommitmentsTopics(ctx, "AssertLatestCommitments", commitmentChan, expectedSlots, finishChan)
 	}()
 }
 
@@ -31,8 +30,7 @@ func (d *DockerTestFramework) AssertFinalizedCommitments(ctx context.Context, ev
 
 	go func() {
 		defer subInfo.Close()
-		d.assertCommitmentsTopics(ctx, commitmentChan, expectedSlots, finishChan)
-		fmt.Println("AssertFinalizedCommitments finished")
+		d.assertCommitmentsTopics(ctx, "AssertFinalizedCommitments", commitmentChan, expectedSlots, finishChan)
 	}()
 }
 
@@ -42,8 +40,7 @@ func (d *DockerTestFramework) AssertBlocks(ctx context.Context, eventClt *nodecl
 
 	go func() {
 		defer subInfo.Close()
-		d.assertBlocksTopics(ctx, blksChan, expectedBlockIDs, finishChan)
-		fmt.Println("AssertBlocks finished")
+		d.assertBlocksTopics(ctx, "AssertBlocks", blksChan, expectedBlockIDs, finishChan)
 	}()
 }
 
@@ -53,8 +50,7 @@ func (d *DockerTestFramework) AssertBasicBlocks(ctx context.Context, eventClt *n
 
 	go func() {
 		defer subInfo.Close()
-		d.assertBlocksTopics(ctx, blksChan, expectedBlockIDs, finishChan)
-		fmt.Println("AssertBasicBlocks finished")
+		d.assertBlocksTopics(ctx, "AssertBasicBlocks", blksChan, expectedBlockIDs, finishChan)
 	}()
 }
 
@@ -100,8 +96,7 @@ func (d *DockerTestFramework) AssertTaggedDataBlocks(ctx context.Context, eventC
 
 	go func() {
 		defer subInfo.Close()
-		d.assertBlocksTopics(ctx, blksChan, expectedBlockIDs, finishChan)
-		fmt.Println("AssertTaggedDataBlocks finished")
+		d.assertBlocksTopics(ctx, "AssertTaggedDataBlocks", blksChan, expectedBlockIDs, finishChan)
 	}()
 }
 
@@ -111,8 +106,7 @@ func (d *DockerTestFramework) AssertTaggedDataBlocksByTag(ctx context.Context, e
 
 	go func() {
 		defer subInfo.Close()
-		d.assertBlocksTopics(ctx, blksChan, expectedBlockIDs, finishChan)
-		fmt.Println("AssertTaggedDataBlocksByTag finished")
+		d.assertBlocksTopics(ctx, "AssertTaggedDataBlocksByTag", blksChan, expectedBlockIDs, finishChan)
 	}()
 }
 
@@ -122,8 +116,7 @@ func (d *DockerTestFramework) AssertTransactionBlocks(ctx context.Context, event
 
 	go func() {
 		defer subInfo.Close()
-		d.assertBlocksTopics(ctx, blksChan, expectedBlockIDs, finishChan)
-		fmt.Println("AssertTransactionBlocks finished")
+		d.assertBlocksTopics(ctx, "AssertTransactionBlocks", blksChan, expectedBlockIDs, finishChan)
 	}()
 }
 
@@ -133,8 +126,7 @@ func (d *DockerTestFramework) AssertTransactionTaggedDataBlocks(ctx context.Cont
 
 	go func() {
 		defer subInfo.Close()
-		d.assertBlocksTopics(ctx, blksChan, expectedBlockIDs, finishChan)
-		fmt.Println("AssertTransactionTaggedDataBlocks finished")
+		d.assertBlocksTopics(ctx, "AssertTransactionTaggedDataBlocks", blksChan, expectedBlockIDs, finishChan)
 	}()
 }
 
@@ -144,8 +136,7 @@ func (d *DockerTestFramework) AssertTransactionBlocksByTag(ctx context.Context, 
 
 	go func() {
 		defer subInfo.Close()
-		d.assertBlocksTopics(ctx, blksChan, expectedBlockIDs, finishChan)
-		fmt.Println("AssertTransactionBlocksByTag finished")
+		d.assertBlocksTopics(ctx, "AssertTransactionBlocksByTag", blksChan, expectedBlockIDs, finishChan)
 	}()
 }
 
@@ -214,8 +205,7 @@ func (d *DockerTestFramework) AssertBlockMetadataAcceptedBlocks(ctx context.Cont
 
 	go func() {
 		defer subInfo.Close()
-		d.assertBlockMetadataTopics(ctx, acceptedChan, expectedBlockIDs, finishChan)
-		fmt.Println("AssertBlockMetadataAcceptedBlocks finished")
+		d.assertBlockMetadataTopics(ctx, "AssertBlockMetadataAcceptedBlocks", acceptedChan, expectedBlockIDs, finishChan)
 	}()
 }
 
@@ -225,8 +215,7 @@ func (d *DockerTestFramework) AssertBlockMetadataConfirmedBlocks(ctx context.Con
 
 	go func() {
 		defer subInfo.Close()
-		d.assertBlockMetadataTopics(ctx, acceptedChan, expectedBlockIDs, finishChan)
-		fmt.Println("AssertBlockMetadataConfirmedBlocks finished")
+		d.assertBlockMetadataTopics(ctx, "AssertBlockMetadataConfirmedBlocks", acceptedChan, expectedBlockIDs, finishChan)
 	}()
 }
 
@@ -236,13 +225,12 @@ func (d *DockerTestFramework) AssertOutput(ctx context.Context, eventClt *nodecl
 
 	go func() {
 		defer subInfo.Close()
-		d.assertOutputMetadataTopics(ctx, outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
+		d.assertOutputMetadataTopics(ctx, "AssertOutput", outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
 			if outputId.Compare(resp.Metadata.OutputID) == 0 {
 				return true
 			}
 			return false
 		}, finishChan)
-		fmt.Println("AssertOutput finished")
 	}()
 }
 
@@ -252,7 +240,7 @@ func (d *DockerTestFramework) AssertOutputsWithMetadataByUnlockConditionAndAddre
 
 	go func() {
 		defer subInfo.Close()
-		d.assertOutputMetadataTopics(ctx, blksChan, func(resp *api.OutputWithMetadataResponse) bool {
+		d.assertOutputMetadataTopics(ctx, "AssertOutputsWithMetadataByUnlockConditionAndAddress", blksChan, func(resp *api.OutputWithMetadataResponse) bool {
 			unlock := resp.Output.UnlockConditionSet()
 			switch condition {
 			case api.EventAPIUnlockConditionAny:
@@ -284,7 +272,6 @@ func (d *DockerTestFramework) AssertOutputsWithMetadataByUnlockConditionAndAddre
 			}
 			return false
 		}, finishChan)
-		fmt.Println("AssertOutputsWithMetadataByUnlockConditionAndAddress finished")
 	}()
 }
 
@@ -294,14 +281,18 @@ func (d *DockerTestFramework) AssertDelegationOutput(ctx context.Context, eventC
 
 	go func() {
 		defer subInfo.Close()
-		d.assertOutputMetadataTopics(ctx, outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
+		d.assertOutputMetadataTopics(ctx, "AssertDelegationOutput", outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
 			if resp.Output.Type() == iotago.OutputDelegation {
 				o := resp.Output.(*iotago.DelegationOutput)
-				return delegationId.Matches(o.DelegationID)
+				actualDelegationID := o.DelegationID
+				if actualDelegationID.Empty() {
+					actualDelegationID = iotago.DelegationIDFromOutputID(resp.Metadata.OutputID)
+				}
+
+				return delegationId.Matches(actualDelegationID)
 			}
 			return false
 		}, finishChan)
-		fmt.Println("AssertDelegationOutput finished")
 	}()
 }
 
@@ -311,14 +302,13 @@ func (d *DockerTestFramework) AssertFoundryOutput(ctx context.Context, eventClt 
 
 	go func() {
 		defer subInfo.Close()
-		d.assertOutputMetadataTopics(ctx, outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
+		d.assertOutputMetadataTopics(ctx, "AssertFoundryOutput", outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
 			if resp.Output.Type() == iotago.OutputFoundry {
 				o := resp.Output.(*iotago.FoundryOutput)
 				return foundryId.Matches(o.MustFoundryID())
 			}
 			return false
 		}, finishChan)
-		fmt.Println("AssertFoundryOutput finished")
 	}()
 }
 
@@ -328,14 +318,17 @@ func (d *DockerTestFramework) AssertAccountOutput(ctx context.Context, eventClt 
 
 	go func() {
 		defer subInfo.Close()
-		d.assertOutputMetadataTopics(ctx, outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
+		d.assertOutputMetadataTopics(ctx, "AssertAccountOutput", outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
 			if resp.Output.Type() == iotago.OutputAccount {
 				o := resp.Output.(*iotago.AccountOutput)
+				actualAccountID := o.AccountID
+				if actualAccountID.Empty() {
+					actualAccountID = iotago.AccountIDFromOutputID(resp.Metadata.OutputID)
+				}
 				return accountId.Matches(o.AccountID)
 			}
 			return false
 		}, finishChan)
-		fmt.Println("AssertAccountOutput finished")
 	}()
 }
 
@@ -345,14 +338,17 @@ func (d *DockerTestFramework) AssertAnchorOutput(ctx context.Context, eventClt *
 
 	go func() {
 		defer subInfo.Close()
-		d.assertOutputMetadataTopics(ctx, outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
+		d.assertOutputMetadataTopics(ctx, "AssertNFTOutput", outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
 			if resp.Output.Type() == iotago.OutputAnchor {
 				o := resp.Output.(*iotago.AnchorOutput)
+				actualAnchorID := o.AnchorID
+				if actualAnchorID.Empty() {
+					actualAnchorID = iotago.AnchorIDFromOutputID(resp.Metadata.OutputID)
+				}
 				return anchorId.Matches(o.AnchorID)
 			}
 			return false
 		}, finishChan)
-		fmt.Println("AssertAnchorOutput finished")
 	}()
 }
 
@@ -362,18 +358,21 @@ func (d *DockerTestFramework) AssertNFTOutput(ctx context.Context, eventClt *nod
 
 	go func() {
 		defer subInfo.Close()
-		d.assertOutputMetadataTopics(ctx, outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
+		d.assertOutputMetadataTopics(ctx, "AssertNFTOutput", outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
 			if resp.Output.Type() == iotago.OutputNFT {
 				o := resp.Output.(*iotago.NFTOutput)
-				return nftId.Matches(o.NFTID)
+				actualNFTID := o.NFTID
+				if actualNFTID.Empty() {
+					actualNFTID = iotago.NFTIDFromOutputID(resp.Metadata.OutputID)
+				}
+				return nftId.Matches(actualNFTID)
 			}
 			return false
 		}, finishChan)
-		fmt.Println("AssertNFTOutput finished")
 	}()
 }
 
-func (d *DockerTestFramework) assertCommitmentsTopics(ctx context.Context, receivedChan <-chan *iotago.Commitment, expectedSlots []iotago.SlotIndex, finishChan chan struct{}) {
+func (d *DockerTestFramework) assertCommitmentsTopics(ctx context.Context, callerName string, receivedChan <-chan *iotago.Commitment, expectedSlots []iotago.SlotIndex, finishChan chan struct{}) {
 	maxSlot := lo.Max(expectedSlots...)
 	slots := make([]iotago.SlotIndex, 0)
 
@@ -392,13 +391,13 @@ func (d *DockerTestFramework) assertCommitmentsTopics(ctx context.Context, recei
 				return
 			}
 		case <-ctx.Done():
-			fmt.Println("Received slots:", slots)
+			fmt.Println("topic", callerName, "does not get expected commitments, recieved slots:", slots)
 			return
 		}
 	}
 }
 
-func (d *DockerTestFramework) assertBlocksTopics(ctx context.Context, receivedChan <-chan *iotago.Block, expectedBlocks map[string]*iotago.Block, finishChan chan struct{}) {
+func (d *DockerTestFramework) assertBlocksTopics(ctx context.Context, callerName string, receivedChan <-chan *iotago.Block, expectedBlocks map[string]*iotago.Block, finishChan chan struct{}) {
 	expectedBlockIDsSlice := lo.Keys(expectedBlocks)
 	blkIDs := make([]string, 0)
 
@@ -419,13 +418,13 @@ func (d *DockerTestFramework) assertBlocksTopics(ctx context.Context, receivedCh
 				}
 			}
 		case <-ctx.Done():
-			fmt.Println("Received blocks:", blkIDs)
+			fmt.Println("topic", callerName, "does not get expected Blocks, received blocks:", blkIDs)
 			return
 		}
 	}
 }
 
-func (d *DockerTestFramework) assertBlockMetadataTopics(ctx context.Context, receivedChan <-chan *api.BlockMetadataResponse, expectedBlocks map[string]*iotago.Block, finishChan chan struct{}) {
+func (d *DockerTestFramework) assertBlockMetadataTopics(ctx context.Context, callerName string, receivedChan <-chan *api.BlockMetadataResponse, expectedBlocks map[string]*iotago.Block, finishChan chan struct{}) {
 	expectedBlockIDsSlice := lo.Keys(expectedBlocks)
 	blkIDs := make([]string, 0)
 
@@ -447,13 +446,13 @@ func (d *DockerTestFramework) assertBlockMetadataTopics(ctx context.Context, rec
 				}
 			}
 		case <-ctx.Done():
-			fmt.Println("Received blocks:", blkIDs)
+			fmt.Println("topic", callerName, "does not get expected BlockMetadata, received blocks:", blkIDs)
 			return
 		}
 	}
 }
 
-func (d *DockerTestFramework) assertOutputMetadataTopics(ctx context.Context, receivedChan <-chan *api.OutputWithMetadataResponse, matchFunc func(*api.OutputWithMetadataResponse) bool, finishChan chan struct{}) {
+func (d *DockerTestFramework) assertOutputMetadataTopics(ctx context.Context, callerName string, receivedChan <-chan *api.OutputWithMetadataResponse, matchFunc func(*api.OutputWithMetadataResponse) bool, finishChan chan struct{}) {
 	// in order to inform that the channel is listened
 	finishChan <- struct{}{}
 
@@ -465,7 +464,7 @@ func (d *DockerTestFramework) assertOutputMetadataTopics(ctx context.Context, re
 				return
 			}
 		case <-ctx.Done():
-			fmt.Println("Output Metadata related topics does not get expected contents")
+			fmt.Println("topic", callerName, "does not get expected outputs")
 			return
 		}
 	}

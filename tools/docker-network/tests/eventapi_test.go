@@ -8,9 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
-	"github.com/stretchr/testify/require"
 )
 
 var eventAPITests = map[string]func(t *testing.T, d *DockerTestFramework){
@@ -53,7 +54,7 @@ func test_Commitments(t *testing.T, d *DockerTestFramework) {
 	finish := make(chan struct{})
 
 	// get event API client ready
-	clt := d.Node("V1").Client
+	clt := d.wallet.DefaultClient()
 	ctx, cancel := context.WithCancel(context.Background())
 	eventClt, err := clt.EventAPI(ctx)
 	require.NoError(t, err)
@@ -75,10 +76,15 @@ func test_Commitments(t *testing.T, d *DockerTestFramework) {
 		expectedFinalizedSlots = append(expectedFinalizedSlots, iotago.SlotIndex(i))
 	}
 
-	totalTopics := 2
+	assertions := []func(){
+		func() { d.AssertLatestCommitments(ctx, eventClt, expectedLatestSlots, finish) },
+		func() { d.AssertFinalizedCommitments(ctx, eventClt, expectedFinalizedSlots, finish) },
+	}
 
-	d.AssertLatestCommitments(ctx, eventClt, expectedLatestSlots, finish)
-	d.AssertFinalizedCommitments(ctx, eventClt, expectedFinalizedSlots, finish)
+	totalTopics := len(assertions)
+	for _, assertion := range assertions {
+		assertion()
+	}
 
 	// wait until all topics receives all expected objects
 	err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
@@ -89,7 +95,7 @@ func test_ValidationBlocks(t *testing.T, d *DockerTestFramework) {
 	finish := make(chan struct{})
 
 	// get event API client ready
-	clt := d.Node("V1").Client
+	clt := d.wallet.DefaultClient()
 	ctx, cancel := context.WithCancel(context.Background())
 	eventClt, err := clt.EventAPI(ctx)
 	require.NoError(t, err)
@@ -104,9 +110,16 @@ func test_ValidationBlocks(t *testing.T, d *DockerTestFramework) {
 		validators[node.AccountAddressBech32] = struct{}{}
 	}
 
-	totalTopics := 1
+	assertions := []func(){
+		func() {
+			d.AssertValidationBlocks(ctx, eventClt, clt.CommittedAPI().ProtocolParameters().Bech32HRP(), validators, finish)
+		},
+	}
 
-	d.AssertValidationBlocks(ctx, eventClt, clt.CommittedAPI().ProtocolParameters().Bech32HRP(), validators, finish)
+	totalTopics := len(assertions)
+	for _, assertion := range assertions {
+		assertion()
+	}
 
 	// wait until all topics receives all expected objects
 	err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
@@ -115,7 +128,7 @@ func test_ValidationBlocks(t *testing.T, d *DockerTestFramework) {
 
 func test_BasicTaggedDataBlocks(t *testing.T, d *DockerTestFramework) {
 	// get event API client ready
-	clt := d.Node("V1").Client
+	clt := d.wallet.DefaultClient()
 	ctx, cancel := context.WithCancel(context.Background())
 	eventClt, err := clt.EventAPI(ctx)
 	require.NoError(t, err)
@@ -133,14 +146,20 @@ func test_BasicTaggedDataBlocks(t *testing.T, d *DockerTestFramework) {
 		expectedBlocks[blk.MustID().ToHex()] = blk
 	}
 	finish := make(chan struct{})
-	totalTopics := 6
 
-	d.AssertBlocks(ctx, eventClt, expectedBlocks, finish)
-	d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish)
-	d.AssertTaggedDataBlocks(ctx, eventClt, expectedBlocks, finish)
-	d.AssertTaggedDataBlocksByTag(ctx, eventClt, expectedBlocks, []byte("tag"), finish)
-	d.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks, finish)
-	d.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks, finish)
+	assertions := []func(){
+		func() { d.AssertBlocks(ctx, eventClt, expectedBlocks, finish) },
+		func() { d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish) },
+		func() { d.AssertTaggedDataBlocks(ctx, eventClt, expectedBlocks, finish) },
+		func() { d.AssertTaggedDataBlocksByTag(ctx, eventClt, expectedBlocks, []byte("tag"), finish) },
+		func() { d.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks, finish) },
+		func() { d.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks, finish) },
+	}
+
+	totalTopics := len(assertions)
+	for _, assertion := range assertions {
+		assertion()
+	}
 
 	// wait until all topics starts listening
 	err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
@@ -161,7 +180,7 @@ func test_BasicTaggedDataBlocks(t *testing.T, d *DockerTestFramework) {
 
 func test_DelegationTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 	// get event API client ready
-	clt := d.Node("V1").Client
+	clt := d.wallet.DefaultClient()
 	ctx, cancel := context.WithCancel(context.Background())
 	eventClt, err := clt.EventAPI(ctx)
 	require.NoError(t, err)
@@ -179,22 +198,30 @@ func test_DelegationTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 		blk.MustID().ToHex(): blk,
 	}
 	finish := make(chan struct{})
-	totalTopics := 8
+	delegationOutput := d.wallet.Output(outputId)
 
-	d.AssertTransactionBlocks(ctx, eventClt, expectedBlocks, finish)
-	d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish)
-	d.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks, finish)
-	d.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks, finish)
+	asserts := []func(){
+		func() { d.AssertTransactionBlocks(ctx, eventClt, expectedBlocks, finish) },
+		func() { d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish) },
+		func() { d.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks, finish) },
+		func() { d.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks, finish) },
+		func() { d.AssertDelegationOutput(ctx, eventClt, delegationId, finish) },
+		func() { d.AssertOutput(ctx, eventClt, outputId, finish) },
+		func() {
+			d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAny, delegationOutput.Address, finish)
+		},
+		func() {
+			d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAddress, delegationOutput.Address, finish)
+		},
+	}
+
+	totalTopics := len(asserts)
+	for _, assert := range asserts {
+		assert()
+	}
 
 	// d.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID(), finish)
 	// d.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID(), finish)
-
-	d.AssertDelegationOutput(ctx, eventClt, delegationId, finish)
-	d.AssertOutput(ctx, eventClt, outputId, finish)
-
-	delegationOutput := d.wallet.Output(outputId)
-	d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAny, delegationOutput.Address, finish)
-	d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAddress, delegationOutput.Address, finish)
 
 	// wait until all topics starts listening
 	err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
@@ -203,7 +230,7 @@ func test_DelegationTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 	// issue blocks
 	go func() {
 		for _, blk := range expectedBlocks {
-			fmt.Println("submitting a block")
+			fmt.Println("submitting a block: ", blk.MustID().ToHex())
 			d.SubmitBlock(context.Background(), blk)
 		}
 	}()
@@ -215,7 +242,7 @@ func test_DelegationTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 
 func test_AccountTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 	// get event API client ready
-	clt := d.Node("V1").Client
+	clt := d.wallet.DefaultClient()
 	ctx, cancel := context.WithCancel(context.Background())
 	eventClt, err := clt.EventAPI(ctx)
 	require.NoError(t, err)
@@ -233,22 +260,30 @@ func test_AccountTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 			blk.MustID().ToHex(): blk,
 		}
 		finish := make(chan struct{})
-		totalTopics := 8
+		accountOutput := d.wallet.Output(outputId)
 
-		d.AssertTransactionBlocks(ctx, eventClt, expectedBlocks, finish)
-		d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish)
-		d.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks, finish)
-		d.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks, finish)
+		assertions := []func(){
+			func() { d.AssertTransactionBlocks(ctx, eventClt, expectedBlocks, finish) },
+			func() { d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish) },
+			func() { d.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks, finish) },
+			func() { d.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks, finish) },
+			func() { d.AssertAccountOutput(ctx, eventClt, fullAccount.ID, finish) },
+			func() { d.AssertOutput(ctx, eventClt, outputId, finish) },
+			func() {
+				d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAny, accountOutput.Address, finish)
+			},
+			func() {
+				d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAddress, accountOutput.Address, finish)
+			},
+		}
+
+		totalTopics := len(assertions)
+		for _, assertion := range assertions {
+			assertion()
+		}
 
 		// d.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID(), finish)
 		// d.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID(), finish)
-
-		d.AssertAccountOutput(ctx, eventClt, fullAccount.ID, finish)
-		d.AssertOutput(ctx, eventClt, outputId, finish)
-
-		accountOutput := d.wallet.Output(outputId)
-		d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAny, accountOutput.Address, finish)
-		d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAddress, accountOutput.Address, finish)
 
 		// wait until all topics starts listening
 		err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
@@ -257,7 +292,7 @@ func test_AccountTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 		// issue blocks
 		go func() {
 			for _, blk := range expectedBlocks {
-				fmt.Println("submitting a block")
+				fmt.Println("submitting a block: ", blk.MustID().ToHex())
 				d.SubmitBlock(context.Background(), blk)
 			}
 		}()
@@ -273,7 +308,7 @@ func test_AccountTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 
 func test_FoundryTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 	// get event API client ready
-	clt := d.Node("V1").Client
+	clt := d.wallet.DefaultClient()
 	ctx, cancel := context.WithCancel(context.Background())
 	eventClt, err := clt.EventAPI(ctx)
 	require.NoError(t, err)
@@ -291,24 +326,32 @@ func test_FoundryTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 			blk.MustID().ToHex(): blk,
 		}
 		finish := make(chan struct{})
-		totalTopics := 10
+		foundryOutput := d.wallet.Output(outputId)
 
-		d.AssertTransactionBlocks(ctx, eventClt, expectedBlocks, finish)
-		d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish)
-		d.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks, finish)
-		d.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks, finish)
+		assertions := []func(){
+			func() { d.AssertTransactionBlocks(ctx, eventClt, expectedBlocks, finish) },
+			func() { d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish) },
+			func() { d.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks, finish) },
+			func() { d.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks, finish) },
+			func() { d.AssertAccountOutput(ctx, eventClt, account.ID, finish) },
+			func() { d.AssertFoundryOutput(ctx, eventClt, foundryId, finish) },
+			func() { d.AssertOutput(ctx, eventClt, outputId, finish) },
+			func() { d.AssertOutput(ctx, eventClt, account.OutputID, finish) },
+			func() {
+				d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAny, foundryOutput.Address, finish)
+			},
+			func() {
+				d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionImmutableAccount, foundryOutput.Address, finish)
+			},
+		}
+
+		totalTopics := len(assertions)
+		for _, assertion := range assertions {
+			assertion()
+		}
 
 		// d.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID(), finish)
 		// d.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID(), finish)
-
-		d.AssertAccountOutput(ctx, eventClt, account.ID, finish)
-		d.AssertFoundryOutput(ctx, eventClt, foundryId, finish)
-		d.AssertOutput(ctx, eventClt, outputId, finish)
-		d.AssertOutput(ctx, eventClt, account.OutputID, finish)
-
-		foundryOutput := d.wallet.Output(outputId)
-		d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAny, foundryOutput.Address, finish)
-		d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionImmutableAccount, foundryOutput.Address, finish)
 
 		// wait until all topics starts listening
 		err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
@@ -317,7 +360,7 @@ func test_FoundryTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 		// issue blocks
 		go func() {
 			for _, blk := range expectedBlocks {
-				fmt.Println("submitting a block")
+				fmt.Println("submitting a block: ", blk.MustID().ToHex())
 				d.SubmitBlock(context.Background(), blk)
 			}
 		}()
@@ -330,7 +373,7 @@ func test_FoundryTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 
 func test_NFTTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 	// get event API client ready
-	clt := d.Node("V1").Client
+	clt := d.wallet.DefaultClient()
 	ctx, cancel := context.WithCancel(context.Background())
 	eventClt, err := clt.EventAPI(ctx)
 	require.NoError(t, err)
@@ -348,23 +391,30 @@ func test_NFTTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 			blk.MustID().ToHex(): blk,
 		}
 		finish := make(chan struct{})
-		totalTopics := 10
+		nftOutput := d.wallet.Output(outputId)
 
-		d.AssertTransactionBlocks(ctx, eventClt, expectedBlocks, finish)
-		d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish)
-		d.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks, finish)
-		d.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks, finish)
+		assertions := []func(){
+			func() { d.AssertTransactionBlocks(ctx, eventClt, expectedBlocks, finish) },
+			func() { d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish) },
+			func() { d.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks, finish) },
+			func() { d.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks, finish) },
+			func() { d.AssertNFTOutput(ctx, eventClt, nftId, finish) },
+			func() { d.AssertOutput(ctx, eventClt, outputId, finish) },
+			func() {
+				d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAny, nftOutput.Address, finish)
+			},
+			func() {
+				d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAddress, nftOutput.Address, finish)
+			},
+		}
+
+		totalTopics := len(assertions)
+		for _, assertion := range assertions {
+			assertion()
+		}
 
 		// d.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID(), finish)
 		// d.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID(), finish)
-
-		d.AssertAccountOutput(ctx, eventClt, account.ID, finish)
-		d.AssertNFTOutput(ctx, eventClt, nftId, finish)
-		d.AssertOutput(ctx, eventClt, outputId, finish)
-
-		nftOutput := d.wallet.Output(outputId)
-		d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAny, nftOutput.Address, finish)
-		d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAddress, nftOutput.Address, finish)
 
 		// wait until all topics starts listening
 		err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
@@ -373,7 +423,7 @@ func test_NFTTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 		// issue blocks
 		go func() {
 			for _, blk := range expectedBlocks {
-				fmt.Println("submitting a block")
+				fmt.Println("submitting a block ", blk.MustID().ToHex())
 				d.SubmitBlock(context.Background(), blk)
 			}
 		}()

@@ -230,6 +230,7 @@ func (m *MemPool[VoteRank]) Reset() {
 		if evictedAttachments := m.attachments.Evict(slot); evictedAttachments != nil {
 			evictedAttachments.ForEach(func(id iotago.BlockID, metadata *SignedTransactionMetadata) bool {
 				metadata.evictAttachment(id)
+
 				return true
 			})
 		}
@@ -621,6 +622,7 @@ func (m *MemPool[VoteRank]) setupSignedTransaction(signedTransactionMetadata *Si
 		executionContext, err := m.vm.ValidateSignatures(signedTransactionMetadata.SignedTransaction(), lo.Map(signedTransactionMetadata.transactionMetadata.inputs, (*StateMetadata).State))
 		if err != nil {
 			_ = signedTransactionMetadata.signaturesInvalid.Set(err)
+
 			return
 		}
 

@@ -43,7 +43,7 @@ func Test_SmallerCommittee(t *testing.T) {
 
 	status := d.NodeStatus("V1")
 
-	clt := d.Node("V1").Client
+	clt := d.wallet.DefaultClient()
 	currentEpoch := clt.CommittedAPI().TimeProvider().EpochFromSlot(status.LatestAcceptedBlockSlot)
 
 	// stop inx-validator plugin of validator 2
@@ -90,7 +90,7 @@ func Test_ReuseDueToNoFinalization(t *testing.T) {
 	err = d.StopContainer(d.Node("V2").ContainerName, d.Node("V3").ContainerName)
 	require.NoError(t, err)
 
-	clt := d.Node("V1").Client
+	clt := d.wallet.DefaultClient()
 	status := d.NodeStatus("V1")
 
 	prevFinalizedSlot := status.LatestFinalizedSlot
@@ -155,7 +155,7 @@ func Test_NoCandidacyPayload(t *testing.T) {
 
 	d.WaitUntilNetworkReady()
 
-	clt := d.Node("V1").Client
+	clt := d.wallet.DefaultClient()
 	status := d.NodeStatus("V1")
 	prevFinalizedSlot := status.LatestFinalizedSlot
 	fmt.Println("First finalized slot: ", prevFinalizedSlot)

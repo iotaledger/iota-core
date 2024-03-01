@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	hiveEd25519 "github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
@@ -18,23 +20,25 @@ import (
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/nodeclient"
 	"github.com/iotaledger/iota.go/v4/wallet"
-	"github.com/stretchr/testify/require"
 )
 
 // DockerWallet holds a keyManager, created outputs and accounts details.
 type DockerWallet struct {
 	Testing *testing.T
 
+	// a map of clients for each node in the network
+	Clients map[string]*nodeclient.Client
+
 	keyManager *wallet.KeyManager
 
 	lastUsedIndex atomic.Uint32
 
-	outputs  map[iotago.OutputID]*Output
-	accounts map[iotago.AccountID]*Account
+	outputs  map[iotago.OutputID]*OutputData
+	accounts map[iotago.AccountID]*AccountData
 }
 
-// Output holds the details of an output that can be used to build a transaction.
-type Output struct {
+// OutputData holds the details of an output that can be used to build a transaction.
+type OutputData struct {
 	// ID is the unique identifier of the output.
 	ID iotago.OutputID
 	// Output is the iotago Output.
@@ -45,8 +49,8 @@ type Output struct {
 	AddressIndex uint32
 }
 
-// Account holds the details of an account that can be used to issue a block or account transition.
-type Account struct {
+// AccountData holds the details of an account that can be used to issue a block or account transition.
+type AccountData struct {
 	// ID is the unique identifier of the account.
 	ID iotago.AccountID
 	// AddressIndex is the index of the address in the keyManager.
@@ -62,21 +66,26 @@ type Account struct {
 func NewDockerWallet(t *testing.T) *DockerWallet {
 	return &DockerWallet{
 		Testing:    t,
-		outputs:    make(map[iotago.OutputID]*Output),
-		accounts:   make(map[iotago.AccountID]*Account),
+		outputs:    make(map[iotago.OutputID]*OutputData),
+		accounts:   make(map[iotago.AccountID]*AccountData),
+		Clients:    make(map[string]*nodeclient.Client),
 		keyManager: lo.PanicOnErr(wallet.NewKeyManagerFromRandom(wallet.DefaultIOTAPath)),
 	}
 }
 
-func (w *DockerWallet) AddOutput(outputId iotago.OutputID, output *Output) {
+func (w *DockerWallet) DefaultClient() *nodeclient.Client {
+	return w.Clients["V1"]
+}
+
+func (w *DockerWallet) AddOutput(outputId iotago.OutputID, output *OutputData) {
 	w.outputs[outputId] = output
 }
 
-func (w *DockerWallet) AddAccount(accountId iotago.AccountID, data *Account) {
+func (w *DockerWallet) AddAccount(accountId iotago.AccountID, data *AccountData) {
 	w.accounts[accountId] = data
 }
 
-func (w *DockerWallet) Output(outputName iotago.OutputID) *Output {
+func (w *DockerWallet) Output(outputName iotago.OutputID) *OutputData {
 	output, exists := w.outputs[outputName]
 	if !exists {
 		panic(ierrors.Errorf("output %s not registered in wallet", outputName))
@@ -85,7 +94,7 @@ func (w *DockerWallet) Output(outputName iotago.OutputID) *Output {
 	return output
 }
 
-func (w *DockerWallet) Account(accountId iotago.AccountID) *Account {
+func (w *DockerWallet) Account(accountId iotago.AccountID) *AccountData {
 	acc, exists := w.accounts[accountId]
 	if !exists {
 		panic(ierrors.Errorf("account %s not registered in wallet", accountId.ToHex()))
@@ -122,13 +131,13 @@ func (w *DockerWallet) AddressSigner(indexes ...uint32) iotago.AddressSigner {
 	return w.keyManager.AddressSigner(indexes...)
 }
 
-func (w *DockerWallet) AllotManaFromAccount(clt *nodeclient.Client, fromId iotago.AccountID, toId iotago.AccountID, manaToAllot iotago.Mana, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
+func (w *DockerWallet) AllotManaFromAccount(fromId iotago.AccountID, toId iotago.AccountID, manaToAllot iotago.Mana, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
 	from := w.Account(fromId)
 	to := w.Account(toId)
 	input := w.Output(inputId)
 
-	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
-	apiForSlot := clt.APIForSlot(currentSlot)
+	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	apiForSlot := w.DefaultClient().APIForSlot(currentSlot)
 
 	basicOutput, ok := input.Output.(*iotago.BasicOutput)
 	require.True(w.Testing, ok)
@@ -143,7 +152,7 @@ func (w *DockerWallet) AllotManaFromAccount(clt *nodeclient.Client, fromId iotag
 		outputBuilder.Mana(basicOutput.StoredMana() - manaToAllot)
 	}
 
-	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot, w.AddressSigner(input.AddressIndex)).
 		AddInput(&builder.TxInput{
 			UnlockTarget: input.Address,
 			InputID:      input.ID,
@@ -153,11 +162,11 @@ func (w *DockerWallet) AllotManaFromAccount(clt *nodeclient.Client, fromId iotag
 		AddOutput(basicOutput).
 		SetCreationSlot(currentSlot).
 		AllotAllMana(currentSlot, from.ID, 0).
-		Build(w.AddressSigner(input.AddressIndex))
+		Build()
 	require.NoError(w.Testing, err)
 
 	allotmentOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
-	w.AddOutput(allotmentOutputId, &Output{
+	w.AddOutput(allotmentOutputId, &OutputData{
 		ID:           allotmentOutputId,
 		Output:       basicOutput,
 		Address:      input.Address,
@@ -167,17 +176,17 @@ func (w *DockerWallet) AllotManaFromAccount(clt *nodeclient.Client, fromId iotag
 	return signedTx
 }
 
-func (w *DockerWallet) AllotManaFromInput(clt *nodeclient.Client, toId iotago.AccountID, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
+func (w *DockerWallet) AllotManaFromInput(toId iotago.AccountID, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
 	to := w.Account(toId)
 	input := w.Output(inputId)
 
-	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
-	apiForSlot := clt.APIForSlot(currentSlot)
+	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	apiForSlot := w.DefaultClient().APIForSlot(currentSlot)
 
 	basicOutput, err := builder.NewBasicOutputBuilder(input.Address, input.Output.BaseTokenAmount()).Build()
 	require.NoError(w.Testing, err)
 
-	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot, w.AddressSigner(input.AddressIndex)).
 		AddInput(&builder.TxInput{
 			UnlockTarget: input.Address,
 			InputID:      input.ID,
@@ -186,10 +195,10 @@ func (w *DockerWallet) AllotManaFromInput(clt *nodeclient.Client, toId iotago.Ac
 		AddOutput(basicOutput).
 		AllotAllMana(currentSlot, to.ID, 0).
 		SetCreationSlot(currentSlot).
-		Build(w.AddressSigner(input.AddressIndex))
+		Build()
 
 	delegationOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
-	w.AddOutput(delegationOutputId, &Output{
+	w.AddOutput(delegationOutputId, &OutputData{
 		ID:           delegationOutputId,
 		Output:       basicOutput,
 		Address:      input.Address,
@@ -199,15 +208,15 @@ func (w *DockerWallet) AllotManaFromInput(clt *nodeclient.Client, toId iotago.Ac
 	return signedTx
 }
 
-func (w *DockerWallet) TransitionImplicitAccountToAccountOutput(clt *nodeclient.Client, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse, opts ...options.Option[builder.AccountOutputBuilder]) (*Account, *iotago.SignedTransaction) {
+func (w *DockerWallet) TransitionImplicitAccountToAccountOutput(inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse, opts ...options.Option[builder.AccountOutputBuilder]) (*AccountData, *iotago.SignedTransaction) {
 	input := w.Output(inputId)
 
 	accountID := iotago.AccountIDFromOutputID(input.ID)
 	accountAddress, ok := accountID.ToAddress().(*iotago.AccountAddress)
 	require.True(w.Testing, ok)
 
-	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
-	apiForSlot := clt.APIForSlot(currentSlot)
+	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	apiForSlot := w.DefaultClient().APIForSlot(currentSlot)
 
 	// transition to a full account with new Ed25519 address and staking feature
 	accEd25519AddrIndex, accEd25519Addr := w.Address()
@@ -219,7 +228,7 @@ func (w *DockerWallet) TransitionImplicitAccountToAccountOutput(clt *nodeclient.
 				BlockIssuer(iotago.NewBlockIssuerKeys(accBlockIssuerKey), iotago.MaxSlotIndex)
 		}).MustBuild()
 
-	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot, w.AddressSigner(input.AddressIndex)).
 		AddInput(&builder.TxInput{
 			UnlockTarget: input.Address,
 			InputID:      input.ID,
@@ -230,35 +239,43 @@ func (w *DockerWallet) TransitionImplicitAccountToAccountOutput(clt *nodeclient.
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
 		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: accountID}).
 		AllotAllMana(currentSlot, accountID, 0).
-		Build(w.AddressSigner(input.AddressIndex))
+		Build()
 	require.NoError(w.Testing, err)
 
-	accountInfo := &Account{
+	accountOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
+	w.AddOutput(accountOutputId, &OutputData{
+		ID:           accountOutputId,
+		Output:       accountOutput,
+		Address:      accEd25519Addr,
+		AddressIndex: accEd25519AddrIndex,
+	})
+
+	accountInfo := &AccountData{
 		ID:           accountID,
 		Address:      accountAddress,
 		AddressIndex: accEd25519AddrIndex,
 		Output:       accountOutput,
-		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0),
+		OutputID:     accountOutputId,
 	}
 
 	return accountInfo, signedTx
 }
 
-func (w *DockerWallet) CreateDelegationFromInput(clt *nodeclient.Client, issuerId iotago.AccountID, validator *Node, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
+func (w *DockerWallet) CreateDelegationFromInput(issuerId iotago.AccountID, validator *Node, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
 	input := w.Output(inputId)
 
 	_, validatorAccountAddr, err := iotago.ParseBech32(validator.AccountAddressBech32)
 	require.NoError(w.Testing, err)
 
-	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
-	apiForSlot := clt.APIForSlot(currentSlot)
+	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	apiForSlot := w.DefaultClient().APIForSlot(currentSlot)
 
 	// construct delegation transaction
 	delegationOutput := builder.NewDelegationOutputBuilder(validatorAccountAddr.(*iotago.AccountAddress), input.Address, input.Output.BaseTokenAmount()).
 		StartEpoch(getDelegationStartEpoch(apiForSlot, issuerResp.LatestCommitment.Slot)).
 		DelegatedAmount(input.Output.BaseTokenAmount()).MustBuild()
 
-	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot, w.AddressSigner(input.AddressIndex)).
 		AddInput(&builder.TxInput{
 			UnlockTarget: input.Address,
 			InputID:      input.ID,
@@ -268,11 +285,11 @@ func (w *DockerWallet) CreateDelegationFromInput(clt *nodeclient.Client, issuerI
 		SetCreationSlot(currentSlot).
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
 		AllotAllMana(currentSlot, issuerId, 0).
-		Build(w.AddressSigner(input.AddressIndex))
+		Build()
 	require.NoError(w.Testing, err)
 
 	delegationOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
-	w.AddOutput(delegationOutputId, &Output{
+	w.AddOutput(delegationOutputId, &OutputData{
 		ID:           delegationOutputId,
 		Output:       delegationOutput,
 		Address:      input.Address,
@@ -282,12 +299,12 @@ func (w *DockerWallet) CreateDelegationFromInput(clt *nodeclient.Client, issuerI
 	return signedTx
 }
 
-func (w *DockerWallet) CreateFoundryAndNativeTokensFromInput(clt *nodeclient.Client, issuerId iotago.AccountID, inputId iotago.OutputID, mintedAmount iotago.BaseToken, maxSupply iotago.BaseToken, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
+func (w *DockerWallet) CreateFoundryAndNativeTokensFromInput(issuerId iotago.AccountID, inputId iotago.OutputID, mintedAmount iotago.BaseToken, maxSupply iotago.BaseToken, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
 	input := w.Output(inputId)
 
 	issuer := w.Account(issuerId)
-	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
-	apiForSlot := clt.APIForSlot(currentSlot)
+	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	apiForSlot := w.DefaultClient().APIForSlot(currentSlot)
 
 	// increase foundry counter
 	accTransitionOutput := builder.NewAccountOutputBuilderFromPrevious(issuer.Output).
@@ -308,7 +325,7 @@ func (w *DockerWallet) CreateFoundryAndNativeTokensFromInput(clt *nodeclient.Cli
 			Amount: big.NewInt(int64(mintedAmount)),
 		}).MustBuild()
 
-	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot, w.AddressSigner(input.AddressIndex, issuer.AddressIndex)).
 		AddInput(&builder.TxInput{
 			UnlockTarget: input.Address,
 			InputID:      input.ID,
@@ -325,17 +342,17 @@ func (w *DockerWallet) CreateFoundryAndNativeTokensFromInput(clt *nodeclient.Cli
 		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: issuerId}).
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
 		AllotAllMana(currentSlot, issuerId, 0).
-		Build(w.AddressSigner(input.AddressIndex, issuer.AddressIndex))
+		Build()
 	require.NoError(w.Testing, err)
 
 	foundryOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 1)
-	w.AddOutput(foundryOutputId, &Output{
+	w.AddOutput(foundryOutputId, &OutputData{
 		ID:      foundryOutputId,
 		Output:  foundryOutput,
 		Address: issuer.Address,
 	})
 
-	w.AddAccount(issuerId, &Account{
+	w.AddAccount(issuerId, &AccountData{
 		ID:           issuerId,
 		Address:      issuer.Address,
 		AddressIndex: issuer.AddressIndex,
@@ -347,7 +364,7 @@ func (w *DockerWallet) CreateFoundryAndNativeTokensFromInput(clt *nodeclient.Cli
 }
 
 // TransitionFoundry transitions a FoundryOutput by increasing the native token amount on the output by one.
-func (w *DockerWallet) TransitionFoundry(clt *nodeclient.Client, issuerId iotago.AccountID, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
+func (w *DockerWallet) TransitionFoundry(issuerId iotago.AccountID, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
 	issuer := w.Account(issuerId)
 	input := w.Output(inputId)
 	inputFoundry, isFoundry := input.Output.(*iotago.FoundryOutput)
@@ -376,10 +393,10 @@ func (w *DockerWallet) TransitionFoundry(clt *nodeclient.Client, issuerId iotago
 	outputAccount := builder.NewAccountOutputBuilderFromPrevious(issuer.Output).
 		MustBuild()
 
-	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
-	apiForSlot := clt.APIForSlot(currentSlot)
+	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	apiForSlot := w.DefaultClient().APIForSlot(currentSlot)
 
-	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot, w.AddressSigner(input.AddressIndex, issuer.AddressIndex)).
 		AddInput(&builder.TxInput{
 			UnlockTarget: input.Address,
 			InputID:      input.ID,
@@ -396,17 +413,17 @@ func (w *DockerWallet) TransitionFoundry(clt *nodeclient.Client, issuerId iotago
 		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: issuer.ID}).
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
 		AllotAllMana(currentSlot, issuerId, 0).
-		Build(w.AddressSigner(input.AddressIndex, issuer.AddressIndex))
+		Build()
 	require.NoError(w.Testing, err)
 
 	foundryOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 1)
-	w.AddOutput(foundryOutputId, &Output{
+	w.AddOutput(foundryOutputId, &OutputData{
 		ID:      foundryOutputId,
 		Output:  outputFoundry,
 		Address: issuer.Address,
 	})
 
-	w.AddAccount(issuerId, &Account{
+	w.AddAccount(issuerId, &AccountData{
 		ID:           issuerId,
 		Address:      issuer.Address,
 		AddressIndex: issuer.AddressIndex,
@@ -417,18 +434,18 @@ func (w *DockerWallet) TransitionFoundry(clt *nodeclient.Client, issuerId iotago
 	return signedTx
 }
 
-func (w *DockerWallet) CreateNFTFromInput(clt *nodeclient.Client, issuerId iotago.AccountID, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse, opts ...options.Option[builder.NFTOutputBuilder]) *iotago.SignedTransaction {
+func (w *DockerWallet) CreateNFTFromInput(issuerId iotago.AccountID, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse, opts ...options.Option[builder.NFTOutputBuilder]) *iotago.SignedTransaction {
 	input := w.Output(inputId)
 
-	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
-	apiForSlot := clt.APIForSlot(currentSlot)
+	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	apiForSlot := w.DefaultClient().APIForSlot(currentSlot)
 
 	nftAddressIndex, nftAddress := w.Address()
 	nftOutputBuilder := builder.NewNFTOutputBuilder(nftAddress, input.Output.BaseTokenAmount())
 	options.Apply(nftOutputBuilder, opts)
 	nftOutput := nftOutputBuilder.MustBuild()
 
-	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot, w.AddressSigner(input.AddressIndex)).
 		AddInput(&builder.TxInput{
 			UnlockTarget: input.Address,
 			InputID:      input.ID,
@@ -439,11 +456,11 @@ func (w *DockerWallet) CreateNFTFromInput(clt *nodeclient.Client, issuerId iotag
 		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: issuerId}).
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
 		AllotAllMana(currentSlot, issuerId, 0).
-		Build(w.AddressSigner(input.AddressIndex))
+		Build()
 	require.NoError(w.Testing, err)
 
 	nftOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
-	w.AddOutput(nftOutputId, &Output{
+	w.AddOutput(nftOutputId, &OutputData{
 		ID:           nftOutputId,
 		Output:       nftOutput,
 		Address:      nftAddress,
