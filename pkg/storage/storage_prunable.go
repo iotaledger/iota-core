@@ -1,11 +1,11 @@
 package storage
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/serializer/v2"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -114,7 +114,15 @@ func (s *Storage) Roots(slot iotago.SlotIndex) (*slotstore.Store[iotago.Commitme
 }
 
 func (s *Storage) ExportRoots(writer io.WriteSeeker, targetCommitment *iotago.Commitment) error {
+
 	slotIndex := targetCommitment.Slot
+
+	if slotIndex <= s.Settings().APIProvider().CommittedAPI().ProtocolParameters().GenesisSlot() {
+		return nil
+	}
+
+	fmt.Println("Export Roots")
+
 	commitmentID, err := targetCommitment.ID()
 
 	if err != nil {
@@ -134,68 +142,28 @@ func (s *Storage) ExportRoots(writer io.WriteSeeker, targetCommitment *iotago.Co
 		return ierrors.Wrap(err, "roots not found")
 	}
 
-	accountRootBytes, erAcc := roots.AccountRoot.Bytes()
-	if erAcc != nil {
-		return ierrors.Wrap(err, "failed to load account root bytes")
-	}
-
-	attestationRootBytes, erAtt := roots.AttestationsRoot.Bytes()
-	if erAtt != nil {
-		return ierrors.Wrap(err, "failed to load attestations root bytes")
-	}
-
-	committeeRootBytes, erCom := roots.CommitteeRoot.Bytes()
-	if erCom != nil {
-		return ierrors.Wrap(err, "failed to load committee root bytes")
-	}
-
-	protocolParametersHashBytes, erPro := roots.ProtocolParametersHash.Bytes()
-	if erPro != nil {
-		return ierrors.Wrap(err, "failed to load protocol parameters hash root bytes")
-	}
-
-	rewardsRootBytes, erRew := roots.RewardsRoot.Bytes()
-	if erRew != nil {
-		return ierrors.Wrap(err, "failed to load rewards root bytes")
-	}
-
-	stateMutationRootBytes, erStM := roots.StateMutationRoot.Bytes()
-	if erStM != nil {
-		return ierrors.Wrap(err, "failed to load state mutation root bytes")
-	}
-
-	stateRootBytes, erSt := roots.StateRoot.Bytes()
-	if erSt != nil {
-		return ierrors.Wrap(err, "failed to load state root bytes")
-	}
-
-	tangleRootBytes, erTan := roots.TangleRoot.Bytes()
-	if erTan != nil {
-		return ierrors.Wrap(err, "failed to load tangle root bytes")
-	}
-
-	if errWrite := stream.WriteBytesWithSize(writer, accountRootBytes, serializer.SeriLengthPrefixTypeAsUint32); errWrite != nil {
+	if errWrite := stream.Write(writer, roots.AccountRoot); errWrite != nil {
 		return ierrors.Wrapf(err, "failed to write account root bytes")
 	}
-	if errWrite := stream.WriteBytesWithSize(writer, attestationRootBytes, serializer.SeriLengthPrefixTypeAsUint32); errWrite != nil {
+	if errWrite := stream.Write(writer, roots.AttestationsRoot); errWrite != nil {
 		return ierrors.Wrapf(err, "failed to write attestation root bytes")
 	}
-	if errWrite := stream.WriteBytesWithSize(writer, committeeRootBytes, serializer.SeriLengthPrefixTypeAsUint32); errWrite != nil {
+	if errWrite := stream.Write(writer, roots.CommitteeRoot); errWrite != nil {
 		return ierrors.Wrapf(err, "failed to write committee root bytes")
 	}
-	if errWrite := stream.WriteBytesWithSize(writer, protocolParametersHashBytes, serializer.SeriLengthPrefixTypeAsUint32); errWrite != nil {
+	if errWrite := stream.Write(writer, roots.ProtocolParametersHash); errWrite != nil {
 		return ierrors.Wrapf(err, "failed to write protocol parameters hash root bytes")
 	}
-	if errWrite := stream.WriteBytesWithSize(writer, rewardsRootBytes, serializer.SeriLengthPrefixTypeAsUint32); errWrite != nil {
+	if errWrite := stream.Write(writer, roots.RewardsRoot); errWrite != nil {
 		return ierrors.Wrapf(err, "failed to write rewards root bytes")
 	}
-	if errWrite := stream.WriteBytesWithSize(writer, stateMutationRootBytes, serializer.SeriLengthPrefixTypeAsUint32); errWrite != nil {
+	if errWrite := stream.Write(writer, roots.StateMutationRoot); errWrite != nil {
 		return ierrors.Wrapf(err, "failed to write state mutation root bytes")
 	}
-	if errWrite := stream.WriteBytesWithSize(writer, stateRootBytes, serializer.SeriLengthPrefixTypeAsUint32); errWrite != nil {
+	if errWrite := stream.Write(writer, roots.StateRoot); errWrite != nil {
 		return ierrors.Wrapf(err, "failed to write state root bytes")
 	}
-	if errWrite := stream.WriteBytesWithSize(writer, tangleRootBytes, serializer.SeriLengthPrefixTypeAsUint32); errWrite != nil {
+	if errWrite := stream.Write(writer, roots.TangleRoot); errWrite != nil {
 		return ierrors.Wrapf(err, "failed to write tangle root bytes")
 	}
 
@@ -203,6 +171,13 @@ func (s *Storage) ExportRoots(writer io.WriteSeeker, targetCommitment *iotago.Co
 }
 
 func (s *Storage) ImportRoots(reader io.ReadSeeker, targetCommitment *model.Commitment) error {
+
+	slotIndex := targetCommitment.Commitment().Slot
+
+	if slotIndex <= s.Settings().APIProvider().CommittedAPI().ProtocolParameters().GenesisSlot() {
+		return nil
+	}
+
 	accountRoot, err := stream.Read[iotago.Identifier](reader)
 	if err != nil {
 		return ierrors.Wrap(err, "can not retrieve account root")
@@ -243,7 +218,6 @@ func (s *Storage) ImportRoots(reader io.ReadSeeker, targetCommitment *model.Comm
 		return ierrors.Wrap(err, "can not retrieve tangle root")
 	}
 
-	slotIndex := targetCommitment.Commitment().Slot
 	commitmentID, err := targetCommitment.Commitment().ID()
 
 	if err != nil {
