@@ -136,7 +136,9 @@ func NewOrchestrator(errorHandler func(error),
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (o *Orchestrator) Reset() {
-	// TODO: clean up latestSignals
+	// latestSignals are evicted upon commitment,
+	// so we can safely clear the whole structure as it only contains data from uncommitted slots.
+	o.latestSignals.Clear()
 }
 
 func (o *Orchestrator) Shutdown() {
