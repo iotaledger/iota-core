@@ -346,13 +346,13 @@ func (c *Chains) trackHeaviestCandidates(chain *Chain) (teardown func()) {
 		if evictionEvent := c.protocol.EvictionEvent(targetSlot); !evictionEvent.WasTriggered() {
 			c.HeaviestClaimedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent, "heaviestClaimedCandidate")
 
-			// latestCommitment.IsAttested.OnTrigger(func() {
-			c.HeaviestAttestedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent, "heaviestAttestedCandidate")
-			// })
+			latestCommitment.IsAttested.OnTrigger(func() {
+				c.HeaviestAttestedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent, "heaviestAttestedCandidate")
+			})
 
-			// latestCommitment.IsVerified.OnTrigger(func() {
-			c.HeaviestVerifiedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent, "heaviestVerifiedCandidate")
-			// })
+			latestCommitment.IsVerified.OnTrigger(func() {
+				c.HeaviestVerifiedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent, "heaviestVerifiedCandidate")
+			})
 		}
 	})
 }
@@ -444,6 +444,8 @@ func (c *ChainsCandidate) measureAt(slot iotago.SlotIndex) (teardown func()) {
 	sortedCommitments, _ := c.sortedCommitmentsBySlot.GetOrCreate(slot, func() reactive.SortedSet[*Commitment] {
 		return reactive.NewSortedSet(c.weightVariable)
 	})
+
+	c.chains.protocol.EvictionEvent(slot)
 
 	// make sure the heaviest commitment was the heaviest for the last chainSwitchingThreshold slots before we update
 	return sortedCommitments.HeaviestElement().WithNonEmptyValue(func(heaviestCommitment *Commitment) (teardown func()) {
