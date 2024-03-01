@@ -35,6 +35,9 @@ import (
 )
 
 func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
+	const maxCommittableAge = iotago.SlotIndex(4)
+	const expectedCommittedSlotAfterPartitionMerge = 22
+
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
@@ -47,7 +50,7 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 				10,
 				10,
 				2,
-				4,
+				maxCommittableAge,
 				5,
 			),
 		),
@@ -64,7 +67,6 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 	node5 := ts.AddNode("node5")
 	ts.AddDefaultWallet(node0)
 
-	const expectedCommittedSlotAfterPartitionMerge = 18
 	nodesP1 := []*mock.Node{node0, node1, node2}
 	nodesP2 := []*mock.Node{node3, node4, node5}
 
@@ -121,16 +123,13 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 
 	// Verify that nodes have the expected states.
 	{
-		// TODO: change this
-		genesisCommitment := iotago.NewEmptyCommitment(ts.API)
-		genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
+		genesisCommitment := ts.CommitmentOfMainEngine(node0, 0)
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
-			testsuite.WithLatestCommitment(genesisCommitment),
+			testsuite.WithLatestCommitment(genesisCommitment.Commitment()),
 			testsuite.WithLatestFinalizedSlot(0),
-			testsuite.WithMainChainID(genesisCommitment.MustID()),
-			testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment}),
+			testsuite.WithMainChainID(genesisCommitment.ID()),
 
 			testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
@@ -176,7 +175,7 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 			manualPOA.SetOnline("node0", "node1")
 			manualPOA.SetOffline("node3", "node4")
 		} else {
-			manualPOA.SetOnline("node4", "node4")
+			manualPOA.SetOnline("node3", "node4")
 			manualPOA.SetOffline("node0", "node1")
 		}
 	}
@@ -234,15 +233,19 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 
 		// Make sure the tips are properly set.
 		ts.AssertStrongTips(ts.BlocksWithPrefix("P2:11.3"), nodesP2...)
-
-		// TODO: do for all nodes
-		// require.NoError(t, node5.Protocol.Engines.Main.Get().Notarization.ForceCommitUntil(12))
 	}
 
 	// Merge the partitions
 	{
 		ts.MergePartitionsToMain()
 		fmt.Println("\n=========================\nMerged network partitions\n=========================")
+
+		// Set online committee for each partition.
+		for _, node := range ts.Nodes() {
+			manualPOA := node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().(*mock2.ManualPOA)
+			manualPOA.SetOnline("node0")
+			manualPOA.SetOffline("node1", "node3", "node4")
+		}
 
 		require.NoError(t, node0.Protocol.Engines.Main.Get().Notarization.ForceCommitUntil(20))
 		ts.IssueValidationBlockWithOptions("revive", node0,
@@ -251,13 +254,47 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 				mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(22)),
 			),
 		)
+		// TODO: assert attested and verified chains
 
-		node5.Protocol.Chains.LatestSeenSlot.Set(20)
-		// ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{20}, 4, "revive", ts.Nodes("node0"), true, true)
-
-		time.Sleep(10 * time.Second)
-		fmt.Println(node5.Protocol.Engines.Main.Get().LogName())
+		ts.IssueBlocksAtSlots("P0-merged:", []iotago.SlotIndex{22, 23, 24}, 3, "revive", ts.Nodes("node0"), true, false)
 	}
+
+	// TODO: should this state be on all nodes?
+	{
+		ts.AssertNodeState(nodesP1,
+			testsuite.WithLatestFinalizedSlot(5),
+			testsuite.WithLatestCommitmentSlotIndex(expectedCommittedSlotAfterPartitionMerge),
+			testsuite.WithEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge),
+			testsuite.WithLatestCommitmentCumulativeWeight(31),
+		)
+		ts.AssertAttestationsForSlot(10, ts.Blocks("P1:10.3-node0", "P1:10.3-node1"), nodesP1...)
+		ts.AssertAttestationsForSlot(11, ts.Blocks("P1:11.1-node0", "P1:11.1-node1"), nodesP1...) // 11.1 are the last blocks that got accepted before reviving
+		ts.AssertAttestationsForSlot(12, ts.Blocks("P1:11.1-node0", "P1:11.1-node1"), nodesP1...)
+		for _, slot := range []iotago.SlotIndex{13, 14, 15, 16, 17, 18, 19, 20, 21} {
+			ts.AssertAttestationsForSlot(slot, ts.Blocks(), nodesP1...)
+		}
+		ts.AssertAttestationsForSlot(22, ts.Blocks("P0-merged:22.2-node0"), nodesP1...)
+	}
+
+	oldestNonEvictedCommitment := 5 - maxCommittableAge
+	commitmentsMainChain := ts.CommitmentsOfMainEngine(nodesP1[0], oldestNonEvictedCommitment, expectedCommittedSlotAfterPartitionMerge)
+
+	// TODO: the mainchain for nodes of P2 should start from slot 9.
+	ts.AssertMainChain(commitmentsMainChain[0].ID(), ts.Nodes()...)
+
+	ts.AssertUniqueCommitmentChain(ts.Nodes()...)
+	ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
+
+	ts.AssertCommitmentsOnEvictedChain(commitmentsMainChain, false, ts.Nodes()...)
+
+	ts.AssertCommitmentsOnChainAndChainHasCommitments(commitmentsMainChain, commitmentsMainChain[0].ID(), ts.Nodes()...)
+
+	ts.AssertCommitmentsOnChain(commitmentsMainChain, commitmentsMainChain[0].ID(), nodesP1...)
+
+	ts.AssertCommitmentsAndChainsEvicted(oldestNonEvictedCommitment-1, ts.Nodes()...)
+
+	fmt.Println(node5.Protocol.Engines.Main.Get().LogName())
+
 }
 
 func TestProtocol_EngineSwitching(t *testing.T) {

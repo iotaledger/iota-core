@@ -441,11 +441,9 @@ func (c *ChainsCandidate) measureAt(slot iotago.SlotIndex) (teardown func()) {
 		return
 	}
 
-	// abort if no commitment exists for this slot
-	sortedCommitments, sortedCommitmentsExist := c.sortedCommitmentsBySlot.Get(slot)
-	if !sortedCommitmentsExist {
-		return
-	}
+	sortedCommitments, _ := c.sortedCommitmentsBySlot.GetOrCreate(slot, func() reactive.SortedSet[*Commitment] {
+		return reactive.NewSortedSet(c.weightVariable)
+	})
 
 	// make sure the heaviest commitment was the heaviest for the last chainSwitchingThreshold slots before we update
 	return sortedCommitments.HeaviestElement().WithNonEmptyValue(func(heaviestCommitment *Commitment) (teardown func()) {

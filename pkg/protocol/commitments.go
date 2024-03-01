@@ -350,7 +350,7 @@ func (c *Commitments) processResponse(commitment *model.Commitment, from peer.ID
 		if publishedCommitment, published, err := c.protocol.Commitments.publishCommitment(commitment); err != nil {
 			c.LogError("failed to process commitment", "fromPeer", from, "err", err)
 		} else if published {
-			c.LogTrace("received response", "commitment", publishedCommitment.LogName(), "fromPeer", from)
+			c.LogTrace("received response", "commitment", publishedCommitment.LogName(), "id", publishedCommitment.ID(), "fromPeer", from)
 		}
 	})
 }
