@@ -182,12 +182,16 @@ func (s *Storage) CheckCorrectnessCommitmentLedgerState() error {
 			return ierrors.Wrap(err, "computed state root from storage does not correspond to stored state root")
 		}
 
+		if roots.ID() != latestCommitment.RootsID() {
+			return ierrors.Wrap(err, "root from prunable storage does not correspond to root from commitment")
+		}
+
 		// Recompute the commitment using roots.ID() from prunable storage and other information from permanent storage
 		computeCurrentCommitment := iotago.NewCommitment(
 			latestCommitment.Commitment().ProtocolVersion,
 			latestCommittedSlotIndex,
 			latestCommitment.PreviousCommitmentID(),
-			roots.ID(),
+			latestCommitment.RootsID(),
 			latestCommitment.CumulativeWeight(),
 			latestCommitment.ReferenceManaCost(),
 		)
