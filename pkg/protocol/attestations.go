@@ -166,45 +166,46 @@ func (a *Attestations) processResponse(commitment *model.Commitment, attestation
 		}
 		a.LogTrace("received response", "commitment", publishedCommitment.LogName(), "fromPeer", from)
 
-		var wasAttested, attestationsUpdated bool
-		publishedCommitment.AttestedWeight.Compute(func(currentWeight uint64) uint64 {
-			wasAttested = currentWeight > 0
+		updateAttestations := func() (updated bool) {
+			publishedCommitment.AttestedWeight.Compute(func(currentWeight uint64) uint64 {
+				if !publishedCommitment.RequestAttestations.Get() {
+					a.LogTrace("received attestations for previously attested commitment", "commitment", publishedCommitment.LogName())
 
-			if !publishedCommitment.RequestAttestations.Get() {
-				a.LogTrace("received attestations for previously attested commitment", "commitment", publishedCommitment.LogName())
+					return currentWeight
+				}
 
-				return currentWeight
-			}
+				chain := publishedCommitment.Chain.Get()
+				if chain == nil {
+					a.LogDebug("failed to find chain for commitment when processing attestations", "commitment", publishedCommitment.LogName())
 
-			chain := publishedCommitment.Chain.Get()
-			if chain == nil {
-				a.LogDebug("failed to find chain for commitment when processing attestations", "commitment", publishedCommitment.LogName())
+					return currentWeight
+				}
 
-				return currentWeight
-			}
+				commitmentVerifier, exists := a.commitmentVerifiers.Get(chain.ForkingPoint.Get().ID())
+				if !exists || commitmentVerifier == nil {
+					a.LogDebug("failed to retrieve commitment verifier", "commitment", publishedCommitment.LogName())
 
-			commitmentVerifier, exists := a.commitmentVerifiers.Get(chain.ForkingPoint.Get().ID())
-			if !exists || commitmentVerifier == nil {
-				a.LogDebug("failed to retrieve commitment verifier", "commitment", publishedCommitment.LogName())
+					return currentWeight
+				}
 
-				return currentWeight
-			}
+				_, actualWeight, err := commitmentVerifier.verifyCommitment(publishedCommitment, attestations, merkleProof)
+				if err != nil {
+					a.LogError("failed to verify commitment", "commitment", publishedCommitment.LogName(), "error", err)
 
-			_, actualWeight, err := commitmentVerifier.verifyCommitment(publishedCommitment, attestations, merkleProof)
-			if err != nil {
-				a.LogError("failed to verify commitment", "commitment", publishedCommitment.LogName(), "error", err)
+					return currentWeight
+				}
 
-				return currentWeight
-			}
+				if updated = actualWeight >= currentWeight; updated {
+					a.LogDebug("verified commitment", "commitment", publishedCommitment.LogName(), "weight", actualWeight, "fromPeer", from)
+				}
 
-			if attestationsUpdated = actualWeight >= currentWeight; attestationsUpdated {
-				a.LogDebug("verified commitment", "commitment", publishedCommitment.LogName(), "weight", actualWeight, "fromPeer", from)
-			}
+				return actualWeight
+			})
 
-			return actualWeight
-		})
+			return updated
+		}
 
-		if !wasAttested && attestationsUpdated {
+		if updateAttestations() {
 			publishedCommitment.IsAttested.Set(true)
 		}
 	})
