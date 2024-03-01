@@ -20,7 +20,7 @@ const (
 	slotPrefixPerformanceFactors
 	slotPrefixUpgradeSignals
 	slotPrefixRoots
-	slotPrefixRetainer
+	slotPrefixBlockMetadata
 	epochPrefixCommitteeCandidates
 )
 
@@ -146,11 +146,11 @@ func (p *Prunable) Roots(slot iotago.SlotIndex) (*slotstore.Store[iotago.Commitm
 	), nil
 }
 
-func (p *Prunable) Retainer(slot iotago.SlotIndex) (*slotstore.Retainer, error) {
-	kv, err := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixRetainer})
+func (p *Prunable) BlockMetadata(slot iotago.SlotIndex) (*slotstore.BlockMetadataStore, error) {
+	kv, err := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixBlockMetadata})
 	if err != nil {
-		return nil, ierrors.Wrapf(database.ErrEpochPruned, "could not get retainer with slot %d", slot)
+		return nil, ierrors.Wrapf(database.ErrEpochPruned, "could not get block metadata store with slot %d", slot)
 	}
 
-	return slotstore.NewRetainer(slot, kv), nil
+	return slotstore.NewBlockMetadataStore(slot, kv), nil
 }

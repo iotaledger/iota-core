@@ -139,9 +139,8 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, blockMet
 		TransactionID: func() string {
 			if isBasic && basicBlock.Payload != nil && basicBlock.Payload.PayloadType() == iotago.PayloadSignedTransaction {
 				tx, _ := basicBlock.Payload.(*iotago.SignedTransaction)
-				id, _ := tx.ID()
 
-				return id.ToHex()
+				return tx.MustID().ToHex()
 			}
 
 			return ""

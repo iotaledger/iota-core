@@ -79,7 +79,7 @@ func (e *Engines) ForkAtSlot(slot iotago.SlotIndex) (*engine.Engine, error) {
 	}
 
 	// copy raw data on disk.
-	newStorage, err := storage.Clone(e.Main.Get().Storage, e.directory.Path(newEngineAlias), DatabaseVersion, errorHandler, e.protocol.Options.StorageOptions...)
+	newStorage, err := storage.Clone(e.Logger, e.Main.Get().Storage, e.directory.Path(newEngineAlias), DatabaseVersion, errorHandler, e.protocol.Options.StorageOptions...)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to copy storage from active engine instance (%s) to new engine instance (%s)", e.Main.Get().Storage.Directory(), e.directory.Path(newEngineAlias))
 	}
@@ -190,7 +190,7 @@ func (e *Engines) loadEngineInstanceFromSnapshot(engineAlias string, snapshotPat
 		e.protocol.LogError("engine error", "err", err, "name", engineAlias[0:8])
 	}
 
-	return e.loadEngineInstanceWithStorage(engineAlias, storage.Create(e.directory.Path(engineAlias), DatabaseVersion, errorHandler, e.protocol.Options.StorageOptions...), engine.WithSnapshotPath(snapshotPath))
+	return e.loadEngineInstanceWithStorage(engineAlias, storage.Create(e.Logger, e.directory.Path(engineAlias), DatabaseVersion, errorHandler, e.protocol.Options.StorageOptions...), engine.WithSnapshotPath(snapshotPath))
 }
 
 // loadEngineInstanceWithStorage loads an engine instance with the given storage.
@@ -213,8 +213,8 @@ func (e *Engines) loadEngineInstanceWithStorage(engineAlias string, storage *sto
 		e.protocol.Options.SchedulerProvider,
 		e.protocol.Options.TipManagerProvider,
 		e.protocol.Options.TipSelectionProvider,
-		e.protocol.Options.RetainerProvider,
 		e.protocol.Options.BlockRetainerProvider,
+		e.protocol.Options.TransactionRetainerProvider,
 		e.protocol.Options.UpgradeOrchestratorProvider,
 		e.protocol.Options.SyncManagerProvider,
 		append(e.protocol.Options.EngineOptions, engineOptions...)...,

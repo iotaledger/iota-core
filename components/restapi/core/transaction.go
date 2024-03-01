@@ -47,13 +47,5 @@ func transactionMetadataFromTransactionID(c echo.Context) (*api.TransactionMetad
 		return nil, ierrors.Wrapf(err, "failed to parse transaction ID %s", c.Param(api.ParameterTransactionID))
 	}
 
-	// TODO: wire this up with the tx retainer
-	//nolint:staticcheck // TODO: remove this once we have the transaction retainer
-	transactionMetadata := &api.TransactionMetadataResponse{TransactionID: txID}
-	//nolint:staticcheck // TODO: remove this once we have the transaction retainer
-	if transactionMetadata == nil {
-		return nil, ierrors.Wrapf(echo.ErrNotFound, "transaction not found")
-	}
-
-	return transactionMetadata, nil
+	return deps.RequestHandler.TransactionMetadataByID(txID)
 }

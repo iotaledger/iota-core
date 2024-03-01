@@ -39,7 +39,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/retainer"
 	"github.com/iotaledger/iota-core/pkg/retainer/blockretainer"
-	oldretainer "github.com/iotaledger/iota-core/pkg/retainer/retainer"
+	"github.com/iotaledger/iota-core/pkg/retainer/txretainer"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -104,11 +104,11 @@ type Options struct {
 	// LedgerProvider contains the provider for the Ledger engine modules.
 	LedgerProvider module.Provider[*engine.Engine, ledger.Ledger]
 
-	// RetainerProvider contains the provider for the Retainer engine modules.
-	RetainerProvider module.Provider[*engine.Engine, retainer.Retainer]
-
 	// BlockRetainerProvider contains the provider for the BlockRetainer engine modules.
 	BlockRetainerProvider module.Provider[*engine.Engine, retainer.BlockRetainer]
+
+	// TransactionRetainerProvider contains the provider for the TransactionRetainer engine modules.
+	TransactionRetainerProvider module.Provider[*engine.Engine, retainer.TransactionRetainer]
 
 	// SchedulerProvider contains the provider for the Scheduler engine modules.
 	SchedulerProvider module.Provider[*engine.Engine, scheduler.Scheduler]
@@ -136,8 +136,8 @@ func NewDefaultOptions() *Options {
 		AttestationProvider:         slotattestation.NewProvider(),
 		SyncManagerProvider:         trivialsyncmanager.NewProvider(),
 		LedgerProvider:              ledger1.NewProvider(),
-		RetainerProvider:            oldretainer.NewProvider(),
 		BlockRetainerProvider:       blockretainer.NewProvider(),
+		TransactionRetainerProvider: txretainer.NewProvider(),
 		SchedulerProvider:           drr.NewProvider(),
 		UpgradeOrchestratorProvider: signalingupgradeorchestrator.NewProvider(),
 	}
@@ -164,8 +164,8 @@ func WithPreSolidFilterProvider(optsFilterProvider module.Provider[*engine.Engin
 	}
 }
 
-// WithPostSolidFilter is an option for the Protocol that allows to set the PostSolidFilterProvider.
-func WithPostSolidFilter(optsCommitmentFilterProvider module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter]) options.Option[Protocol] {
+// WithPostSolidFilterProvider is an option for the Protocol that allows to set the PostSolidFilterProvider.
+func WithPostSolidFilterProvider(optsCommitmentFilterProvider module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter]) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.Options.PostSolidFilterProvider = optsCommitmentFilterProvider
 	}
@@ -206,13 +206,6 @@ func WithClockProvider(optsClockProvider module.Provider[*engine.Engine, clock.C
 	}
 }
 
-// WithSybilProtectionProvider is an option for the Protocol that allows to set the SybilProtectionProvider.
-func WithSybilProtectionProvider(optsSybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]) options.Option[Protocol] {
-	return func(p *Protocol) {
-		p.Options.SybilProtectionProvider = optsSybilProtectionProvider
-	}
-}
-
 // WithBlockGadgetProvider is an option for the Protocol that allows to set the BlockGadgetProvider.
 func WithBlockGadgetProvider(optsBlockGadgetProvider module.Provider[*engine.Engine, blockgadget.Gadget]) options.Option[Protocol] {
 	return func(p *Protocol) {
@@ -227,10 +220,10 @@ func WithSlotGadgetProvider(optsSlotGadgetProvider module.Provider[*engine.Engin
 	}
 }
 
-// WithEpochGadgetProvider is an option for the Protocol that allows to set the EpochGadgetProvider.
-func WithEpochGadgetProvider(optsEpochGadgetProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]) options.Option[Protocol] {
+// WithSybilProtectionProvider is an option for the Protocol that allows to set the SybilProtectionProvider.
+func WithSybilProtectionProvider(optsSybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.SybilProtectionProvider = optsEpochGadgetProvider
+		p.Options.SybilProtectionProvider = optsSybilProtectionProvider
 	}
 }
 
@@ -248,6 +241,13 @@ func WithAttestationProvider(optsAttestationProvider module.Provider[*engine.Eng
 	}
 }
 
+// WithSyncManagerProvider is an option for the Protocol that allows to set the SyncManagerProvider.
+func WithSyncManagerProvider(optsSyncManagerProvider module.Provider[*engine.Engine, syncmanager.SyncManager]) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.Options.SyncManagerProvider = optsSyncManagerProvider
+	}
+}
+
 // WithLedgerProvider is an option for the Protocol that allows to set the LedgerProvider.
 func WithLedgerProvider(optsLedgerProvider module.Provider[*engine.Engine, ledger.Ledger]) options.Option[Protocol] {
 	return func(p *Protocol) {
@@ -255,17 +255,31 @@ func WithLedgerProvider(optsLedgerProvider module.Provider[*engine.Engine, ledge
 	}
 }
 
+// WithBlockRetainerProvider is an option for the Protocol that allows to set the BlockRetainerProvider.
+func WithBlockRetainerProvider(optsBlockRetainerProvider module.Provider[*engine.Engine, retainer.BlockRetainer]) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.Options.BlockRetainerProvider = optsBlockRetainerProvider
+	}
+}
+
+// WithTransactionRetainerProvider is an option for the Protocol that allows to set the TransactionRetainerProvider.
+func WithTransactionRetainerProvider(optsTransactionRetainerProvider module.Provider[*engine.Engine, retainer.TransactionRetainer]) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.Options.TransactionRetainerProvider = optsTransactionRetainerProvider
+	}
+}
+
+// WithSchedulerProvider is an option for the Protocol that allows to set the SchedulerProvider.
+func WithSchedulerProvider(optsSchedulerProvider module.Provider[*engine.Engine, scheduler.Scheduler]) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.Options.SchedulerProvider = optsSchedulerProvider
+	}
+}
+
 // WithUpgradeOrchestratorProvider is an option for the Protocol that allows to set the UpgradeOrchestratorProvider.
 func WithUpgradeOrchestratorProvider(optsUpgradeOrchestratorProvider module.Provider[*engine.Engine, upgrade.Orchestrator]) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.Options.UpgradeOrchestratorProvider = optsUpgradeOrchestratorProvider
-	}
-}
-
-// WithSyncManagerProvider is an option for the Protocol that allows to set the SyncManagerProvider.
-func WithSyncManagerProvider(optsSyncManagerProvider module.Provider[*engine.Engine, syncmanager.SyncManager]) options.Option[Protocol] {
-	return func(p *Protocol) {
-		p.Options.SyncManagerProvider = optsSyncManagerProvider
 	}
 }
 

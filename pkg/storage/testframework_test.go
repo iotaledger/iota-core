@@ -13,6 +13,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -32,6 +33,7 @@ const (
 
 type TestFramework struct {
 	t               *testing.T
+	logger          log.Logger
 	Instance        *storage.Storage
 	apiProvider     iotago.APIProvider
 	baseDir         string
@@ -46,8 +48,10 @@ func NewTestFramework(t *testing.T, baseDir string, storageOpts ...options.Optio
 		t.Log(err)
 	}
 
+	testLogger := log.NewLogger()
+
 	storageFactoryFunc := func() *storage.Storage {
-		instance := storage.Create(baseDir, 0, errorHandler, storageOpts...)
+		instance := storage.Create(testLogger, baseDir, 0, errorHandler, storageOpts...)
 		require.NoError(t, instance.Settings().StoreProtocolParametersForStartEpoch(iotago.NewV3SnapshotProtocolParameters(), 0))
 
 		return instance
@@ -57,6 +61,7 @@ func NewTestFramework(t *testing.T, baseDir string, storageOpts ...options.Optio
 
 	return &TestFramework{
 		t:                  t,
+		logger:             testLogger,
 		Instance:           instance,
 		apiProvider:        instance.Settings().APIProvider(),
 		baseDir:            baseDir,
@@ -194,12 +199,12 @@ func uint64ToBytes[V ~uint64](v V) []byte {
 	return b
 }
 
-func (t *TestFramework) assertPrunableSizeGreater(expected int64) {
-	require.GreaterOrEqual(t.t, float64(t.Instance.PrunableDatabaseSize()), float64(expected)*0.8)
-}
-
 func (t *TestFramework) assertPermanentSizeGreater(expected int64) {
 	require.GreaterOrEqual(t.t, float64(t.Instance.PermanentDatabaseSize()), float64(expected)*0.8)
+}
+
+func (t *TestFramework) assertPrunableSizeGreater(expected int64) {
+	require.GreaterOrEqual(t.t, float64(t.Instance.PrunableDatabaseSize()), float64(expected)*0.8)
 }
 
 func (t *TestFramework) AssertStorageSizeBelow(expected int64) {
@@ -307,7 +312,7 @@ func (t *TestFramework) assertPrunableSlotStoragesPruned(epoch iotago.EpochIndex
 	_, err = t.Instance.Roots(endSlot)
 	require.ErrorIsf(t.t, err, database.ErrEpochPruned, "expected epoch %d to be pruned", epoch)
 
-	_, err = t.Instance.Retainer(endSlot)
+	_, err = t.Instance.BlockMetadata(endSlot)
 	require.ErrorIsf(t.t, err, database.ErrEpochPruned, "expected epoch %d to be pruned", epoch)
 }
 

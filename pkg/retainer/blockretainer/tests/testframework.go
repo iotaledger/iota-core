@@ -37,7 +37,7 @@ const (
 
 type TestFramework struct {
 	Instance *blockretainer.BlockRetainer
-	stores   map[iotago.SlotIndex]*slotstore.Retainer
+	stores   map[iotago.SlotIndex]*slotstore.BlockMetadataStore
 	api      iotago.API
 	test     *testing.T
 
@@ -49,7 +49,7 @@ type TestFramework struct {
 
 func NewTestFramework(test *testing.T) *TestFramework {
 	tf := &TestFramework{
-		stores:            make(map[iotago.SlotIndex]*slotstore.Retainer),
+		stores:            make(map[iotago.SlotIndex]*slotstore.BlockMetadataStore),
 		lastCommittedSlot: iotago.SlotIndex(0),
 		testBlockIDs:      make(map[string]iotago.BlockID),
 		api: iotago.V3API(
@@ -63,9 +63,9 @@ func NewTestFramework(test *testing.T) *TestFramework {
 
 	workers := workerpool.NewGroup(test.Name())
 
-	storeFunc := func(slotIndex iotago.SlotIndex) (*slotstore.Retainer, error) {
+	storeFunc := func(slotIndex iotago.SlotIndex) (*slotstore.BlockMetadataStore, error) {
 		if _, exists := tf.stores[slotIndex]; !exists {
-			tf.stores[slotIndex] = slotstore.NewRetainer(slotIndex, mapdb.NewMapDB())
+			tf.stores[slotIndex] = slotstore.NewBlockMetadataStore(slotIndex, mapdb.NewMapDB())
 		}
 
 		return tf.stores[slotIndex], nil

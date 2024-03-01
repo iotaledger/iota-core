@@ -11,19 +11,20 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.1
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/iotaledger/hive.go/ads v0.0.0-20240223142044-12ffcb37c413
-	github.com/iotaledger/hive.go/app v0.0.0-20240223142044-12ffcb37c413
+	github.com/iotaledger/hive.go/ads v0.0.0-20240305162344-4b8be588e1cf
+	github.com/iotaledger/hive.go/app v0.0.0-20240305162344-4b8be588e1cf
 	github.com/iotaledger/hive.go/constraints v0.0.0-20240305162344-4b8be588e1cf
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20240305162344-4b8be588e1cf
 	github.com/iotaledger/hive.go/crypto v0.0.0-20240305162344-4b8be588e1cf
-	github.com/iotaledger/hive.go/db v0.0.0-20240223142044-12ffcb37c413
+	github.com/iotaledger/hive.go/db v0.0.0-20240305162344-4b8be588e1cf
 	github.com/iotaledger/hive.go/ds v0.0.0-20240305162344-4b8be588e1cf
 	github.com/iotaledger/hive.go/ierrors v0.0.0-20240305162344-4b8be588e1cf
-	github.com/iotaledger/hive.go/kvstore v0.0.0-20240223142044-12ffcb37c413
+	github.com/iotaledger/hive.go/kvstore v0.0.0-20240305162344-4b8be588e1cf
 	github.com/iotaledger/hive.go/lo v0.0.0-20240305162344-4b8be588e1cf
-	github.com/iotaledger/hive.go/log v0.0.0-20240223142044-12ffcb37c413
+	github.com/iotaledger/hive.go/log v0.0.0-20240305162344-4b8be588e1cf
 	github.com/iotaledger/hive.go/runtime v0.0.0-20240305162344-4b8be588e1cf
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20240305162344-4b8be588e1cf
+	github.com/iotaledger/hive.go/sql v0.0.0-20240305162344-4b8be588e1cf
 	github.com/iotaledger/hive.go/stringify v0.0.0-20240305162344-4b8be588e1cf
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20240216141618-d7dfe94bdc1e
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20240222130947-50c20a2b17b0
@@ -46,6 +47,7 @@ require (
 	golang.org/x/crypto v0.20.0
 	google.golang.org/grpc v1.62.0
 	google.golang.org/protobuf v1.32.0
+	gorm.io/gorm v1.25.7
 )
 
 require (
@@ -96,9 +98,14 @@ require (
 	github.com/ipfs/go-log v1.0.5 // indirect
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
 	github.com/ipld/go-ipld-prime v0.21.0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
+	github.com/jackc/pgx/v5 v5.4.3 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/jbenet/goprocess v0.1.4 // indirect
+	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/klauspost/compress v1.17.7 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
 	github.com/knadh/koanf v1.5.0 // indirect
@@ -119,6 +126,7 @@ require (
 	github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/mattn/go-sqlite3 v1.14.17 // indirect
 	github.com/miekg/dns v1.1.58 // indirect
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b // indirect
 	github.com/mikioh/tcpopt v0.0.0-20190314235656-172688c1accc // indirect
@@ -180,5 +188,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240227224415-6ceb2ff114de // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gorm.io/driver/postgres v1.5.6 // indirect
+	gorm.io/driver/sqlite v1.5.5 // indirect
 	lukechampine.com/blake3 v1.2.1 // indirect
 )

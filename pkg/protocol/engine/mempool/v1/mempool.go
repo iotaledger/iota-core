@@ -69,6 +69,8 @@ type MemPool[VoteRank spenddag.VoteRankType[VoteRank]] struct {
 	// commitmentMutex is used to synchronize commitment of slots.
 	commitmentMutex syncutils.RWMutex
 
+	attachTransactionFailed *event.Event3[iotago.TransactionID, iotago.BlockID, error]
+
 	signedTransactionAttached *event.Event1[mempool.SignedTransactionMetadata]
 
 	transactionAttached *event.Event1[mempool.TransactionMetadata]
@@ -100,6 +102,7 @@ func New[VoteRank spenddag.VoteRankType[VoteRank]](
 		spendDAG:                   spendDAG,
 		apiProvider:                apiProvider,
 		errorHandler:               errorHandler,
+		attachTransactionFailed:    event.New3[iotago.TransactionID, iotago.BlockID, error](),
 		signedTransactionAttached:  event.New1[mempool.SignedTransactionMetadata](),
 		transactionAttached:        event.New1[mempool.TransactionMetadata](),
 	}, opts, (*MemPool[VoteRank]).setup)
@@ -113,7 +116,10 @@ func (m *MemPool[VoteRank]) VM() mempool.VM {
 func (m *MemPool[VoteRank]) AttachSignedTransaction(signedTransaction mempool.SignedTransaction, transaction mempool.Transaction, blockID iotago.BlockID) (signedTransactionMetadata mempool.SignedTransactionMetadata, err error) {
 	storedSignedTransaction, isNewSignedTransaction, isNewTransaction, err := m.storeTransaction(signedTransaction, transaction, blockID)
 	if err != nil {
-		return nil, ierrors.Wrap(err, "failed to store signedTransaction")
+		err = ierrors.Wrap(err, "failed to store signedTransaction")
+		m.attachTransactionFailed.Trigger(transaction.MustID(), blockID, err)
+
+		return nil, err
 	}
 
 	if isNewSignedTransaction {
@@ -124,10 +130,13 @@ func (m *MemPool[VoteRank]) AttachSignedTransaction(signedTransaction mempool.Si
 
 			m.solidifyInputs(storedSignedTransaction.transactionMetadata)
 		}
-
 	}
 
 	return storedSignedTransaction, nil
+}
+
+func (m *MemPool[VoteRank]) OnAttachTransactionFailed(handler func(iotago.TransactionID, iotago.BlockID, error), opts ...event.Option) *event.Hook[func(iotago.TransactionID, iotago.BlockID, error)] {
+	return m.attachTransactionFailed.Hook(handler, opts...)
 }
 
 func (m *MemPool[VoteRank]) OnSignedTransactionAttached(handler func(signedTransactionMetadata mempool.SignedTransactionMetadata), opts ...event.Option) *event.Hook[func(metadata mempool.SignedTransactionMetadata)] {
@@ -366,7 +375,7 @@ func (m *MemPool[VoteRank]) storeTransaction(signedTransaction mempool.SignedTra
 		return nil, false, false, ierrors.Errorf("failed to create signedTransaction metadata: %w", err)
 	}
 
-	storedSignedTransaction, isNewSignedTransaction = m.cachedSignedTransactions.GetOrCreate(lo.PanicOnErr(signedTransaction.ID()), func() *SignedTransactionMetadata { return newSignedTransaction })
+	storedSignedTransaction, isNewSignedTransaction = m.cachedSignedTransactions.GetOrCreate(signedTransaction.MustID(), func() *SignedTransactionMetadata { return newSignedTransaction })
 	if isNewSignedTransaction {
 		m.setupSignedTransaction(storedSignedTransaction, storedTransaction)
 	}
@@ -399,7 +408,10 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 			}
 		})
 
-		request.OnError(transaction.setInvalid)
+		request.OnError(func(reason error) {
+			// use the sentinel error to mark that the request failed instead of the execution
+			transaction.setInvalid(ierrors.Join(mempool.ErrRequestFailed, reason))
+		})
 	}
 }
 

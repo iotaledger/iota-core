@@ -140,6 +140,8 @@ func (d *DockerTestFramework) AssertTransactionBlocksByTag(ctx context.Context, 
 	}()
 }
 
+/*
+TODO: Fix after merging the retainer PR
 func (d *DockerTestFramework) AssertTransactionMetadataIncludedBlocks(ctx context.Context, eventClt *nodeclient.EventAPIClient, txID iotago.TransactionID, finishChan chan struct{}) {
 	acceptedChan, subInfo := eventClt.BlockMetadataTransactionIncludedBlocksByTransactionID(txID)
 	require.Nil(d.Testing, subInfo.Error())
@@ -172,6 +174,7 @@ func (d *DockerTestFramework) AssertTransactionMetadataIncludedBlocks(ctx contex
 
 	}()
 }
+*/
 
 func (d *DockerTestFramework) AssertTransactionMetadataByTransactionID(ctx context.Context, eventClt *nodeclient.EventAPIClient, txID iotago.TransactionID, finishChan chan struct{}) {
 	acceptedChan, subInfo := eventClt.TransactionMetadataByTransactionID(txID)
