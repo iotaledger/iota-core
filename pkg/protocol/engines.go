@@ -239,7 +239,7 @@ func (e *Engines) syncMainEngineFromMainChain() (shutdown func()) {
 	return e.protocol.Chains.Main.WithNonEmptyValue(func(mainChain *Chain) (shutdown func()) {
 		return e.Main.DeriveValueFrom(reactive.NewDerivedVariable(func(currentMainEngine *engine.Engine, newMainEngine *engine.Engine) *engine.Engine {
 			return lo.Cond(newMainEngine == nil, currentMainEngine, newMainEngine)
-		}, mainChain.Engine))
+		}, mainChain.Engine, e.Main.Get()))
 	})
 }
 
