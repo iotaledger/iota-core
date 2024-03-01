@@ -441,11 +441,8 @@ func (c *ChainsCandidate) measureAt(slot iotago.SlotIndex) (teardown func()) {
 		return
 	}
 
-	sortedCommitments, _ := c.sortedCommitmentsBySlot.GetOrCreate(slot, func() reactive.SortedSet[*Commitment] {
-		return reactive.NewSortedSet(c.weightVariable)
-	})
-
-	c.chains.protocol.EvictionEvent(slot)
+	// get the sorted commitments for the given slot
+	sortedCommitments := c.sortedCommitments(slot, c.chains.protocol.EvictionEvent(slot))
 
 	// make sure the heaviest commitment was the heaviest for the last chainSwitchingThreshold slots before we update
 	return sortedCommitments.HeaviestElement().WithNonEmptyValue(func(heaviestCommitment *Commitment) (teardown func()) {
@@ -485,6 +482,14 @@ func (c *ChainsCandidate) measureAt(slot iotago.SlotIndex) (teardown func()) {
 // registerCommitment registers the given commitment for the given slot, which makes it become part of the weight
 // measurement process.
 func (c *ChainsCandidate) registerCommitment(slot iotago.SlotIndex, commitment *Commitment, evictionEvent reactive.Event, t string) {
+	sortedCommitments := c.sortedCommitments(slot, evictionEvent)
+	sortedCommitments.Add(commitment)
+
+	c.chains.LogDebug("registered commitment", "type", t, "slot", slot, "commitment", commitment.ID(), "commitments", lo.Map(sortedCommitments.ToSlice(), func(commitment *Commitment) string { return commitment.ID().String() }))
+}
+
+// sortedCommitments returns the sorted commitments for the given slot and creates a new sorted set if it doesn't exist.
+func (c *ChainsCandidate) sortedCommitments(slot iotago.SlotIndex, evictionEvent reactive.Event) (sortedCommitments reactive.SortedSet[*Commitment]) {
 	sortedCommitments, slotCreated := c.sortedCommitmentsBySlot.GetOrCreate(slot, func() reactive.SortedSet[*Commitment] {
 		return reactive.NewSortedSet(c.weightVariable)
 	})
@@ -493,9 +498,7 @@ func (c *ChainsCandidate) registerCommitment(slot iotago.SlotIndex, commitment *
 		evictionEvent.OnTrigger(func() { c.sortedCommitmentsBySlot.Delete(slot) })
 	}
 
-	sortedCommitments.Add(commitment)
-
-	c.chains.LogDebug("registered commitment", "type", t, "slot", slot, "commitment", commitment.ID(), "commitments", lo.Map(sortedCommitments.ToSlice(), func(commitment *Commitment) string { return commitment.ID().String() }))
+	return sortedCommitments
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
