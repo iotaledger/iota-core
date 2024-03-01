@@ -532,6 +532,7 @@ func (d *DockerTestFramework) PrepareBlockIssuance(ctx context.Context, clt *nod
 // AllotManaTo requests faucet funds then uses it to allots mana from one account to another.
 func (d *DockerTestFramework) AllotManaTo(fromId iotago.AccountID, toId iotago.AccountID, manaToAllot iotago.Mana) {
 	from := d.wallet.Account(fromId)
+	to := d.wallet.Account(toId)
 	// requesting faucet funds for allotment
 	ctx := context.TODO()
 	fundsOutputID := d.RequestFaucetFunds(ctx, iotago.AddressEd25519)
@@ -544,6 +545,19 @@ func (d *DockerTestFramework) AllotManaTo(fromId iotago.AccountID, toId iotago.A
 	fmt.Println("Allot mana transaction sent, blkID:", blkID.ToHex(), ", txID:", lo.PanicOnErr(signedTx.Transaction.ID()).ToHex(), ", slot:", blkID.Slot())
 
 	d.AwaitTransactionPayloadAccepted(ctx, blkID)
+
+	// allotment is updated until the transaction is committed
+	d.AwaitCommitment(blkID.Slot())
+
+	// check if the mana is allotted
+	toCongestionResp, err := clt.Congestion(ctx, to.Address, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
+	require.NoError(d.Testing, err)
+	oldBIC := toCongestionResp.BlockIssuanceCredits
+
+	toCongestionResp, err = clt.Congestion(ctx, to.Address, 0)
+	require.NoError(d.Testing, err)
+	newBIC := toCongestionResp.BlockIssuanceCredits
+	require.Equal(d.Testing, oldBIC+iotago.BlockIssuanceCredits(manaToAllot), newBIC)
 }
 
 // CreateNativeToken request faucet funds then use it to create native token for the account, and returns the updated Account.
