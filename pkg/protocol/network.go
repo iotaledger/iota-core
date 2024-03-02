@@ -41,8 +41,7 @@ func newNetwork(protocol *Protocol, networkEndpoint network.Endpoint) *Network {
 func (n *Network) OnBlockReceived(callback func(block *model.Block, src peer.ID)) (unsubscribe func()) {
 	return n.Protocol.OnBlockReceived(func(block *model.Block, src peer.ID) {
 		// filter blocks from the future
-		// TODO: ADD GRACE PERIOD?
-		if !block.ProtocolBlock().Header.IssuingTime.After(time.Now()) {
+		if !block.ProtocolBlock().Header.IssuingTime.After(time.Now().Add(maxTimeDrift)) {
 			n.LogTrace("filtered block", "block", block.ID(), "issuingTime", block.ProtocolBlock().Header.IssuingTime, "from", src, "err", ierrors.New("invalid issuing time"))
 
 			return
@@ -51,3 +50,6 @@ func (n *Network) OnBlockReceived(callback func(block *model.Block, src peer.ID)
 		callback(block, src)
 	})
 }
+
+// maxTimeDrift defines the maximum time drift that is allowed for incoming blocks.
+const maxTimeDrift = 5 * time.Second
