@@ -41,8 +41,8 @@ func newNetwork(protocol *Protocol, networkEndpoint network.Endpoint) *Network {
 func (n *Network) OnBlockReceived(callback func(block *model.Block, src peer.ID)) (unsubscribe func()) {
 	return n.Protocol.OnBlockReceived(func(block *model.Block, src peer.ID) {
 		// filter blocks from the future
-		if !block.ProtocolBlock().Header.IssuingTime.After(time.Now().Add(maxTimeDrift)) {
-			n.LogError("filtered block", "block", block.ID(), "issuingTime", block.ProtocolBlock().Header.IssuingTime, "from", src, "err", ierrors.New("invalid issuing time"))
+		if maxIssuingTime := time.Now().Add(maxTimeDrift); !block.ProtocolBlock().Header.IssuingTime.After(maxIssuingTime) {
+			n.LogError("filtered block", "block", block.ID(), "issuingTime", block.ProtocolBlock().Header.IssuingTime, "maxIssuingTime", maxIssuingTime, "from", src, "err", ierrors.New("invalid issuing time"))
 
 			return
 		}
