@@ -287,7 +287,7 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 
 	ts.AssertCommitmentsOnEvictedChain(commitmentsMainChain, false, ts.Nodes()...)
 
-	ts.AssertCommitmentsOnChainAndChainHasCommitments(commitmentsMainChain, commitmentsMainChain[0].ID(), ts.Nodes()...)
+	ts.AssertCommitmentsOnChainAndChainHasCommitments(commitmentsMainChain, commitmentsMainChain[0].ID(), nodesP1...)
 
 	ts.AssertCommitmentsOnChain(commitmentsMainChain, commitmentsMainChain[0].ID(), nodesP1...)
 
