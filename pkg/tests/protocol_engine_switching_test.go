@@ -99,7 +99,7 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 
 	ts.Run(false, nodeOptions)
 
-	node5.Protocol.SetLogLevel(log.LevelTrace)
+	node3.Protocol.SetLogLevel(log.LevelTrace)
 
 	expectedCommittee := []iotago.AccountID{
 		node0.Validator.AccountID,
@@ -279,8 +279,8 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 	oldestNonEvictedCommitment := 5 - maxCommittableAge
 	commitmentsMainChain := ts.CommitmentsOfMainEngine(nodesP1[0], oldestNonEvictedCommitment, expectedCommittedSlotAfterPartitionMerge)
 
-	// TODO: the mainchain for nodes of P2 should start from slot 9.
-	ts.AssertMainChain(commitmentsMainChain[0].ID(), ts.Nodes()...)
+	ts.AssertMainChain(commitmentsMainChain[8].ID(), nodesP2...)
+	ts.AssertMainChain(commitmentsMainChain[0].ID(), nodesP1...)
 
 	ts.AssertUniqueCommitmentChain(ts.Nodes()...)
 	ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
@@ -288,6 +288,7 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 	ts.AssertCommitmentsOnEvictedChain(commitmentsMainChain, false, ts.Nodes()...)
 
 	ts.AssertCommitmentsOnChainAndChainHasCommitments(commitmentsMainChain, commitmentsMainChain[0].ID(), nodesP1...)
+	ts.AssertCommitmentsOnChainAndChainHasCommitments(commitmentsMainChain[8:], commitmentsMainChain[8].ID(), nodesP2...)
 
 	ts.AssertCommitmentsOnChain(commitmentsMainChain, commitmentsMainChain[0].ID(), nodesP1...)
 
