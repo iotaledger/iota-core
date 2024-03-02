@@ -42,7 +42,7 @@ func (n *Network) OnBlockReceived(callback func(block *model.Block, src peer.ID)
 	return n.Protocol.OnBlockReceived(func(block *model.Block, src peer.ID) {
 		// filter blocks from the future
 		if !block.ProtocolBlock().Header.IssuingTime.After(time.Now().Add(maxTimeDrift)) {
-			n.LogTrace("filtered block", "block", block.ID(), "issuingTime", block.ProtocolBlock().Header.IssuingTime, "from", src, "err", ierrors.New("invalid issuing time"))
+			n.LogError("filtered block", "block", block.ID(), "issuingTime", block.ProtocolBlock().Header.IssuingTime, "from", src, "err", ierrors.New("invalid issuing time"))
 
 			return
 		}
