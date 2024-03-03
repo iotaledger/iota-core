@@ -13,6 +13,8 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+// This Go code snippet is a test function that checks the ledger state commitment from a non-genesis snapshot. It involves setting up a test suite, issuing blocks at specific slots, creating and using snapshots, and starting nodes based on those snapshots. The test verifies node states and commitments during the process.
+
 func TestCheckLedgerStateCommitmentFromNonGenesisSnapshot(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
@@ -32,30 +34,24 @@ func TestCheckLedgerStateCommitmentFromNonGenesisSnapshot(t *testing.T) {
 		),
 	)
 	defer ts.Shutdown()
-
 	node0 := ts.AddValidatorNode("node0")
 	ts.AddDefaultWallet(node0)
 	ts.AddValidatorNode("node1")
-
 	ts.Run(true, nil)
-
 	// Issue up to slot 10, committing slot 8.
 	{
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 3, "Genesis", ts.Nodes(), true, false)
-
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(7),
 			testsuite.WithLatestCommitmentSlotIndex(8),
 			testsuite.WithEqualStoredCommitmentAtIndex(8),
 		)
 	}
-
 	// Create snapshot from node0 and start node 2 from it. Stop node 0
 	var node2 *mock.Node
 	{
 		snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
 		require.NoError(t, ts.Node("node0").Protocol.Engines.Main.Get().WriteSnapshot(snapshotPath))
-
 		node2 = ts.AddNode("node2")
 		node2.Validator = node0.Validator
 		node2.Initialize(true,
@@ -64,21 +60,16 @@ func TestCheckLedgerStateCommitmentFromNonGenesisSnapshot(t *testing.T) {
 		)
 		ts.Wait()
 	}
-
 	ts.RemoveNode(node0.Name)
 	node0.Shutdown()
 
-	// Create snapshot for the latest slot (which has available roots) from node2 and start node 3 from it. Stop node 2
-	var node3 *mock.Node
-
+	// Modify StateRoot and check whether the check would get an error
 	{
-		snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
-
 		curCommitment := ts.Node("node2").Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment()
 		rootsStorage, _ := ts.Node("node2").Protocol.Engines.Main.Get().Storage.Roots(curCommitment.Slot())
-
 		roots, _, _ := rootsStorage.Load(curCommitment.ID())
 
+		// create a modified root and store it
 		newRoots := iotago.NewRoots(
 			roots.TangleRoot,
 			roots.StateMutationRoot,
@@ -89,21 +80,12 @@ func TestCheckLedgerStateCommitmentFromNonGenesisSnapshot(t *testing.T) {
 			roots.RewardsRoot,
 			roots.ProtocolParametersHash,
 		)
-
 		rootsStorage.Store(curCommitment.ID(), newRoots)
 
-		require.NoError(t, ts.Node("node2").Protocol.Engines.Main.Get().WriteSnapshot(snapshotPath))
+		// check that with a modified root, it does not pass the required check
 
-		node3 = ts.AddNode("node3")
-		node3.Validator = node2.Validator
-		node3.Initialize(true,
-			protocol.WithSnapshotPath(snapshotPath),
-			protocol.WithBaseDirectory(ts.Directory.PathWithCreate(node3.Name)),
-		)
+		require.Error(t, ts.Node("node2").Protocol.Engines.Main.Get().Storage.CheckCorrectnessCommitmentLedgerState())
+
 		ts.Wait()
 	}
-
-	ts.RemoveNode(node2.Name)
-	node2.Shutdown()
-
 }
