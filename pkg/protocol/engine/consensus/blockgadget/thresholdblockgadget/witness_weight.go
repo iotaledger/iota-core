@@ -8,11 +8,15 @@ import (
 )
 
 func (g *Gadget) TrackWitnessWeight(votingBlock *blocks.Block) {
+	g.LogTrace("Tracking witness weight", "block", votingBlock.ID())
+
 	defer votingBlock.SetWeightPropagated()
 
 	// Only track witness weight for issuers that are part of the committee.
 	seat, isValid := g.isCommitteeValidationBlock(votingBlock)
 	if !isValid {
+		g.LogTrace("Tracking witness weight - not valid", "block", votingBlock.ID())
+
 		return
 	}
 
@@ -26,6 +30,8 @@ func (g *Gadget) TrackWitnessWeight(votingBlock *blocks.Block) {
 
 	process := func(block *blocks.Block) bool {
 		shouldPreAccept, shouldPreConfirm := g.shouldPreAcceptAndPreConfirm(block)
+
+		g.LogTrace("TrackWitnessWeight - process", "block", votingBlock.ID(), "shouldPreAccept", shouldPreAccept, "shouldPreConfirm", shouldPreConfirm)
 
 		var propagateFurther bool
 		if !block.IsPreAccepted() && (shouldPreAccept || anyChildInSet(block, toPreAcceptByID)) {
@@ -100,6 +106,8 @@ func (g *Gadget) shouldPreAcceptAndPreConfirm(block *blocks.Block) (preAccept bo
 
 	onlineCommitteeTotalSeats := g.seatManager.OnlineCommittee().Size()
 	blockSeatsOnline := len(block.Witnesses())
+
+	g.LogTrace("shouldPreAcceptAndPreConfirm", "block", block.ID(), "blockSeats", blockSeats, "committeeTotalSeats", committeeTotalSeats, "blockSeatsOnline", blockSeatsOnline, "onlineCommitteeTotalSeats", onlineCommitteeTotalSeats)
 
 	if votes.IsThresholdReached(blockSeats, committeeTotalSeats, g.optsConfirmationThreshold) {
 		return true, true

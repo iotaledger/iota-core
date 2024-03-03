@@ -67,31 +67,41 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 	node5 := ts.AddNode("node5")
 	ts.AddDefaultWallet(node0)
 
+	nodes := []*mock.Node{node0, node1, node2, node3, node4, node5}
+	validatorsByAccountID := map[iotago.AccountID]*mock.Node{
+		nodes[0].Validator.AccountID: nodes[0],
+		nodes[1].Validator.AccountID: nodes[1],
+		nodes[3].Validator.AccountID: nodes[3],
+		nodes[4].Validator.AccountID: nodes[4],
+	}
+
 	nodesP1 := []*mock.Node{node0, node1, node2}
 	nodesP2 := []*mock.Node{node3, node4, node5}
-
-	poaProvider := func() module.Provider[*engine.Engine, seatmanager.SeatManager] {
-		return module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
-			poa := mock2.NewManualPOAProvider()(e).(*mock2.ManualPOA)
-
-			for _, node := range append(nodesP1, nodesP2...) {
-				if node.IsValidator() {
-					poa.AddAccount(node.Validator.AccountID, node.Name)
-				}
-			}
-
-			return poa
-		})
-	}
 
 	nodeOptions := make(map[string][]options.Option[protocol.Protocol])
 	for _, node := range ts.Nodes() {
 		nodeOptions[node.Name] = []options.Option[protocol.Protocol]{
 			protocol.WithSybilProtectionProvider(
 				sybilprotectionv1.NewProvider(
-					sybilprotectionv1.WithSeatManagerProvider(
-						poaProvider(),
-					),
+					sybilprotectionv1.WithSeatManagerProvider(module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
+						poa := mock2.NewManualPOAProvider()(e).(*mock2.ManualPOA)
+						for _, node := range lo.Filter(nodes, (*mock.Node).IsValidator) {
+							poa.AddAccount(node.Validator.AccountID, node.Name)
+						}
+
+						onlineValidators := ds.NewSet[string]()
+
+						e.Constructed.OnTrigger(func() {
+							e.Events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
+								if node, exists := validatorsByAccountID[block.ModelBlock().ProtocolBlock().Header.IssuerID]; exists && onlineValidators.Add(node.Name) {
+									e.LogError("node online", "name", node.Name)
+									poa.SetOnline(onlineValidators.ToSlice()...)
+								}
+							})
+						})
+
+						return poa
+					})),
 				),
 			),
 		}
@@ -277,8 +287,7 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 	}
 
 	oldestNonEvictedCommitment := 5 - maxCommittableAge
-	// TODO: -1 because some nodes don't commit the last slot (22) after warp syncing - maybe another block is needed? otherwise debug why the commitment doesnt trigger as blocks seem to get solid.
-	commitmentsMainChain := ts.CommitmentsOfMainEngine(nodesP1[0], oldestNonEvictedCommitment, expectedCommittedSlotAfterPartitionMerge-1)
+	commitmentsMainChain := ts.CommitmentsOfMainEngine(nodesP1[0], oldestNonEvictedCommitment, expectedCommittedSlotAfterPartitionMerge)
 
 	ts.AssertMainChain(commitmentsMainChain[8].ID(), nodesP2...)
 	ts.AssertMainChain(commitmentsMainChain[0].ID(), nodesP1...)

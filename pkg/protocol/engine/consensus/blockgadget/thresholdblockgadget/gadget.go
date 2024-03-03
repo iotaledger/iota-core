@@ -6,6 +6,7 @@ import (
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -31,12 +32,14 @@ type Gadget struct {
 	optsConfirmationThreshold             float64
 	optsConfirmationRatificationThreshold iotago.SlotIndex
 
+	log.Logger
+
 	module.Module
 }
 
 func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine, blockgadget.Gadget] {
 	return module.Provide(func(e *engine.Engine) blockgadget.Gadget {
-		g := New(e.BlockCache, e.SybilProtection.SeatManager(), e.ErrorHandler("gadget"), opts...)
+		g := New(e.Logger.NewChildLogger("BlockGadget"), e.BlockCache, e.SybilProtection.SeatManager(), e.ErrorHandler("gadget"), opts...)
 
 		wp := e.Workers.CreatePool("ThresholdBlockGadget", workerpool.WithWorkerCount(1))
 		e.Events.Booker.BlockBooked.Hook(g.TrackWitnessWeight, event.WithWorkerPool(wp))
@@ -47,7 +50,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(blockCache *blocks.Blocks, seatManager seatmanager.SeatManager, errorHandler func(error), opts ...options.Option[Gadget]) *Gadget {
+func New(logger log.Logger, blockCache *blocks.Blocks, seatManager seatmanager.SeatManager, errorHandler func(error), opts ...options.Option[Gadget]) *Gadget {
 	return options.Apply(&Gadget{
 		events:       blockgadget.NewEvents(),
 		seatManager:  seatManager,
@@ -57,6 +60,8 @@ func New(blockCache *blocks.Blocks, seatManager seatmanager.SeatManager, errorHa
 		optsAcceptanceThreshold:               0.67,
 		optsConfirmationThreshold:             0.67,
 		optsConfirmationRatificationThreshold: 2,
+
+		Logger: logger,
 	}, opts,
 		(*Gadget).TriggerConstructed,
 	)
