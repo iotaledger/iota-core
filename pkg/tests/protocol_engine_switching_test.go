@@ -283,6 +283,8 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 	ts.AssertMainChain(commitmentsMainChain[8].ID(), nodesP2...)
 	ts.AssertMainChain(commitmentsMainChain[0].ID(), nodesP1...)
 
+	fmt.Println(node5.Protocol.Inspect())
+
 	ts.AssertUniqueCommitmentChain(ts.Nodes()...)
 	ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
 
@@ -294,9 +296,6 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 	ts.AssertCommitmentsOnChain(commitmentsMainChain, commitmentsMainChain[0].ID(), nodesP1...)
 
 	ts.AssertCommitmentsAndChainsEvicted(oldestNonEvictedCommitment-1, ts.Nodes()...)
-
-	fmt.Println(node5.Protocol.Engines.Main.Get().LogName())
-
 }
 
 func TestProtocol_EngineSwitching(t *testing.T) {

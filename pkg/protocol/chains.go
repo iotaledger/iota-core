@@ -446,9 +446,18 @@ func (c *ChainsCandidate) measureAt(slot iotago.SlotIndex) (teardown func()) {
 
 	// make sure the heaviest commitment was the heaviest for the last chainSwitchingThreshold slots before we update
 	return sortedCommitments.HeaviestElement().WithNonEmptyValue(func(heaviestCommitment *Commitment) (teardown func()) {
+		// abort if main chain is already heavier than the heaviest element
+		mainChain := c.chains.Main.Get()
+		if mainChain != nil {
+			latestMainChainCommitment := mainChain.LatestProducedCommitment.Get()
+			if latestMainChainCommitment != nil && c.weightVariable(latestMainChainCommitment).Get() > c.weightVariable(heaviestCommitment).Get() {
+				return
+			}
+		}
+
 		// abort if the heaviest commitment is the main chain
 		heaviestChain := heaviestCommitment.Chain.Get()
-		if heaviestChain == c.chains.Main.Get() {
+		if heaviestChain == mainChain {
 			return
 		}
 
