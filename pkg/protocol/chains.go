@@ -344,14 +344,14 @@ func (c *Chains) trackHeaviestCandidates(chain *Chain) (teardown func()) {
 		targetSlot := latestCommitment.ID().Index()
 
 		if evictionEvent := c.protocol.EvictionEvent(targetSlot); !evictionEvent.WasTriggered() {
-			c.HeaviestClaimedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent, "heaviestClaimedCandidate")
+			c.HeaviestClaimedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
 
 			latestCommitment.IsAttested.OnTrigger(func() {
-				c.HeaviestAttestedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent, "heaviestAttestedCandidate")
+				c.HeaviestAttestedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
 			})
 
 			latestCommitment.IsVerified.OnTrigger(func() {
-				c.HeaviestVerifiedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent, "heaviestVerifiedCandidate")
+				c.HeaviestVerifiedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
 			})
 		}
 	})
@@ -490,7 +490,7 @@ func (c *ChainsCandidate) measureAt(slot iotago.SlotIndex) (teardown func()) {
 
 // registerCommitment registers the given commitment for the given slot, which makes it become part of the weight
 // measurement process.
-func (c *ChainsCandidate) registerCommitment(slot iotago.SlotIndex, commitment *Commitment, evictionEvent reactive.Event, t string) {
+func (c *ChainsCandidate) registerCommitment(slot iotago.SlotIndex, commitment *Commitment, evictionEvent reactive.Event) {
 	sortedCommitments := c.sortedCommitments(slot, evictionEvent)
 	sortedCommitments.Add(commitment)
 }
