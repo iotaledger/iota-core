@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -120,8 +119,6 @@ func (s *Storage) ExportRoots(writer io.WriteSeeker, targetCommitment *iotago.Co
 	if slotIndex <= s.Settings().APIProvider().CommittedAPI().ProtocolParameters().GenesisSlot() {
 		return nil
 	}
-
-	fmt.Println("Export Roots")
 
 	commitmentID, err := targetCommitment.ID()
 
