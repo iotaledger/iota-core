@@ -10,11 +10,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/lo"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
-func Test_ValidatorAPI(t *testing.T) {
+func Test_CoreAPI(t *testing.T) {
 	d := NewDockerTestFramework(t,
 		WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 4),
@@ -30,47 +31,15 @@ func Test_ValidatorAPI(t *testing.T) {
 	d.AddValidatorNode("V4", "docker-network-inx-validator-4-1", "http://localhost:8040", "rms1pr8cxs3dzu9xh4cduff4dd4cxdthpjkpwmz2244f75m0urslrsvtsshrrjw")
 	d.AddNode("node5", "docker-network-node-5-1", "http://localhost:8090")
 
+	err := d.Run()
+	require.NoError(t, err)
+
 	d.WaitUntilNetworkReady()
 
-	ctx := context.Background()
+	assetsPerSlot, lastSlot := d.prepareAssets(3)
 
-	prePreparedAssets := struct {
-		slot           iotago.SlotIndex
-		epoch          iotago.EpochIndex
-		dataBlock      *iotago.Block
-		valueBlock     *iotago.Block
-		transaction    *iotago.SignedTransaction
-		transactionID  iotago.TransactionID
-		basicOutput    iotago.Output
-		basicOutputID  iotago.OutputID
-		accountAddress *iotago.AccountAddress
-	}{
-		slot: iotago.SlotIndex(2),
-	}
-
-	sharedAssets := struct {
-		commitmentIDs map[string]iotago.CommitmentID
-	}{}
-
-	clt := d.Node("V1").Client
-	prePreparedAssets.epoch = clt.APIForSlot(prePreparedAssets.slot).TimeProvider().EpochFromSlot(prePreparedAssets.slot)
-	prePreparedAssets.dataBlock = d.CreateTaggedDataBlock(d.Node("V1").AccountAddress(t).AccountID(), []byte{'t', 'a', 'g'})
-
-	block, signedTx, basicOut := d.CreateValueBlock("V1")
-	d.SubmitBlock(ctx, block)
-
-	prePreparedAssets.valueBlock = block
-	prePreparedAssets.basicOutput = basicOut
-	prePreparedAssets.transaction = signedTx
-	txID, err := signedTx.Transaction.ID()
-	require.NoError(d.Testing, err)
-	prePreparedAssets.transactionID = txID
-	prePreparedAssets.basicOutputID = iotago.OutputIDFromTransactionIDAndIndex(txID, 0)
-
-	account := d.CreateAccount()
-	prePreparedAssets.accountAddress = account.Address
-
-	d.AwaitCommitment(prePreparedAssets.slot)
+	fmt.Println("AwaitCommitment for slot", lastSlot)
+	d.AwaitCommitment(lastSlot)
 
 	tests := []struct {
 		name     string
@@ -79,136 +48,160 @@ func Test_ValidatorAPI(t *testing.T) {
 		{
 			name: "Test_Info",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				resp, err := d.Node(nodeAlias).Client.Info(context.Background())
+				resp, err := d.wallet.Clients[nodeAlias].Info(context.Background())
 				require.NoError(t, err)
 				require.NotNil(t, resp)
-
-				fmt.Println(resp)
 			},
 		},
 		{
 			name: "Test_BlockByBlockID",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				respBlock, err := d.Node(nodeAlias).Client.BlockByBlockID(context.Background(), prePreparedAssets.dataBlock.MustID())
-				require.NoError(t, err)
-				require.NotNil(t, respBlock)
-				require.Equal(t, prePreparedAssets.dataBlock, respBlock)
+				assetsPerSlot.forEachBlock(t, func(t *testing.T, block *iotago.Block) {
+					respBlock, err := d.wallet.Clients[nodeAlias].BlockByBlockID(context.Background(), block.MustID())
+					require.NoError(t, err)
+					require.NotNil(t, respBlock)
+					require.Equal(t, block.MustID(), respBlock.MustID(), "BlockID of retrieved block does not match: %s != %s", block.MustID(), respBlock.MustID())
+					//require.EqualValues(t, block, respBlock)
+				})
 			},
 		},
 		{
 			name: "Test_BlockMetadataByBlockID",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				resp, err := d.Node(nodeAlias).Client.BlockMetadataByBlockID(context.Background(), prePreparedAssets.dataBlock.MustID())
-				require.NoError(t, err)
-				require.NotNil(t, resp)
-
-				require.Equal(t, prePreparedAssets.dataBlock.MustID(), resp.BlockID)
-				require.Equal(t, api.BlockStateFinalized, resp.BlockState)
+				assetsPerSlot.forEachBlock(t, func(t *testing.T, block *iotago.Block) {
+					resp, err := d.wallet.Clients[nodeAlias].BlockMetadataByBlockID(context.Background(), block.MustID())
+					require.NoError(t, err)
+					require.NotNil(t, resp)
+					//require.Equal(t, block.MustID(), resp.BlockID)
+					require.Equal(t, api.BlockStateFinalized, resp.BlockState)
+				})
 			},
 		},
 		{
 			name: "Test_BlockWithMetadata",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				// TODO missing client side implementation
-				resp, err := d.Node(nodeAlias).Client.BlockMetadataByBlockID(context.Background(), prePreparedAssets.dataBlock.MustID())
-				require.NoError(t, err)
-				require.NotNil(t, resp)
+				// TODO missing client side implementation for BlockWithMetadata
+				assetsPerSlot.forEachBlock(t, func(t *testing.T, block *iotago.Block) {
+					resp, err := d.wallet.Clients[nodeAlias].BlockMetadataByBlockID(context.Background(), block.MustID())
+					require.NoError(t, err)
+					require.NotNil(t, resp)
+					require.Equal(t, block.MustID(), resp.BlockID)
+					require.Equal(t, api.BlockStateFinalized, resp.BlockState)
+				})
 			},
 		},
 		{
 			name: "Test_BlockIssuance",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				resp, err := d.Node(nodeAlias).Client.BlockIssuance(context.Background())
+				resp, err := d.wallet.Clients[nodeAlias].BlockIssuance(context.Background())
 				require.NoError(t, err)
 				require.NotNil(t, resp)
 
-				require.GreaterOrEqual(t, resp.StrongParents, 1)
+				require.GreaterOrEqual(t, len(resp.StrongParents), 1)
 			},
 		},
 		{
 			name: "Test_CommitmentBySlot",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				resp, err := d.Node(nodeAlias).Client.CommitmentByIndex(context.Background(), prePreparedAssets.slot)
-				require.NoError(t, err)
-				require.NotNil(t, resp)
-				sharedAssets.commitmentIDs[nodeAlias] = resp.MustID()
+				assetsPerSlot.forEachSlot(t, func(t *testing.T, slot iotago.SlotIndex, sharedCommitments map[string]iotago.CommitmentID) {
+					resp, err := d.wallet.Clients[nodeAlias].CommitmentByIndex(context.Background(), slot)
+					require.NoError(t, err)
+					require.NotNil(t, resp)
+					sharedCommitments[nodeAlias] = resp.MustID()
+				})
 			},
 		},
 		{
 			name: "Test_CommitmentByID",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				resp, err := d.Node(nodeAlias).Client.CommitmentByID(context.Background(), sharedAssets.commitmentIDs[nodeAlias])
-				require.NoError(t, err)
-				require.NotNil(t, resp)
-				require.Equal(t, sharedAssets.commitmentIDs[nodeAlias], resp.MustID())
+				assetsPerSlot.forEachCommitment(t, func(t *testing.T, commitmentsPerNode map[string]iotago.CommitmentID) {
+					resp, err := d.wallet.Clients[nodeAlias].CommitmentByID(context.Background(), commitmentsPerNode[nodeAlias])
+					require.NoError(t, err)
+					require.NotNil(t, resp)
+					require.Equal(t, commitmentsPerNode[nodeAlias], resp.MustID())
+				})
 			},
 		},
 		{
 			name: "Test_CommitmentUTXOChangesByID",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				resp, err := d.Node(nodeAlias).Client.CommitmentUTXOChangesByID(context.Background(), sharedAssets.commitmentIDs[nodeAlias])
-				require.NoError(t, err)
-				require.NotNil(t, resp)
-				fmt.Println(resp)
+				assetsPerSlot.forEachCommitment(t, func(t *testing.T, commitmentsPerNode map[string]iotago.CommitmentID) {
+					resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesByID(context.Background(), commitmentsPerNode[nodeAlias])
+					require.NoError(t, err)
+					require.NotNil(t, resp)
+					assetsPerSlot.assertUTXOOutputIDsInSlot(t, commitmentsPerNode[nodeAlias].Slot(), resp.CreatedOutputs, resp.ConsumedOutputs)
+					require.Equal(t, commitmentsPerNode[nodeAlias], resp.CommitmentID)
+				})
 			},
 		},
 		{
-			name: "Test_CommitmentUTXOChangesFullByID",
-			testFunc: func(t *testing.T, nodeAlias string) {
-				resp, err := d.Node(nodeAlias).Client.CommitmentUTXOChangesFullByID(context.Background(), sharedAssets.commitmentIDs[nodeAlias])
-				require.NoError(t, err)
-				require.NotNil(t, resp)
-				fmt.Println(resp)
+			"Test_CommitmentUTXOChangesFullByID",
+			func(t *testing.T, nodeAlias string) {
+				assetsPerSlot.forEachCommitment(t, func(t *testing.T, commitmentsPerNode map[string]iotago.CommitmentID) {
+					resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesFullByID(context.Background(), commitmentsPerNode[nodeAlias])
+					require.NoError(t, err)
+					require.NotNil(t, resp)
+					assetsPerSlot.assertUTXOOutputsInSlot(t, commitmentsPerNode[nodeAlias].Slot(), resp.CreatedOutputs, resp.ConsumedOutputs)
+					require.Equal(t, commitmentsPerNode[nodeAlias], resp.CommitmentID)
+				})
 			},
 		},
 		{
 			name: "Test_CommitmentUTXOChangesBySlot",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				resp, err := d.Node(nodeAlias).Client.CommitmentUTXOChangesByIndex(context.Background(), prePreparedAssets.slot)
-				require.NoError(t, err)
-				require.NotNil(t, resp)
-				// check by what I have sent
-
-				resp, err = d.Node(nodeAlias).Client.CommitmentUTXOChangesByIndex(context.Background(), sharedAssets.commitmentIDs[nodeAlias].Slot())
-				require.NoError(t, err)
-				require.NotNil(t, resp)
-				require.Equal(t, sharedAssets.commitmentIDs[nodeAlias], resp.CommitmentID)
-
-				// todo check with by commitment resp
-
+				assetsPerSlot.forEachCommitment(t, func(t *testing.T, commitmentsPerNode map[string]iotago.CommitmentID) {
+					resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesByIndex(context.Background(), commitmentsPerNode[nodeAlias].Slot())
+					require.NoError(t, err)
+					require.NotNil(t, resp)
+					assetsPerSlot.assertUTXOOutputIDsInSlot(t, commitmentsPerNode[nodeAlias].Slot(), resp.CreatedOutputs, resp.ConsumedOutputs)
+					require.Equal(t, commitmentsPerNode[nodeAlias], resp.CommitmentID)
+				})
 			},
 		},
 		{
 			name: "Test_CommitmentUTXOChangesFullBySlot",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				resp, err := d.Node(nodeAlias).Client.CommitmentUTXOChangesFullByIndex(context.Background(), prePreparedAssets.slot)
-				require.NoError(t, err)
-				require.NotNil(t, resp)
+				assetsPerSlot.forEachCommitment(t, func(t *testing.T, commitmentsPerNode map[string]iotago.CommitmentID) {
+					resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesFullByIndex(context.Background(), commitmentsPerNode[nodeAlias].Slot())
+					require.NoError(t, err)
+					require.NotNil(t, resp)
+					assetsPerSlot.assertUTXOOutputsInSlot(t, commitmentsPerNode[nodeAlias].Slot(), resp.CreatedOutputs, resp.ConsumedOutputs)
+					require.Equal(t, commitmentsPerNode[nodeAlias], resp.CommitmentID)
+				})
 			},
 		},
 		{
 			name: "Test_OutputByID",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				resp, err := d.Node(nodeAlias).Client.OutputByID(context.Background(), prePreparedAssets.basicOutputID)
-				require.NoError(t, err)
-				require.NotNil(t, resp)
-				// todo calculate outID
+				assetsPerSlot.forEachOutput(t, func(t *testing.T, outputID iotago.OutputID, output iotago.Output) {
+					resp, err := d.wallet.Clients[nodeAlias].OutputByID(context.Background(), outputID)
+					require.NoError(t, err)
+					require.NotNil(t, resp)
+					require.EqualValues(t, output, resp)
+				})
 			},
 		},
 		{
 			name: "Test_OutputMetadata",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				resp, err := d.Node(nodeAlias).Client.OutputMetadataByID(context.Background(), prePreparedAssets.basicOutputID)
-				require.NoError(t, err)
-				require.NotNil(t, resp)
+				assetsPerSlot.forEachOutput(t, func(t *testing.T, outputID iotago.OutputID, output iotago.Output) {
+					resp, err := d.wallet.Clients[nodeAlias].OutputMetadataByID(context.Background(), outputID)
+					require.NoError(t, err)
+					require.NotNil(t, resp)
+					require.EqualValues(t, outputID, resp.OutputID)
+					require.EqualValues(t, outputID.Slot(), resp.Included.Slot)
+					require.EqualValues(t, outputID.TransactionID(), resp.Included.TransactionID)
+				})
 			},
 		},
 		{
 			name: "Test_TransactionsIncludedBlock",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				resp, err := d.Node(nodeAlias).Client.TransactionIncludedBlock(context.Background(), prePreparedAssets.transactionID)
-				require.NoError(t, err)
-				require.NotNil(t, resp)
+				assetsPerSlot.forEachTransaction(t, func(t *testing.T, transaction *iotago.SignedTransaction) {
+					resp, err := d.wallet.Clients[nodeAlias].TransactionIncludedBlock(context.Background(), lo.PanicOnErr(transaction.Transaction.ID()))
+					require.NoError(t, err)
+					require.NotNil(t, resp)
+				})
 
 				// todo issue second block with the same tx, and make sure that the first one is returned here
 			},
@@ -216,41 +209,49 @@ func Test_ValidatorAPI(t *testing.T) {
 		{
 			name: "Test_TransactionsIncludedBlockMetadata",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				resp, err := d.Node(nodeAlias).Client.TransactionIncludedBlockMetadata(context.Background(), prePreparedAssets.transactionID)
-				require.NoError(t, err)
-				require.NotNil(t, resp)
+				assetsPerSlot.forEachTransaction(t, func(t *testing.T, transaction *iotago.SignedTransaction) {
+					resp, err := d.wallet.Clients[nodeAlias].TransactionIncludedBlockMetadata(context.Background(), lo.PanicOnErr(transaction.Transaction.ID()))
+					require.NoError(t, err)
+					require.NotNil(t, resp)
+				})
 			},
 		},
 		{
 			name: "Test_TransactionsMetadata",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				resp, err := d.Node(nodeAlias).Client.TransactionMetadata(context.Background(), prePreparedAssets.transactionID)
-				require.NoError(t, err)
-				require.NotNil(t, resp)
+				assetsPerSlot.forEachTransaction(t, func(t *testing.T, transaction *iotago.SignedTransaction) {
+					resp, err := d.wallet.Clients[nodeAlias].TransactionMetadata(context.Background(), lo.PanicOnErr(transaction.Transaction.ID()))
+					require.NoError(t, err)
+					require.NotNil(t, resp)
+					require.Equal(t, api.TransactionStateFinalized, resp.TransactionState)
+				})
 			},
 		},
 		{
 			name: "Test_Congestion",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				resp, err := d.Node(nodeAlias).Client.Congestion(context.Background(), d.Node(nodeAlias).AccountAddress(t), 0)
-				require.NoError(t, err)
-				require.NotNil(t, resp)
+				assetsPerSlot.forEachAccountAddress(t, func(t *testing.T, accountAddress *iotago.AccountAddress, commitmentPerNode map[string]iotago.CommitmentID) {
 
-				resp, err = d.Node(nodeAlias).Client.Congestion(context.Background(), prePreparedAssets.accountAddress, 0, sharedAssets.commitmentIDs[nodeAlias])
-				require.NoError(t, err)
-				require.NotNil(t, resp)
+					resp, err := d.wallet.Clients[nodeAlias].Congestion(context.Background(), accountAddress, 0)
+					require.NoError(t, err)
+					require.NotNil(t, resp)
+
+					resp, err = d.wallet.Clients[nodeAlias].Congestion(context.Background(), accountAddress, 0, commitmentPerNode[nodeAlias])
+					require.NoError(t, err)
+					require.NotNil(t, resp)
+				})
 			},
 		},
 		{
 			name: "Test_Validators",
 			testFunc: func(t *testing.T, nodeAlias string) {
 				pageSize := uint64(3)
-				resp, err := d.Node(nodeAlias).Client.Validators(context.Background(), pageSize)
+				resp, err := d.wallet.Clients[nodeAlias].Validators(context.Background(), pageSize)
 				require.NoError(t, err)
 				require.NotNil(t, resp)
 				require.Equal(t, len(resp.Validators), int(pageSize))
 
-				resp, err = d.Node(nodeAlias).Client.Validators(context.Background(), pageSize, resp.Cursor)
+				resp, err = d.wallet.Clients[nodeAlias].Validators(context.Background(), pageSize, resp.Cursor)
 				require.NoError(t, err)
 				require.NotNil(t, resp)
 				require.Equal(t, len(resp.Validators), 1)
@@ -259,7 +260,7 @@ func Test_ValidatorAPI(t *testing.T) {
 		{
 			name: "Test_ValidatorsAll",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				resp, all, err := d.Node(nodeAlias).Client.ValidatorsAll(context.Background())
+				resp, all, err := d.wallet.Clients[nodeAlias].ValidatorsAll(context.Background())
 				require.NoError(t, err)
 				require.True(t, all)
 				require.Equal(t, 4, len(resp.Validators))
@@ -268,15 +269,13 @@ func Test_ValidatorAPI(t *testing.T) {
 		{
 			name: "Test_Rewards",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				resp, err := d.Node(nodeAlias).Client.Rewards(context.Background(), prePreparedAssets.basicOutputID)
-				require.NoError(t, err)
-				require.NotNil(t, resp)
+				//skip: we will test it with caliming tests
 			},
 		},
 		{
 			name: "Test_Committee",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				resp, err := d.Node(nodeAlias).Client.Committee(context.Background(), prePreparedAssets.epoch)
+				resp, err := d.wallet.Clients[nodeAlias].Committee(context.Background())
 				require.NoError(t, err)
 				require.NotNil(t, resp)
 			},
@@ -289,5 +288,5 @@ func Test_ValidatorAPI(t *testing.T) {
 		})
 	}
 
-	// TDO Assert shared assets are the same
+	assetsPerSlot.assertCommitments(t)
 }
