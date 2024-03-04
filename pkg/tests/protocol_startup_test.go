@@ -59,11 +59,11 @@ func Test_BookInCommittedSlot(t *testing.T) {
 	ts.Wait()
 
 	expectedCommittee := []iotago.AccountID{
-		nodeA.Validator.AccountID,
+		nodeA.Validator.AccountData.ID,
 	}
 
 	expectedOnlineCommittee := []account.SeatIndex{
-		lo.Return1(lo.Return1(nodeA.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountID)),
+		lo.Return1(lo.Return1(nodeA.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountData.ID)),
 	}
 
 	// Verify that nodes have the expected states.
@@ -174,13 +174,13 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	ts.Wait()
 
 	expectedCommittee := []iotago.AccountID{
-		nodeA.Validator.AccountID,
-		nodeB.Validator.AccountID,
+		nodeA.Validator.AccountData.ID,
+		nodeB.Validator.AccountData.ID,
 	}
 
 	expectedOnlineCommittee := []account.SeatIndex{
-		lo.Return1(lo.Return1(nodeA.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountID)),
-		lo.Return1(lo.Return1(nodeA.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeB.Validator.AccountID)),
+		lo.Return1(lo.Return1(nodeA.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountData.ID)),
+		lo.Return1(lo.Return1(nodeA.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeB.Validator.AccountData.ID)),
 	}
 
 	// Verify that nodes have the expected states.

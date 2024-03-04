@@ -39,7 +39,7 @@ func setupRewardTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *mock
 	// Validator node account.
 	validatorAccountOutput := ts.AccountOutput("Genesis:1")
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              node1.Validator.AccountID,
+		ID:              node1.Validator.AccountData.ID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.MaxBlockIssuanceCredits/2, 0),
 		OutputID:        validatorAccountOutput.ID,
 		ExpirySlot:      iotago.MaxSlotIndex,
@@ -50,7 +50,7 @@ func setupRewardTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *mock
 	// Default wallet block issuer account.
 	blockIssuerAccountOutput := ts.AccountOutput("Genesis:2")
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              wallet.BlockIssuer.AccountID,
+		ID:              wallet.BlockIssuer.AccountData.ID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.MaxBlockIssuanceCredits/2, 0),
 		OutputID:        blockIssuerAccountOutput.ID,
 		ExpirySlot:      iotago.MaxSlotIndex,

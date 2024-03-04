@@ -52,6 +52,7 @@ type Node struct {
 	logger  log.Logger
 
 	Name         string
+	isValidator  bool
 	Validator    *BlockIssuer
 	KeyManager   *wallet.KeyManager
 	BlockHandler *blockhandler.BlockHandler
@@ -80,7 +81,7 @@ type Node struct {
 	invalidTransactionEvents map[iotago.SignedTransactionID]InvalidSignedTransactionEvent
 }
 
-func NewNode(t *testing.T, parentLogger log.Logger, net *Network, partition string, name string, validator bool) *Node {
+func NewNode(t *testing.T, parentLogger log.Logger, net *Network, partition string, name string, isValidator bool) *Node {
 	keyManager := lo.PanicOnErr(wallet.NewKeyManagerFromRandom(wallet.DefaultIOTAPath))
 	priv, pub := keyManager.KeyPair()
 
@@ -90,11 +91,11 @@ func NewNode(t *testing.T, parentLogger log.Logger, net *Network, partition stri
 	peerID := lo.PanicOnErr(peer.IDFromPrivateKey(lo.PanicOnErr(p2pcrypto.UnmarshalEd25519PrivateKey(priv))))
 	RegisterIDAlias(peerID, name)
 
-	var validationBlockIssuer *BlockIssuer
-	if validator {
-		validationBlockIssuer = NewBlockIssuer(t, name, keyManager, accountID, validator)
+	var validator *BlockIssuer
+	if isValidator {
+		validator = NewBlockIssuer(t, name, keyManager, nil, 0, accountID, isValidator)
 	} else {
-		validationBlockIssuer = nil
+		validator = nil
 	}
 
 	return &Node{
@@ -103,8 +104,9 @@ func NewNode(t *testing.T, parentLogger log.Logger, net *Network, partition stri
 
 		Name: name,
 
-		Validator:  validationBlockIssuer,
-		KeyManager: keyManager,
+		isValidator: isValidator,
+		Validator:   validator,
+		KeyManager:  keyManager,
 
 		PeerID: peerID,
 
@@ -135,6 +137,13 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 	)
 	n.BlockHandler = blockhandler.New(n.Protocol)
 
+	_, pub := n.KeyManager.KeyPair()
+	accountID := iotago.AccountID(blake2b.Sum256(pub))
+
+	client := &TestClient{n}
+	if n.isValidator {
+		n.Validator = NewBlockIssuer(n.Testing, n.Name, n.KeyManager, client, 0, accountID, n.isValidator)
+	}
 	n.hookEvents()
 	n.hookEngineEvents(failOnBlockFiltered)
 
@@ -359,5 +368,5 @@ func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...o
 		panic("node is not a validator")
 	}
 
-	return n.Validator.IssueValidationBlock(ctx, alias, n, opts...)
+	return n.Validator.IssueValidationBlock(ctx, alias, opts...)
 }

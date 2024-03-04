@@ -10,14 +10,14 @@ import (
 )
 
 type BlockHeaderParams struct {
-	ParentsCount            int
-	References              model.ParentReferences
-	SlotCommitment          *iotago.Commitment
-	LatestFinalizedSlot     *iotago.SlotIndex
-	IssuingTime             *time.Time
-	ProtocolVersion         *iotago.Version
-	Issuer                  wallet.Account
-	SkipReferenceValidation bool
+	ParentsCount        int
+	References          model.ParentReferences
+	SlotCommitment      *iotago.Commitment
+	LatestFinalizedSlot *iotago.SlotIndex
+	IssuingTime         *time.Time
+	ProtocolVersion     *iotago.Version
+	Issuer              wallet.Account
+	ReferenceValidation bool
 }
 type BasicBlockParams struct {
 	BlockHeader *BlockHeaderParams
@@ -90,12 +90,6 @@ func WithProtocolVersion(version iotago.Version) func(builder *BlockHeaderParams
 func WithIssuer(issuer wallet.Account) func(builder *BlockHeaderParams) {
 	return func(builder *BlockHeaderParams) {
 		builder.Issuer = issuer
-	}
-}
-
-func WithSkipReferenceValidation(skipReferenceValidation bool) func(builder *BlockHeaderParams) {
-	return func(builder *BlockHeaderParams) {
-		builder.SkipReferenceValidation = skipReferenceValidation
 	}
 }
 

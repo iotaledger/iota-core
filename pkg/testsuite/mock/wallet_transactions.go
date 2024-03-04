@@ -128,7 +128,7 @@ func (w *Wallet) CreateDelegationFromInput(transactionName string, inputName str
 		}),
 		WithInputs(input),
 		WithOutputs(outputStates...),
-		WithAllotAllManaToAccount(w.currentSlot, w.BlockIssuer.AccountID),
+		WithAllotAllManaToAccount(w.currentSlot, w.BlockIssuer.AccountData.ID),
 	)
 
 	return signedTransaction
@@ -340,7 +340,7 @@ func (w *Wallet) CreateImplicitAccountFromInput(transactionName string, inputNam
 
 	// register the implicit account as a block issuer in the wallet
 	implicitAccountID := iotago.AccountIDFromOutputID(recipientWallet.OutputData(fmt.Sprintf("%s:0", transactionName)).ID)
-	recipientWallet.SetBlockIssuer(implicitAccountID)
+	recipientWallet.SetBlockIssuer(&AccountData{ID: implicitAccountID})
 
 	return signedTransaction
 }
@@ -379,7 +379,7 @@ func (w *Wallet) CreateImplicitAccountAndBasicOutputFromInput(transactionName st
 
 	// register the implicit account as a block issuer in the wallet
 	implicitAccountID := iotago.AccountIDFromOutputID(recipientWallet.OutputData(fmt.Sprintf("%s:0", transactionName)).ID)
-	recipientWallet.SetBlockIssuer(implicitAccountID)
+	recipientWallet.SetBlockIssuer(&AccountData{ID: implicitAccountID})
 
 	return signedTransaction
 }
@@ -1038,7 +1038,7 @@ func (w *Wallet) AllotManaToWallet(transactionName string, inputName string, rec
 		transactionName,
 		[]uint32{0},
 		WithInputs(input),
-		WithAllotAllManaToAccount(w.currentSlot, recipientWallet.BlockIssuer.AccountID),
+		WithAllotAllManaToAccount(w.currentSlot, recipientWallet.BlockIssuer.AccountData.ID),
 	)
 
 	return signedTransaction
@@ -1056,7 +1056,7 @@ func (w *Wallet) CreateNFTFromInput(transactionName string, inputName string, op
 		[]uint32{0},
 		WithInputs(input),
 		WithOutputs(nftOutput),
-		WithAllotAllManaToAccount(w.currentSlot, w.BlockIssuer.AccountID),
+		WithAllotAllManaToAccount(w.currentSlot, w.BlockIssuer.AccountData.ID),
 	)
 }
 
@@ -1123,7 +1123,7 @@ func (w *Wallet) TransitionNFTWithTransactionOpts(transactionName string, inputN
 		append(opts,
 			WithInputs(input),
 			WithOutputs(nftOutput),
-			WithAllotAllManaToAccount(w.currentSlot, w.BlockIssuer.AccountID))...,
+			WithAllotAllManaToAccount(w.currentSlot, w.BlockIssuer.AccountData.ID))...,
 	)
 }
 
@@ -1163,8 +1163,8 @@ func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Tra
 		immutableAccountUC := output.UnlockConditionSet().ImmutableAccount()
 		for _, index := range addressIndexes {
 			if addressUC != nil && (w.HasAddress(addressUC.Address, index) ||
-				addressUC.Address.Type() == iotago.AddressAccount && addressUC.Address.String() == w.BlockIssuer.AccountID.ToAddress().String()) ||
-				immutableAccountUC != nil && immutableAccountUC.Address.AccountID() == w.BlockIssuer.AccountID ||
+				addressUC.Address.Type() == iotago.AddressAccount && addressUC.Address.String() == w.BlockIssuer.AccountData.ID.ToAddress().String()) ||
+				immutableAccountUC != nil && immutableAccountUC.Address.AccountID() == w.BlockIssuer.AccountData.ID ||
 				stateControllerUC != nil && w.HasAddress(stateControllerUC.Address, index) {
 				clonedOutput := output.Clone()
 				actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), outputID.Index())

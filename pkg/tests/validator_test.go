@@ -293,7 +293,7 @@ func validatorTest(t *testing.T, test ValidatorTest) {
 	var totalValidatorStake iotago.BaseToken = 0
 	lo.ForEach(ts.Validators(), func(n *mock.Node) {
 		latestCommittedSlot := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot()
-		accountData, exists, err := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Ledger.Account(n.Validator.AccountID, latestCommittedSlot)
+		accountData, exists, err := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Ledger.Account(n.Validator.AccountData.ID, latestCommittedSlot)
 		if err != nil || !exists {
 			t.Fatal(exists, err)
 		}

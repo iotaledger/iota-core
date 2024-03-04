@@ -119,7 +119,7 @@ func sendBlock(c echo.Context) (*api.BlockCreatedResponse, error) {
 		return nil, err
 	}
 
-	blockID, err := deps.BlockHandler.AttachBlock(c.Request().Context(), iotaBlock)
+	blockID, err := deps.BlockHandler.SubmitBlockAndAwaitBooking(c.Request().Context(), iotaBlock)
 	if err != nil {
 		switch {
 		case ierrors.Is(err, blockhandler.ErrBlockAttacherInvalidBlock):

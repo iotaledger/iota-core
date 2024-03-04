@@ -4,7 +4,6 @@ import (
 	"crypto/ed25519"
 	"testing"
 
-	hiveEd25519 "github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
@@ -30,6 +29,20 @@ func OutputDataFromUTXOLedgerOutput(output *utxoledger.Output) *OutputData {
 	}
 }
 
+// AccountData holds the details of an account that can be used to issue a block or account transition.
+type AccountData struct {
+	// ID is the unique identifier of the account.
+	ID iotago.AccountID
+	// AddressIndex is the index of the address in the keyManager.
+	AddressIndex uint32
+	// AccountAddress is the AccountAddress of the account output.
+	AccountAddress *iotago.AccountAddress
+	// Output is the latest iotago AccountOutput of the account.
+	Output *iotago.AccountOutput
+	// OutputID is the unique identifier of the Output.
+	OutputID iotago.OutputID
+}
+
 // Wallet is an object representing a wallet (similar to a FireFly wallet) capable of the following:
 // - hierarchical deterministic key management
 // - signing transactions
@@ -46,7 +59,8 @@ type Wallet struct {
 
 	keyManager *wallet.KeyManager
 
-	BlockIssuer *BlockIssuer
+	BlockIssuer   *BlockIssuer
+	IssuerAccount *AccountData
 
 	outputs      map[string]*OutputData
 	transactions map[string]*iotago.Transaction
@@ -60,34 +74,32 @@ func NewWallet(t *testing.T, name string, node *Node, keyManager ...*wallet.KeyM
 	} else {
 		km = keyManager[0]
 	}
+	client := &TestClient{node}
+	issuerAccountData := &AccountData{
+		ID:           iotago.EmptyAccountID,
+		AddressIndex: 0,
+	}
 
 	return &Wallet{
-		Testing:      t,
-		Name:         name,
-		Client:       &TestClient{node},
-		Node:         node,
-		outputs:      make(map[string]*OutputData),
-		transactions: make(map[string]*iotago.Transaction),
-		keyManager:   km,
-		BlockIssuer:  NewBlockIssuer(t, name, km, iotago.EmptyAccountID, false),
+		Testing:       t,
+		Name:          name,
+		Client:        client,
+		Node:          node,
+		outputs:       make(map[string]*OutputData),
+		transactions:  make(map[string]*iotago.Transaction),
+		keyManager:    km,
+		IssuerAccount: issuerAccountData,
+		BlockIssuer:   NewBlockIssuer(t, name, km, client, issuerAccountData.AddressIndex, issuerAccountData.ID, false),
 	}
 }
 
-func (w *Wallet) SetBlockIssuer(accountID iotago.AccountID) {
-	w.BlockIssuer = NewBlockIssuer(w.Testing, w.Name, w.keyManager, accountID, false)
-}
-
-func (w *Wallet) BlockIssuerKey() iotago.BlockIssuerKey {
-	if w.BlockIssuer != nil {
-		return w.BlockIssuer.BlockIssuerKey()
-	}
-	_, pub := w.keyManager.KeyPair()
-
-	return iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(hiveEd25519.PublicKey(pub))
+func (w *Wallet) SetBlockIssuer(accountData *AccountData) {
+	w.BlockIssuer = NewBlockIssuer(w.Testing, w.Name, w.keyManager, w.Client, accountData.AddressIndex, accountData.ID, false)
 }
 
 func (w *Wallet) SetDefaultNode(node *Node) {
 	w.Client = &TestClient{node}
+	w.BlockIssuer.client = w.Client
 	w.Node = node
 }
 

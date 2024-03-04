@@ -89,7 +89,7 @@ func (t *TestSuite) IssueExistingBlock(blockName string, wallet *mock.Wallet) {
 	require.True(t.Testing, exists)
 	require.NotNil(t.Testing, block)
 
-	require.NoError(t.Testing, wallet.BlockIssuer.IssueBlock(block.ModelBlock(), wallet.Node))
+	require.NoError(t.Testing, wallet.BlockIssuer.SubmitBlockWithoutAwaitingBooking(block.ModelBlock(), wallet.Node))
 }
 
 func (t *TestSuite) IssueValidationBlockWithOptions(blockName string, node *mock.Node, blockOpts ...options.Option[mock.ValidationBlockParams]) (*blocks.Block, error) {
@@ -151,7 +151,7 @@ func (t *TestSuite) issueBlockRow(prefix string, row int, parentsPrefix string, 
 		var b *blocks.Block
 		var err error
 		// Only issue validation blocks if account has staking feature and is part of committee.
-		if node.Validator != nil && lo.Return1(node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(t.currentSlot)).HasAccount(node.Validator.AccountID) {
+		if node.Validator != nil && lo.Return1(node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(t.currentSlot)).HasAccount(node.Validator.AccountData.ID) {
 			blockHeaderOptions := append(issuingOptionsCopy[node.Name], mock.WithIssuingTime(issuingTime))
 			t.assertParentsCommitmentExistFromBlockOptions(blockHeaderOptions, node)
 			t.assertParentsExistFromBlockOptions(blockHeaderOptions, node)
@@ -285,7 +285,7 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parents ...iotago.Blo
 
 			require.True(t.Testing, exists, "node: %s: does not have committee selected for slot %d", node.Name, t.currentSlot)
 
-			if committeeAtBlockSlot.HasAccount(node.Validator.AccountID) {
+			if committeeAtBlockSlot.HasAccount(node.Validator.AccountData.ID) {
 				blockName := fmt.Sprintf("chain-%s-%d-%s", parents[0].Alias(), chainIndex, node.Name)
 				latestCommitment := node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment()
 				tips = []iotago.BlockID{lo.PanicOnErr(t.IssueValidationBlockWithHeaderOptions(blockName, node, mock.WithSlotCommitment(latestCommitment), mock.WithStrongParents(tips...))).ID()}
@@ -295,7 +295,7 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parents ...iotago.Blo
 		for _, node := range activeValidators {
 			committeeAtBlockSlot, exists := node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(t.currentSlot)
 			require.True(t.Testing, exists, "node: %s: does not have committee selected for slot %d", node.Name, t.currentSlot)
-			if committeeAtBlockSlot.HasAccount(node.Validator.AccountID) {
+			if committeeAtBlockSlot.HasAccount(node.Validator.AccountData.ID) {
 				blockName := fmt.Sprintf("chain-%s-%d-%s", parents[0].Alias(), chainIndex+1, node.Name)
 				latestCommitment := node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment()
 				tips = []iotago.BlockID{lo.PanicOnErr(t.IssueValidationBlockWithHeaderOptions(blockName, node, mock.WithSlotCommitment(latestCommitment), mock.WithStrongParents(tips...))).ID()}

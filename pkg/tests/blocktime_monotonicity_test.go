@@ -40,7 +40,6 @@ func Test_BlockTimeMonotonicity(t *testing.T) {
 		ts.IssueValidationBlockWithOptions("block1", node0, mock.WithValidationBlockHeaderOptions(
 			mock.WithStrongParents(ts.BlockIDs("Genesis", "block0")...),
 			mock.WithIssuingTime(time1),
-			mock.WithSkipReferenceValidation(true),
 		))
 	}
 
@@ -49,7 +48,6 @@ func Test_BlockTimeMonotonicity(t *testing.T) {
 		ts.IssueValidationBlockWithOptions("block2", node0, mock.WithValidationBlockHeaderOptions(
 			mock.WithStrongParents(ts.BlockIDs("Genesis", "block0")...),
 			mock.WithIssuingTime(time0),
-			mock.WithSkipReferenceValidation(true),
 		))
 
 	}

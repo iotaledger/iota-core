@@ -62,8 +62,8 @@ func Test_WeightPropagation(t *testing.T) {
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
-		node1.Validator.AccountID,
-		node2.Validator.AccountID,
+		node1.Validator.AccountData.ID,
+		node2.Validator.AccountData.ID,
 	}, ts.Nodes()...)
 
 	// Create and issue double spends
@@ -152,8 +152,8 @@ func Test_DoubleSpend(t *testing.T) {
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
-		node1.Validator.AccountID,
-		node2.Validator.AccountID,
+		node1.Validator.AccountData.ID,
+		node2.Validator.AccountData.ID,
 	}, ts.Nodes()...)
 
 	// Create and issue double spends
@@ -346,8 +346,8 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
-		node1.Validator.AccountID,
-		node2.Validator.AccountID,
+		node1.Validator.AccountData.ID,
+		node2.Validator.AccountData.ID,
 	}, ts.Nodes()...)
 
 	genesisCommitment := lo.PanicOnErr(node1.Protocol.Engines.Main.Get().Storage.Commitments().Load(0)).Commitment()
@@ -619,8 +619,8 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
-		node1.Validator.AccountID,
-		node2.Validator.AccountID,
+		node1.Validator.AccountData.ID,
+		node2.Validator.AccountData.ID,
 	}, ts.Nodes()...)
 
 	genesisCommitment := lo.PanicOnErr(node1.Protocol.Engines.Main.Get().Storage.Commitments().Load(0)).Commitment()

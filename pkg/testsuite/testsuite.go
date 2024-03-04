@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds/orderedmap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
@@ -280,7 +279,7 @@ func (t *TestSuite) AccountsOfNodes(names ...string) []iotago.AccountID {
 	nodes := t.Nodes(names...)
 
 	return lo.Map(nodes, func(node *mock.Node) iotago.AccountID {
-		return node.Validator.AccountID
+		return node.Validator.AccountData.ID
 	})
 }
 
@@ -291,8 +290,8 @@ func (t *TestSuite) SeatOfNodes(slot iotago.SlotIndex, names ...string) []accoun
 		seatedAccounts, exists := node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(slot)
 		require.True(t.Testing, exists, "node %s: committee at slot %d does not exist", node.Name, slot)
 
-		seat, exists := seatedAccounts.GetSeat(node.Validator.AccountID)
-		require.True(t.Testing, exists, "node %s: seat for account %s does not exist", node.Name, node.Validator.AccountID)
+		seat, exists := seatedAccounts.GetSeat(node.Validator.AccountData.ID)
+		require.True(t.Testing, exists, "node %s: seat for account %s does not exist", node.Name, node.Validator.AccountData.ID)
 
 		return seat
 	})
@@ -347,16 +346,16 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 
 	if walletOptions.Amount > 0 && validator {
 		accountDetails := snapshotcreator.AccountDetails{
-			Address:              iotago.Ed25519AddressFromPubKey(node.Validator.PublicKey),
+			Address:              node.Validator.Address(),
 			Amount:               walletOptions.Amount,
 			Mana:                 iotago.Mana(walletOptions.Amount),
-			IssuerKey:            iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(ed25519.PublicKey(node.Validator.PublicKey)),
+			IssuerKey:            node.Validator.BlockIssuerKey(),
 			ExpirySlot:           iotago.MaxSlotIndex,
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 2,
 			StakedAmount:         walletOptions.Amount,
 			StakingEndEpoch:      iotago.MaxEpochIndex,
 			FixedCost:            walletOptions.FixedCost,
-			AccountID:            node.Validator.AccountID,
+			AccountID:            node.Validator.AccountData.ID,
 		}
 
 		t.optsAccounts = append(t.optsAccounts, accountDetails)
@@ -372,7 +371,7 @@ func (t *TestSuite) AddValidatorNodeToPartition(name string, partition string, w
 func (t *TestSuite) AddValidatorNode(name string, walletOpts ...options.Option[WalletOptions]) *mock.Node {
 	node := t.addNodeToPartition(name, mock.NetworkMainPartition, true, walletOpts...)
 	// create a wallet for each validator node which uses the validator account as a block issuer
-	t.AddWallet(name, node, node.Validator.AccountID, node.KeyManager)
+	t.AddWallet(name, node, node.Validator.AccountData.ID, node.KeyManager)
 
 	return node
 }
@@ -424,10 +423,10 @@ func (t *TestSuite) AddGenesisWallet(name string, node *mock.Node, walletOpts ..
 
 	accountDetails := snapshotcreator.AccountDetails{
 		AccountID:            accountID,
-		Address:              iotago.Ed25519AddressFromPubKey(newWallet.BlockIssuer.PublicKey),
+		Address:              newWallet.BlockIssuer.Address(),
 		Amount:               walletOptions.Amount,
 		Mana:                 iotago.Mana(mock.MinIssuerAccountAmount(t.API.ProtocolParameters())),
-		IssuerKey:            iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(ed25519.PublicKey(newWallet.BlockIssuer.PublicKey)),
+		IssuerKey:            newWallet.BlockIssuer.BlockIssuerKey(),
 		ExpirySlot:           iotago.MaxSlotIndex,
 		BlockIssuanceCredits: walletOptions.BlockIssuanceCredits,
 	}
@@ -456,7 +455,7 @@ func (t *TestSuite) DefaultWallet() *mock.Wallet {
 
 func (t *TestSuite) AddWallet(name string, node *mock.Node, accountID iotago.AccountID, keyManager ...*wallet.KeyManager) *mock.Wallet {
 	newWallet := mock.NewWallet(t.Testing, name, node, keyManager...)
-	newWallet.SetBlockIssuer(accountID)
+	newWallet.SetBlockIssuer(&mock.AccountData{ID: accountID})
 	t.wallets.Set(name, newWallet)
 	newWallet.SetCurrentSlot(t.currentSlot)
 
