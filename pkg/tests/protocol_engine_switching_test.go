@@ -274,18 +274,12 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 	ts.AssertMainChain(commitmentsMainChain[8].ID(), nodesP2...)
 	ts.AssertMainChain(commitmentsMainChain[0].ID(), nodesP1...)
 
-	fmt.Println(node5.Protocol.Inspect())
-
-	ts.AssertUniqueCommitmentChain(ts.Nodes()...)
-	ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
-
-	ts.AssertCommitmentsOnEvictedChain(commitmentsMainChain, false, ts.Nodes()...)
-
 	ts.AssertCommitmentsOnChainAndChainHasCommitments(commitmentsMainChain, commitmentsMainChain[0].ID(), nodesP1...)
 	ts.AssertCommitmentsOnChainAndChainHasCommitments(commitmentsMainChain[8:], commitmentsMainChain[8].ID(), nodesP2...)
 
-	ts.AssertCommitmentsOnChain(commitmentsMainChain, commitmentsMainChain[0].ID(), nodesP1...)
-
+	ts.AssertUniqueCommitmentChain(ts.Nodes()...)
+	ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
+	ts.AssertCommitmentsOnEvictedChain(commitmentsMainChain, false, ts.Nodes()...)
 	ts.AssertCommitmentsAndChainsEvicted(oldestNonEvictedCommitment-1, ts.Nodes()...)
 }
 
