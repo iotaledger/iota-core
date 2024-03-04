@@ -63,7 +63,7 @@ func TestCheckLedgerStateCommitmentFromNonGenesisSnapshot(t *testing.T) {
 	ts.RemoveNode(node0.Name)
 	node0.Shutdown()
 
-	// Modify StateRoot and check whether the check would get an error
+	// Modify StateRoot and check whether the commitment check gets an error
 	{
 		curCommitment := ts.Node("node2").Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment()
 		rootsStorage, _ := ts.Node("node2").Protocol.Engines.Main.Get().Storage.Roots(curCommitment.Slot())

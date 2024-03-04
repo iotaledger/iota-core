@@ -86,6 +86,7 @@ type Engine struct {
 	optsSnapshotPath     string
 	optsEntryPointsDepth int
 	optsSnapshotDepth    int
+	optsCheckCommitment  bool
 	optsBlockRequester   []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]]
 
 	*module.ReactiveModule
@@ -127,8 +128,9 @@ func New(
 			LatestCommitment: reactive.NewVariable[*model.Commitment](),
 			Workers:          workers,
 
-			optsSnapshotPath:  "snapshot.bin",
-			optsSnapshotDepth: 5,
+			optsSnapshotPath:    "snapshot.bin",
+			optsSnapshotDepth:   5,
+			optsCheckCommitment: true,
 		}, opts, func(e *Engine) {
 			e.ReactiveModule = e.initReactiveModule(logger)
 
@@ -229,8 +231,10 @@ func New(
 
 			// Check consistency of commitment and ledger state in the storage;
 			// In addition, check the correctness of computing commitment
-			if err := e.Storage.CheckCorrectnessCommitmentLedgerState(); err != nil {
-				panic(ierrors.Wrap(err, "commitment or ledger state are incorrect"))
+			if e.optsCheckCommitment {
+				if err := e.Storage.CheckCorrectnessCommitmentLedgerState(); err != nil {
+					panic(ierrors.Wrap(err, "commitment or ledger state are incorrect"))
+				}
 			}
 
 			e.Initialized.Trigger()
@@ -278,64 +282,6 @@ func (e *Engine) Reset() {
 
 func (e *Engine) BlockFromCache(id iotago.BlockID) (*blocks.Block, bool) {
 	return e.BlockCache.Block(id)
-}
-
-// Check whether the latest commitment is consistent with the ledger state.
-// It uses prunable, permanent storage and current state in SyncManager
-func (e *Engine) CheckConsistencyLatestCommitment() (correctness bool, err error) {
-
-	// Get the latest commitment and its ID
-	latestCommitment := e.SyncManager.LatestCommitment()
-	latestCommitmentID := latestCommitment.ID()
-
-	// Get the last committed slot index
-	lastCommittedSlotIndex := latestCommitment.Slot()
-
-	// Get the state root in the permanent storage (that corresponds to the last commitment)
-	lastStateRoot := e.Storage.Ledger().StateTreeRoot()
-
-	// Load root storage from prunable storage
-	rootsStorage, err := e.Storage.Roots(lastCommittedSlotIndex)
-	if err != nil {
-		return false, ierrors.Wrap(err, "failed to load roots storage")
-	}
-
-	// Load roots from prunable storage that correspond to the last committed slot index and commitment
-	roots, exists, err := rootsStorage.Load(latestCommitmentID)
-	if err != nil {
-		return false, ierrors.New("failed to load roots from prunable storage")
-	} else if !exists {
-		return false, ierrors.New("roots not found")
-	}
-
-	// Check the correctness of stored state root and the state root computed from the stored ledger state
-	if roots.StateRoot != lastStateRoot {
-		return false, ierrors.New("computed state root from storage does not correspond to stored state root")
-	}
-
-	// Load the previous commitment
-	previousCommitment, err := e.Storage.Commitments().Load(lastCommittedSlotIndex - 1)
-	if err != nil {
-		return false, ierrors.New("failed to load previous commitment")
-	}
-
-	// Recompute the commitment using roots.ID() from prunable storage and other information from permanent storage
-	computeCurrentCommitment := iotago.NewCommitment(
-		latestCommitment.Commitment().ProtocolVersion,
-		lastCommittedSlotIndex,
-		previousCommitment.ID(),
-		roots.ID(),
-		latestCommitment.CumulativeWeight(),
-		latestCommitment.ReferenceManaCost(),
-	)
-	computeCurrentCommitmentID := computeCurrentCommitment.MustID()
-
-	// Check if the computed commitment ID matches the stored one
-	if computeCurrentCommitmentID != latestCommitmentID {
-		return false, ierrors.New("Computed commitment ID is different from the stored one")
-	}
-
-	return true, nil
 }
 
 func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {

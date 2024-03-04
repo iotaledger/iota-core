@@ -158,7 +158,7 @@ func (s *Storage) CheckCorrectnessCommitmentLedgerState() error {
 	latestCommittedSlotIndex := latestCommitment.Slot()
 
 	// Do all the following checks only for non-genesis slots
-	// TODO: once the genesis slot provides more reasonable data, all the roots should be imported and checked
+	// TODO: once the genesis slot provides the roots, change this
 	if latestCommittedSlotIndex > s.Settings().APIProvider().CommittedAPI().ProtocolParameters().GenesisSlot() {
 		// Get the state root in the permanent storage (that corresponds to the last commitment)
 		latestStateRoot := s.Ledger().StateTreeRoot()
