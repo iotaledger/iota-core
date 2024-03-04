@@ -446,45 +446,41 @@ func (c *ChainsCandidate) measureAt(slot iotago.SlotIndex) (teardown func()) {
 
 	// make sure the heaviest commitment was the heaviest for the last chainSwitchingThreshold slots before we update
 	return sortedCommitments.HeaviestElement().WithNonEmptyValue(func(heaviestCommitment *Commitment) (teardown func()) {
-		// abort if main chain is already heavier than the heaviest element
-		mainChain := c.chains.Main.Get()
-		if mainChain != nil {
-			latestMainChainCommitment := mainChain.LatestProducedCommitment.Get()
-			if latestMainChainCommitment != nil && c.weightVariable(latestMainChainCommitment).Get() > c.weightVariable(heaviestCommitment).Get() {
+		return c.weightVariable(heaviestCommitment).WithValue(func(candidateWeight uint64) (teardown func()) {
+			heaviestChain := heaviestCommitment.Chain.Get()
+
+			// abort if the heaviest commitment is the main chain or main chain is heavier
+			if mainChain := c.chains.Main.Get(); heaviestChain == mainChain {
+				return
+			} else if mainChain.CumulativeVerifiedWeightAt(heaviestCommitment.Slot()) > candidateWeight {
 				return
 			}
-		}
 
-		// abort if the heaviest commitment is the main chain
-		heaviestChain := heaviestCommitment.Chain.Get()
-		if heaviestChain == mainChain {
-			return
-		}
+			// create counter for the number of slots with the same chain
+			slotsWithSameChain := reactive.NewCounter[*Commitment](func(commitment *Commitment) bool {
+				return commitment.Chain.Get() == heaviestChain
+			})
 
-		// create counter for the number of slots with the same chain
-		slotsWithSameChain := reactive.NewCounter[*Commitment](func(commitment *Commitment) bool {
-			return commitment.Chain.Get() == heaviestChain
-		})
-
-		// reactively counts the number of slots with the same chain
-		var teardownMonitoringFunctions []func()
-		for i := uint8(1); i < chainSwitchingThreshold; i++ {
-			if earlierCommitments, earlierCommitmentsExist := c.sortedCommitmentsBySlot.Get(slot - iotago.SlotIndex(i)); earlierCommitmentsExist {
-				teardownMonitoringFunctions = append(teardownMonitoringFunctions, slotsWithSameChain.Monitor(earlierCommitments.HeaviestElement()))
+			// reactively counts the number of slots with the same chain
+			var teardownMonitoringFunctions []func()
+			for i := uint8(1); i < chainSwitchingThreshold; i++ {
+				if earlierCommitments, earlierCommitmentsExist := c.sortedCommitmentsBySlot.Get(slot - iotago.SlotIndex(i)); earlierCommitmentsExist {
+					teardownMonitoringFunctions = append(teardownMonitoringFunctions, slotsWithSameChain.Monitor(earlierCommitments.HeaviestElement()))
+				}
 			}
-		}
 
-		// reactively update the value in respect to the reached threshold
-		teardownUpdates := slotsWithSameChain.OnUpdate(func(_ int, slotsWithSameChain int) {
-			if slotsWithSameChain >= int(chainSwitchingThreshold)-1 {
-				c.Set(heaviestChain)
-			} else {
-				c.Set(nil)
-			}
+			// reactively update the value in respect to the reached threshold
+			teardownUpdates := slotsWithSameChain.OnUpdate(func(_ int, slotsWithSameChain int) {
+				if slotsWithSameChain >= int(chainSwitchingThreshold)-1 {
+					c.Set(heaviestChain)
+				} else {
+					c.Set(nil)
+				}
+			})
+
+			// return all teardown functions
+			return lo.Batch(append(teardownMonitoringFunctions, teardownUpdates)...)
 		})
-
-		// return all teardown functions
-		return lo.Batch(append(teardownMonitoringFunctions, teardownUpdates)...)
 	})
 }
 

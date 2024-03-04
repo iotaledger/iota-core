@@ -161,6 +161,20 @@ func (c *Chain) Commitment(slot iotago.SlotIndex) (commitment *Commitment, exist
 	return nil, false
 }
 
+// CumulativeVerifiedWeightAt returns the cumulative verified weight at the given slot for this chain.
+func (c *Chain) CumulativeVerifiedWeightAt(slot iotago.SlotIndex) uint64 {
+	lastCommitment, exists := c.Commitment(slot)
+	if exists && lastCommitment.IsVerified.Get() {
+		return lastCommitment.CumulativeVerifiedWeight.Get()
+	}
+
+	if latestProducedCommitment := c.LatestProducedCommitment.Get(); latestProducedCommitment != nil {
+		return latestProducedCommitment.CumulativeVerifiedWeight.Get()
+	}
+
+	return 0
+}
+
 // LatestEngine returns the latest engine instance that was spawned by the chain itself or one of its ancestors.
 func (c *Chain) LatestEngine() *engine.Engine {
 	currentChain, currentEngine := c, c.Engine.Get()
