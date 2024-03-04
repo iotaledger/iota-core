@@ -493,8 +493,6 @@ func (c *ChainsCandidate) measureAt(slot iotago.SlotIndex) (teardown func()) {
 func (c *ChainsCandidate) registerCommitment(slot iotago.SlotIndex, commitment *Commitment, evictionEvent reactive.Event, t string) {
 	sortedCommitments := c.sortedCommitments(slot, evictionEvent)
 	sortedCommitments.Add(commitment)
-
-	c.chains.LogDebug("registered commitment", "type", t, "slot", slot, "commitment", commitment.ID(), "commitments", lo.Map(sortedCommitments.ToSlice(), func(commitment *Commitment) string { return commitment.ID().String() }))
 }
 
 // sortedCommitments returns the sorted commitments for the given slot and creates a new sorted set if it doesn't exist.
