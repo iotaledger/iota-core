@@ -114,11 +114,7 @@ func (c *Commitments) initEngineCommitmentSynchronization() func() {
 		return lo.Batch(
 			// advance the root commitment of the main chain
 			c.protocol.Chains.Main.WithNonEmptyValue(func(mainChain *Chain) (shutdown func()) {
-				c.LogTrace("synchronizing root commitment", "chain", mainChain.LogName())
-
 				return mainChain.WithInitializedEngine(func(mainEngine *engine.Engine) (shutdown func()) {
-					c.LogTrace("publishing root commitment", "chain", mainChain.LogName(), "engine", mainEngine.LogName())
-
 					return c.publishRootCommitment(mainChain, mainEngine)
 				})
 			}),
@@ -145,8 +141,6 @@ func (c *Commitments) initRequester() (shutdown func()) {
 // publishRootCommitment publishes the root commitment of the main engine.
 func (c *Commitments) publishRootCommitment(mainChain *Chain, mainEngine *engine.Engine) func() {
 	return mainEngine.RootCommitment.OnUpdate(func(_ *model.Commitment, rootCommitment *model.Commitment) {
-		c.LogTrace("received new root commitment", "mainChain", mainChain.LogName(), "mainEngine", mainEngine.LogName(), "id", rootCommitment.ID())
-
 		publishedCommitment, published, err := c.publishCommitment(rootCommitment)
 		if err != nil {
 			c.LogError("failed to publish new root commitment", "id", rootCommitment.ID(), "error", err)
@@ -356,7 +350,7 @@ func (c *Commitments) processResponse(commitment *model.Commitment, from peer.ID
 		if publishedCommitment, published, err := c.protocol.Commitments.publishCommitment(commitment); err != nil {
 			c.LogError("failed to process commitment", "fromPeer", from, "err", err)
 		} else if published {
-			c.LogTrace("received response", "commitment", publishedCommitment.LogName(), "id", publishedCommitment.ID(), "fromPeer", from)
+			c.LogTrace("received response", "commitment", publishedCommitment.LogName(), "fromPeer", from)
 		}
 	})
 }
