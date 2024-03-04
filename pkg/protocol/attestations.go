@@ -164,7 +164,6 @@ func (a *Attestations) processResponse(commitment *model.Commitment, attestation
 
 			return
 		}
-		a.LogTrace("received response", "commitment", publishedCommitment.LogName(), "fromPeer", from)
 
 		updateAttestations := func() (updated bool) {
 			publishedCommitment.AttestedWeight.Compute(func(currentWeight uint64) uint64 {
@@ -196,7 +195,7 @@ func (a *Attestations) processResponse(commitment *model.Commitment, attestation
 				}
 
 				if updated = actualWeight >= currentWeight; updated {
-					a.LogDebug("verified commitment", "commitment", publishedCommitment.LogName(), "weight", actualWeight, "fromPeer", from)
+					a.LogDebug("received response", "commitment", publishedCommitment.LogName(), "weight", actualWeight, "fromPeer", from)
 				}
 
 				return actualWeight
