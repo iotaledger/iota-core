@@ -246,26 +246,26 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 				mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(22)),
 			),
 		)
+
 		// TODO: assert attested and verified chains
 
 		ts.IssueBlocksAtSlots("P0-merged:", []iotago.SlotIndex{22, 23, 24}, 3, "revive", ts.Nodes("node0"), true, false)
 	}
 
-	// TODO: should this state be on all nodes?
 	{
-		ts.AssertNodeState(nodesP1,
+		ts.AssertNodeState(nodes,
 			testsuite.WithLatestFinalizedSlot(5),
 			testsuite.WithLatestCommitmentSlotIndex(expectedCommittedSlotAfterPartitionMerge),
 			testsuite.WithEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge),
 			testsuite.WithLatestCommitmentCumulativeWeight(31),
 		)
-		ts.AssertAttestationsForSlot(10, ts.Blocks("P1:10.3-node0", "P1:10.3-node1"), nodesP1...)
-		ts.AssertAttestationsForSlot(11, ts.Blocks("P1:11.1-node0", "P1:11.1-node1"), nodesP1...) // 11.1 are the last blocks that got accepted before reviving
-		ts.AssertAttestationsForSlot(12, ts.Blocks("P1:11.1-node0", "P1:11.1-node1"), nodesP1...)
+		ts.AssertAttestationsForSlot(10, ts.Blocks("P1:10.3-node0", "P1:10.3-node1"), nodes...)
+		ts.AssertAttestationsForSlot(11, ts.Blocks("P1:11.1-node0", "P1:11.1-node1"), nodes...) // 11.1 are the last blocks that got accepted before reviving
+		ts.AssertAttestationsForSlot(12, ts.Blocks("P1:11.1-node0", "P1:11.1-node1"), nodes...)
 		for _, slot := range []iotago.SlotIndex{13, 14, 15, 16, 17, 18, 19, 20, 21} {
-			ts.AssertAttestationsForSlot(slot, ts.Blocks(), nodesP1...)
+			ts.AssertAttestationsForSlot(slot, ts.Blocks(), nodes...)
 		}
-		ts.AssertAttestationsForSlot(22, ts.Blocks("P0-merged:22.2-node0"), nodesP1...)
+		ts.AssertAttestationsForSlot(22, ts.Blocks("P0-merged:22.2-node0"), nodes...)
 	}
 
 	oldestNonEvictedCommitment := 5 - maxCommittableAge
