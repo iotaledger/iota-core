@@ -14,7 +14,6 @@ import (
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -68,13 +67,6 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 	ts.AddDefaultWallet(node0)
 
 	nodes := []*mock.Node{node0, node1, node2, node3, node4, node5}
-	validatorsByAccountID := map[iotago.AccountID]*mock.Node{
-		nodes[0].Validator.AccountID: nodes[0],
-		nodes[1].Validator.AccountID: nodes[1],
-		nodes[3].Validator.AccountID: nodes[3],
-		nodes[4].Validator.AccountID: nodes[4],
-	}
-
 	nodesP1 := []*mock.Node{node0, node1, node2}
 	nodesP2 := []*mock.Node{node3, node4, node5}
 
@@ -89,17 +81,6 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 							poa.AddAccount(node.Validator.AccountID, node.Name)
 						}
 
-						onlineValidators := ds.NewSet[string]()
-
-						e.Constructed.OnTrigger(func() {
-							e.Events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
-								if node, exists := validatorsByAccountID[block.ModelBlock().ProtocolBlock().Header.IssuerID]; exists && onlineValidators.Add(node.Name) {
-									e.LogError("node online", "name", node.Name)
-									poa.SetOnline(onlineValidators.ToSlice()...)
-								}
-							})
-						})
-
 						return poa
 					})),
 				),
@@ -108,8 +89,6 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 	}
 
 	ts.Run(false, nodeOptions)
-
-	node3.Protocol.SetLogLevel(log.LevelTrace)
 
 	expectedCommittee := []iotago.AccountID{
 		node0.Validator.AccountID,
@@ -250,11 +229,14 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 		ts.MergePartitionsToMain()
 		fmt.Println("\n=========================\nMerged network partitions\n=========================")
 
-		// Set online committee for each partition.
 		for _, node := range ts.Nodes() {
-			manualPOA := node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().(*mock2.ManualPOA)
-			manualPOA.SetOnline("node0")
-			manualPOA.SetOffline("node1", "node3", "node4")
+			node.Protocol.Chains.WithInitializedEngines(func(chain *protocol.Chain, engine *engine.Engine) (shutdown func()) {
+				manualPOA := engine.SybilProtection.SeatManager().(*mock2.ManualPOA)
+				manualPOA.SetOnline("node0")
+				manualPOA.SetOffline("node1", "node3", "node4")
+
+				return nil
+			})
 		}
 
 		require.NoError(t, node0.Protocol.Engines.Main.Get().Notarization.ForceCommitUntil(20))
