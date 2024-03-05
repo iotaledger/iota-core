@@ -18,7 +18,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/jwt"
 	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
-	"github.com/iotaledger/iota-core/pkg/requesthandler"
 	"github.com/iotaledger/iota-core/pkg/restapi"
 )
 
@@ -85,28 +84,6 @@ func provide(c *dig.Container) error {
 		e.Use(middleware.BodyLimit(ParamsRestAPI.Limits.MaxBodyLength))
 
 		return e
-	}); err != nil {
-		Component.LogPanic(err.Error())
-	}
-
-	type proxyDeps struct {
-		dig.In
-		Echo *echo.Echo
-	}
-
-	if err := c.Provide(func(deps proxyDeps) *restapi.RestRouteManager {
-		return restapi.NewRestRouteManager(deps.Echo)
-	}); err != nil {
-		Component.LogPanic(err.Error())
-	}
-
-	type requestHandlerDeps struct {
-		dig.In
-		Protocol *protocolpkg.Protocol
-	}
-
-	if err := c.Provide(func(deps requestHandlerDeps) *requesthandler.RequestHandler {
-		return requesthandler.New(deps.Protocol)
 	}); err != nil {
 		Component.LogPanic(err.Error())
 	}
