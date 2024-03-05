@@ -25,6 +25,7 @@ func (r *RequestHandler) GetCommitmentBySlot(slot iotago.SlotIndex) (*model.Comm
 	return commitment, nil
 }
 
+// GetCommitmentByID returns the commitment for the given commitmentID. If commitmentID is empty, the latest commitment is returned.
 func (r *RequestHandler) GetCommitmentByID(commitmentID iotago.CommitmentID) (*model.Commitment, error) {
 	latest := r.protocol.Engines.Main.Get().SyncManager.LatestCommitment()
 	if commitmentID == iotago.EmptyCommitmentID {
