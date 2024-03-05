@@ -2,50 +2,12 @@ package core
 
 import "github.com/iotaledger/iota.go/v4/api"
 
-func protocolParameters() []*api.InfoResProtocolParameters {
-	protoParams := make([]*api.InfoResProtocolParameters, 0)
-	provider := deps.Protocol.Engines.Main.Get().Storage.Settings().APIProvider()
-	for _, version := range provider.ProtocolEpochVersions() {
-		protocolParams := provider.ProtocolParameters(version.Version)
-		if protocolParams == nil {
-			continue
-		}
-
-		protoParams = append(protoParams, &api.InfoResProtocolParameters{
-			StartEpoch: version.StartEpoch,
-			Parameters: protocolParams,
-		})
-	}
-
-	return protoParams
-}
-
 func info() *api.InfoResponse {
-	clSnapshot := deps.Protocol.Engines.Main.Get().Clock.Snapshot()
-	syncStatus := deps.Protocol.Engines.Main.Get().SyncManager.SyncStatus()
-	metrics := deps.MetricsTracker.NodeMetrics()
-
 	return &api.InfoResponse{
-		Name:    deps.AppInfo.Name,
-		Version: deps.AppInfo.Version,
-		Status: &api.InfoResNodeStatus{
-			IsHealthy:                   syncStatus.NodeSynced,
-			AcceptedTangleTime:          clSnapshot.AcceptedTime,
-			RelativeAcceptedTangleTime:  clSnapshot.RelativeAcceptedTime,
-			ConfirmedTangleTime:         clSnapshot.ConfirmedTime,
-			RelativeConfirmedTangleTime: clSnapshot.RelativeConfirmedTime,
-			LatestCommitmentID:          syncStatus.LatestCommitment.ID(),
-			LatestFinalizedSlot:         syncStatus.LatestFinalizedSlot,
-			LatestAcceptedBlockSlot:     syncStatus.LastAcceptedBlockSlot,
-			LatestConfirmedBlockSlot:    syncStatus.LastConfirmedBlockSlot,
-			PruningEpoch:                syncStatus.LastPrunedEpoch,
-		},
-		Metrics: &api.InfoResNodeMetrics{
-			BlocksPerSecond:          metrics.BlocksPerSecond,
-			ConfirmedBlocksPerSecond: metrics.ConfirmedBlocksPerSecond,
-			ConfirmationRate:         metrics.ConfirmedRate,
-		},
-		ProtocolParameters: protocolParameters(),
+		Name:               deps.AppInfo.Name,
+		Version:            deps.AppInfo.Version,
+		Status:             deps.RequestHandler.GetNodeStatus(),
+		ProtocolParameters: deps.RequestHandler.GetProtocolParameters(),
 		BaseToken: &api.InfoResBaseToken{
 			Name:         deps.BaseToken.Name,
 			TickerSymbol: deps.BaseToken.TickerSymbol,
@@ -53,5 +15,14 @@ func info() *api.InfoResponse {
 			Subunit:      deps.BaseToken.Subunit,
 			Decimals:     deps.BaseToken.Decimals,
 		},
+	}
+}
+
+func metrics() *api.NetworkMetricsResponse {
+	metrics := deps.MetricsTracker.NodeMetrics()
+	return &api.NetworkMetricsResponse{
+		BlocksPerSecond:          metrics.BlocksPerSecond,
+		ConfirmedBlocksPerSecond: metrics.ConfirmedBlocksPerSecond,
+		ConfirmationRate:         metrics.ConfirmedRate,
 	}
 }
