@@ -55,13 +55,21 @@ func (s *State) LastEvictedSlot() iotago.SlotIndex {
 	return s.lastCommittedSlot
 }
 
-// InActiveRootBlockRange checks if the Block associated with the given id is within the active root block range with
-// respect to the latest committed slot.
-func (s *State) InActiveRootBlockRange(id iotago.BlockID) bool {
+// BelowOrInActiveRootBlockRange checks if the Block associated with the given id is within or below the active root block range
+// with respect to the latest committed slot.
+func (s *State) BelowOrInActiveRootBlockRange(id iotago.BlockID) (belowRange bool, inRange bool) {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	return s.withinActiveIndexRange(id.Slot())
+	slot := id.Slot()
+
+	startSlot, endSlot := s.activeIndexRange(s.lastCommittedSlot)
+
+	if slot >= startSlot && slot <= endSlot {
+		return false, true
+	}
+
+	return slot < startSlot, false
 }
 
 func (s *State) AllActiveRootBlocks() map[iotago.BlockID]iotago.CommitmentID {
