@@ -17,3 +17,12 @@ func info() *api.InfoResponse {
 		},
 	}
 }
+
+func metrics() *api.NetworkMetricsResponse {
+	metrics := deps.MetricsTracker.NodeMetrics()
+	return &api.NetworkMetricsResponse{
+		BlocksPerSecond:          metrics.BlocksPerSecond,
+		ConfirmedBlocksPerSecond: metrics.ConfirmedBlocksPerSecond,
+		ConfirmationRate:         metrics.ConfirmedRate,
+	}
+}
