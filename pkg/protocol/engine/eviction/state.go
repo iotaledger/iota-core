@@ -135,10 +135,6 @@ func (s *State) AddRootBlock(id iotago.BlockID, commitmentID iotago.CommitmentID
 	if err := lo.PanicOnErr(s.rootBlockStorageFunc(id.Slot())).Store(id, commitmentID); err != nil {
 		panic(ierrors.Wrapf(err, "failed to store root block %s", id))
 	}
-
-	if err := s.settings.AdvanceLatestNonEmptySlot(id.Slot()); err != nil && !ierrors.Is(err, kvstore.ErrTypedValueNotChanged) {
-		panic(ierrors.Wrapf(err, "failed to advance latest non empty slot to %d", id.Slot()))
-	}
 }
 
 // RemoveRootBlock removes a solid entry points from the map.

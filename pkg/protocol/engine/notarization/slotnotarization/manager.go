@@ -296,6 +296,13 @@ func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, er
 		return nil, ierrors.Wrap(err, "failed to set latest commitment")
 	}
 
+	// A commitment is considered empty if it has no accepted blocks.
+	if acceptedBlocksSet.Size() > 0 {
+		if err = m.storage.Settings().AdvanceLatestNonEmptySlot(slot); err != nil {
+			return nil, ierrors.Wrap(err, "failed to advance latest non-empty slot")
+		}
+	}
+
 	m.events.LatestCommitmentUpdated.Trigger(newModelCommitment)
 
 	return newModelCommitment, nil
