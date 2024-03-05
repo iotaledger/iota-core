@@ -66,13 +66,13 @@ require (
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20240223142044-12ffcb37c413 // indirect
 	github.com/iotaledger/hive.go/lo v0.0.0-20240223142044-12ffcb37c413 // indirect
 	github.com/iotaledger/hive.go/log v0.0.0-20240223142044-12ffcb37c413 // indirect
-	github.com/iotaledger/hive.go/runtime v0.0.0-20240223142044-12ffcb37c413 // indirect
+	github.com/iotaledger/hive.go/runtime v0.0.0-20240301015124-eea9bb54a256 // indirect
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20240223142044-12ffcb37c413 // indirect
 	github.com/iotaledger/hive.go/stringify v0.0.0-20240223142044-12ffcb37c413 // indirect
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20240216141618-d7dfe94bdc1e // indirect
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20240216141023-6d5f4ef12ac5 // indirect
 	github.com/iotaledger/iota-crypto-demo v0.0.0-20240216103559-27ca8dffd1e7 // indirect
-	github.com/iotaledger/iota.go/v4 v4.0.0-20240228104340-25491bf70f39 // indirect
+	github.com/iotaledger/iota.go/v4 v4.0.0-20240305050302-08c8c30c6101 // indirect
 	github.com/ipfs/boxo v0.17.0 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-datastore v0.6.0 // indirect

@@ -4,7 +4,7 @@ import "github.com/iotaledger/iota.go/v4/api"
 
 func protocolParameters() []*api.InfoResProtocolParameters {
 	protoParams := make([]*api.InfoResProtocolParameters, 0)
-	provider := deps.Protocol.Engines.Main.Get().Storage.Settings().APIProvider()
+	provider := deps.RequestHandler.APIProvider()
 	for _, version := range provider.ProtocolEpochVersions() {
 		protocolParams := provider.ProtocolParameters(version.Version)
 		if protocolParams == nil {
@@ -21,8 +21,8 @@ func protocolParameters() []*api.InfoResProtocolParameters {
 }
 
 func info() *api.InfoResponse {
-	clSnapshot := deps.Protocol.Engines.Main.Get().Clock.Snapshot()
-	syncStatus := deps.Protocol.Engines.Main.Get().SyncManager.SyncStatus()
+	clSnapshot := deps.RequestHandler.Snapshot()
+	syncStatus := deps.RequestHandler.SyncStatus()
 	metrics := deps.MetricsTracker.NodeMetrics()
 
 	return &api.InfoResponse{

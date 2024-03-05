@@ -78,8 +78,17 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 }
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
-func (g *Gadget) Reset() {
-	// TODO: reset slotTrackers
+// It accepts a targetSlot as a parameter because it doesn't track that value internally.
+func (g *Gadget) Reset(targetSlot iotago.SlotIndex) {
+	// Slot trackers track votes cast in a given slot.
+	// When resetting, we need to remove trackers for all the uncommitted slots (bigger than the latest commitment)
+	g.slotTrackers.ForEachKey(func(index iotago.SlotIndex) bool {
+		if targetSlot < index {
+			g.slotTrackers.Delete(index)
+		}
+
+		return true
+	})
 }
 
 func (g *Gadget) Shutdown() {
