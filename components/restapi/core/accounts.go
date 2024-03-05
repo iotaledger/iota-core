@@ -27,7 +27,6 @@ func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error)
 		workScores = append(workScores, workScore)
 	}
 
-	// a commitment ID was provided, so we use the commitment for that ID
 	commitment, err := deps.RequestHandler.GetCommitmentByID(commitmentID)
 	if err != nil {
 		return nil, err
@@ -113,12 +112,16 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 }
 
 func selectedCommittee(c echo.Context) (*api.CommitteeResponse, error) {
-	timeProvider := deps.RequestHandler.CommittedAPI().TimeProvider()
-
-	epoch, err := httpserver.ParseEpochQueryParam(c, api.ParameterEpoch)
-	if err != nil {
+	var epoch iotago.EpochIndex
+	if len(c.QueryParam(api.ParameterEpoch)) == 0 {
 		// by default we return current epoch
-		epoch = timeProvider.CurrentEpoch()
+		epoch = deps.RequestHandler.CommittedAPI().TimeProvider().CurrentEpoch()
+	} else {
+		var err error
+		epoch, err = httpserver.ParseEpochQueryParam(c, api.ParameterEpoch)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return deps.RequestHandler.SelectedCommittee(epoch)
