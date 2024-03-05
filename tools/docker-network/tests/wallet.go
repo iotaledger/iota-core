@@ -7,7 +7,6 @@ import (
 	"math/big"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -136,7 +135,7 @@ func (w *DockerWallet) AllotManaFromAccount(fromId iotago.AccountID, toId iotago
 	to := w.Account(toId)
 	input := w.Output(inputId)
 
-	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().CurrentSlot()
 	apiForSlot := w.DefaultClient().APIForSlot(currentSlot)
 
 	basicOutput, ok := input.Output.(*iotago.BasicOutput)
@@ -180,7 +179,7 @@ func (w *DockerWallet) AllotManaFromInput(toId iotago.AccountID, inputId iotago.
 	to := w.Account(toId)
 	input := w.Output(inputId)
 
-	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().CurrentSlot()
 	apiForSlot := w.DefaultClient().APIForSlot(currentSlot)
 
 	basicOutput, err := builder.NewBasicOutputBuilder(input.Address, input.Output.BaseTokenAmount()).Build()
@@ -215,7 +214,7 @@ func (w *DockerWallet) TransitionImplicitAccountToAccountOutput(inputId iotago.O
 	accountAddress, ok := accountID.ToAddress().(*iotago.AccountAddress)
 	require.True(w.Testing, ok)
 
-	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().CurrentSlot()
 	apiForSlot := w.DefaultClient().APIForSlot(currentSlot)
 
 	// transition to a full account with new Ed25519 address and staking feature
@@ -267,7 +266,7 @@ func (w *DockerWallet) CreateDelegationFromInput(issuerId iotago.AccountID, vali
 	_, validatorAccountAddr, err := iotago.ParseBech32(validator.AccountAddressBech32)
 	require.NoError(w.Testing, err)
 
-	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().CurrentSlot()
 	apiForSlot := w.DefaultClient().APIForSlot(currentSlot)
 
 	// construct delegation transaction
@@ -303,7 +302,7 @@ func (w *DockerWallet) CreateFoundryAndNativeTokensFromInput(issuerId iotago.Acc
 	input := w.Output(inputId)
 
 	issuer := w.Account(issuerId)
-	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().CurrentSlot()
 	apiForSlot := w.DefaultClient().APIForSlot(currentSlot)
 
 	// increase foundry counter
@@ -393,7 +392,7 @@ func (w *DockerWallet) TransitionFoundry(issuerId iotago.AccountID, inputId iota
 	outputAccount := builder.NewAccountOutputBuilderFromPrevious(issuer.Output).
 		MustBuild()
 
-	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().CurrentSlot()
 	apiForSlot := w.DefaultClient().APIForSlot(currentSlot)
 
 	signedTx, err := builder.NewTransactionBuilder(apiForSlot, w.AddressSigner(input.AddressIndex, issuer.AddressIndex)).
@@ -437,7 +436,7 @@ func (w *DockerWallet) TransitionFoundry(issuerId iotago.AccountID, inputId iota
 func (w *DockerWallet) CreateNFTFromInput(issuerId iotago.AccountID, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse, opts ...options.Option[builder.NFTOutputBuilder]) *iotago.SignedTransaction {
 	input := w.Output(inputId)
 
-	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().CurrentSlot()
 	apiForSlot := w.DefaultClient().APIForSlot(currentSlot)
 
 	nftAddressIndex, nftAddress := w.Address()
