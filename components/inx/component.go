@@ -35,7 +35,7 @@ var (
 type dependencies struct {
 	dig.In
 	Protocol         *protocolpkg.Protocol
-	BlockHandler     *requesthandler.RequestHandler
+	RequestHandler   *requesthandler.RequestHandler
 	Echo             *echo.Echo `optional:"true"`
 	RestRouteManager *restapipkg.RestRouteManager
 	INXServer        *Server
