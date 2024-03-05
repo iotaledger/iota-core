@@ -1,16 +1,20 @@
 package retainer
 
 import (
+	"github.com/labstack/echo/v4"
+
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/retainer"
+	"github.com/iotaledger/iota-core/pkg/retainer/cache"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
@@ -18,36 +22,48 @@ import (
 
 type (
 	//nolint:revive
-	RetainerFunc            func(iotago.SlotIndex) (*slotstore.Retainer, error)
-	LatestCommittedSlotFunc func() iotago.SlotIndex
-	FinalizedSlotFunc       func() iotago.SlotIndex
+	RetainerFunc             func(iotago.SlotIndex) (*slotstore.Retainer, error)
+	LatestCommittedSlotFunc  func() iotago.SlotIndex
+	FinalizedSlotFunc        func() iotago.SlotIndex
+	RegisteredValidatorsFunc func(iotago.EpochIndex) ([]*api.ValidatorResponse, error)
+	APIFunc                  func(iotago.EpochIndex) iotago.API
 )
 
 const MaxStakersResponsesCacheNum = 10
 
 // Retainer keeps and resolves all the information needed in the API and INX.
 type Retainer struct {
-	store                   RetainerFunc
-	latestCommittedSlotFunc LatestCommittedSlotFunc
-	finalizedSlotFunc       FinalizedSlotFunc
-	errorHandler            func(error)
+	store                    RetainerFunc
+	latestCommittedSlotFunc  LatestCommittedSlotFunc
+	finalizedSlotFunc        FinalizedSlotFunc
+	registeredValidatorsFunc RegisteredValidatorsFunc
+	apiForEpochFunc          APIFunc
+	errorHandler             func(error)
 
-	stakersResponses *shrinkingmap.ShrinkingMap[uint32, []*api.ValidatorResponse]
+	stakersResponses          *shrinkingmap.ShrinkingMap[uint32, []*api.ValidatorResponse]
+	registeredValidatorsCache *cache.Cache
 
 	workerPool *workerpool.WorkerPool
+
+	optsCacheMaxSize int
 
 	module.Module
 }
 
-func New(workersGroup *workerpool.Group, retainerFunc RetainerFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *Retainer {
-	return &Retainer{
-		workerPool:              workersGroup.CreatePool("Retainer", workerpool.WithWorkerCount(1)),
-		store:                   retainerFunc,
-		stakersResponses:        shrinkingmap.New[uint32, []*api.ValidatorResponse](),
-		latestCommittedSlotFunc: latestCommittedSlotFunc,
-		finalizedSlotFunc:       finalizedSlotFunc,
-		errorHandler:            errorHandler,
-	}
+func New(workersGroup *workerpool.Group, retainerFunc RetainerFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, finalizedSlotFunc FinalizedSlotFunc, registeredValidatorsFunc RegisteredValidatorsFunc, apiForEpochFunc APIFunc, errorHandler func(error), opts ...options.Option[Retainer]) *Retainer {
+	return options.Apply(&Retainer{
+		workerPool:               workersGroup.CreatePool("Retainer", workerpool.WithWorkerCount(1)),
+		store:                    retainerFunc,
+		stakersResponses:         shrinkingmap.New[uint32, []*api.ValidatorResponse](),
+		latestCommittedSlotFunc:  latestCommittedSlotFunc,
+		finalizedSlotFunc:        finalizedSlotFunc,
+		apiForEpochFunc:          apiForEpochFunc,
+		registeredValidatorsFunc: registeredValidatorsFunc,
+		errorHandler:             errorHandler,
+		optsCacheMaxSize:         2 << 20, // 2MB
+	}, opts, func(r *Retainer) {
+		r.registeredValidatorsCache = cache.NewCache(r.optsCacheMaxSize)
+	})
 }
 
 // NewProvider creates a new Retainer provider.
@@ -71,6 +87,8 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 
 				return e.SyncManager.LatestFinalizedSlot()
 			},
+			e.SybilProtection.OrderedRegisteredCandidateValidatorsList,
+			e.APIForEpoch,
 			e.ErrorHandler("retainer"))
 
 		asyncOpt := event.WithWorkerPool(r.workerPool)
@@ -211,22 +229,44 @@ func (r *Retainer) RetainTransactionFailure(blockID iotago.BlockID, err error) {
 	}
 }
 
-func (r *Retainer) RegisteredValidatorsCache(index uint32) ([]*api.ValidatorResponse, bool) {
-	return r.stakersResponses.Get(index)
+func (r *Retainer) RegisteredValidators(index iotago.EpochIndex) ([]*api.ValidatorResponse, error) {
+	apiForEpoch := r.apiForEpochFunc(index)
+	currentEpoch := apiForEpoch.TimeProvider().EpochFromSlot(r.latestCommittedSlotFunc())
+
+	// return registered validators of current epoch from node, because they are not yet finalized.
+	if index == currentEpoch {
+		return r.registeredValidatorsFunc(index)
+	}
+
+	return r.registeredValidatorsFromCache(index)
 }
 
-func (r *Retainer) RetainRegisteredValidatorsCache(index uint32, resp []*api.ValidatorResponse) {
-	r.stakersResponses.Set(index, resp)
-	if r.stakersResponses.Size() > MaxStakersResponsesCacheNum {
-		keys := r.stakersResponses.Keys()
-		minKey := index + 1
-		for _, key := range keys {
-			if key < minKey {
-				minKey = key
-			}
+func (r *Retainer) registeredValidatorsFromCache(index iotago.EpochIndex) ([]*api.ValidatorResponse, error) {
+	apiForEpoch := r.apiForEpochFunc(index)
+
+	registeredValidatorsBytes := r.registeredValidatorsCache.Get(index.MustBytes())
+	if registeredValidatorsBytes == nil {
+		// get the ordered registered validators list from engine.
+		registeredValidators, err := r.registeredValidatorsFunc(index)
+		if err != nil {
+			return nil, ierrors.Wrapf(echo.ErrNotFound, " ordered registered validators list for epoch %d not found: %s", index, err)
 		}
-		r.stakersResponses.Delete(minKey)
+
+		// store validator responses in cache.
+		registeredValidatorsBytes, err := apiForEpoch.Encode(registeredValidators)
+		if err != nil {
+			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to encode ordered registered validators list for epoch %d : %s", index, err)
+		}
+		r.registeredValidatorsCache.Set(index.MustBytes(), registeredValidatorsBytes)
 	}
+
+	validatorResp := make([]*api.ValidatorResponse, 0)
+	_, err := apiForEpoch.Decode(registeredValidatorsBytes, validatorResp)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to decode validator responses for epoch %d", index)
+	}
+
+	return validatorResp, nil
 }
 
 func (r *Retainer) blockStatus(blockID iotago.BlockID) (api.BlockState, api.BlockFailureReason) {
@@ -346,4 +386,10 @@ func (r *Retainer) onAttachmentUpdated(prevID iotago.BlockID, newID iotago.Block
 	}
 
 	return store.StoreTransactionNoFailureStatus(newID, api.TransactionStatePending)
+}
+
+func WithCacheMaxSizeOptions(size int) options.Option[Retainer] {
+	return func(p *Retainer) {
+		p.optsCacheMaxSize = size
+	}
 }

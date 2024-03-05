@@ -9,9 +9,7 @@ import (
 // Retainer keeps and resolves all the information needed in the API and INX.
 type Retainer interface {
 	BlockMetadata(blockID iotago.BlockID) (*BlockMetadata, error)
-
-	RegisteredValidatorsCache(uint32) ([]*api.ValidatorResponse, bool)
-	RetainRegisteredValidatorsCache(uint32, []*api.ValidatorResponse)
+	RegisteredValidators(iotago.EpochIndex) ([]*api.ValidatorResponse, error)
 
 	RetainBlockFailure(iotago.BlockID, api.BlockFailureReason)
 	RetainTransactionFailure(iotago.BlockID, error)
