@@ -3,7 +3,6 @@ package mock
 import (
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -1176,7 +1175,7 @@ func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Tra
 						accountOutput.AccountID = iotago.AccountIDFromOutputID(actualOutputID)
 					}
 				}
-				w.outputs[fmt.Sprintf("%s:%d", transactionName, outputID.Index())] = utxoledger.CreateOutput(w.Node.Protocol, actualOutputID, iotago.EmptyBlockID, currentAPI.TimeProvider().SlotFromTime(time.Now()), clonedOutput, lo.PanicOnErr(iotago.OutputIDProofFromTransaction(transaction, outputID.Index())))
+				w.outputs[fmt.Sprintf("%s:%d", transactionName, outputID.Index())] = utxoledger.CreateOutput(w.Node.Protocol, actualOutputID, iotago.EmptyBlockID, currentAPI.TimeProvider().CurrentSlot(), clonedOutput, lo.PanicOnErr(iotago.OutputIDProofFromTransaction(transaction, outputID.Index())))
 
 				break
 			}

@@ -1,8 +1,6 @@
 package core
 
 import (
-	"time"
-
 	"github.com/labstack/echo/v4"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -120,8 +118,7 @@ func selectedCommittee(c echo.Context) (*api.CommitteeResponse, error) {
 	epoch, err := httpserver.ParseEpochQueryParam(c, api.ParameterEpoch)
 	if err != nil {
 		// by default we return current epoch
-		slot := timeProvider.SlotFromTime(time.Now())
-		epoch = timeProvider.EpochFromSlot(slot)
+		epoch = timeProvider.CurrentEpoch()
 	}
 
 	return deps.RequestHandler.SelectedCommittee(epoch)
