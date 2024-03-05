@@ -80,7 +80,7 @@ func TestCheckLedgerStateCommitmentFromNonGenesisSnapshot(t *testing.T) {
 			roots.RewardsRoot,
 			roots.ProtocolParametersHash,
 		)
-		rootsStorage.Store(curCommitment.ID(), newRoots)
+		require.NoError(t, rootsStorage.Store(curCommitment.ID(), newRoots))
 
 		// check that with a modified root, it does not pass the required check
 
