@@ -38,7 +38,7 @@ type BlockHandler struct {
 func New(p *protocol.Protocol) *BlockHandler {
 	return &BlockHandler{
 		events:     NewEvents(),
-		workerPool: p.Workers.CreatePool("BlockIssuer"),
+		workerPool: p.Workers.CreatePool("BlockHandler"),
 		protocol:   p,
 	}
 }

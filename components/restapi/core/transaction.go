@@ -55,7 +55,7 @@ func blockMetadataFromTransactionID(c echo.Context) (*api.BlockMetadataResponse,
 		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to get block ID by transaction ID: %s", err)
 	}
 
-	return blockMetadataByBlockID(blockID)
+	return deps.RequestHandler.BlockMetadataByBlockID(blockID)
 }
 
 func transactionMetadataFromTransactionID(c echo.Context) (*api.TransactionMetadataResponse, error) {
@@ -69,7 +69,7 @@ func transactionMetadataFromTransactionID(c echo.Context) (*api.TransactionMetad
 		return nil, ierrors.Wrapf(echo.ErrNotFound, "failed to get block ID from transaction ID: %v", err)
 	}
 
-	metadata, err := transactionMetadataByBlockID(blockID)
+	metadata, err := deps.RequestHandler.TransactionMetadataByBlockID(blockID)
 	if err != nil {
 		return nil, err
 	}

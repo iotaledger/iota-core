@@ -41,6 +41,7 @@ type dependencies struct {
 	RestRouteManager *restapipkg.RestRouteManager
 	Protocol         *protocolpkg.Protocol
 	BlockHandler     *blockhandler.BlockHandler
+	RequestHandler   *restapipkg.RequestHandler
 	MetricsTracker   *metricstracker.MetricsTracker
 	BaseToken        *protocol.BaseToken
 }
@@ -97,7 +98,7 @@ func configure() error {
 	}, checkNodeSynced())
 
 	routeGroup.GET(api.CoreEndpointBlockIssuance, func(c echo.Context) error {
-		resp, err := blockIssuance()
+		resp, err := deps.RequestHandler.BlockIssuance()
 		if err != nil {
 			return err
 		}
@@ -111,7 +112,7 @@ func configure() error {
 			return err
 		}
 
-		commitment, err := getCommitmentByID(commitmentID)
+		commitment, err := deps.RequestHandler.GetCommitmentByID(commitmentID)
 		if err != nil {
 			return err
 		}
@@ -126,12 +127,12 @@ func configure() error {
 		}
 
 		// load the commitment to check if it matches the given commitmentID
-		commitment, err := getCommitmentByID(commitmentID)
+		commitment, err := deps.RequestHandler.GetCommitmentByID(commitmentID)
 		if err != nil {
 			return err
 		}
 
-		resp, err := getUTXOChanges(commitment.ID())
+		resp, err := deps.RequestHandler.GetUTXOChanges(commitment.ID())
 		if err != nil {
 			return err
 		}
@@ -146,12 +147,12 @@ func configure() error {
 		}
 
 		// load the commitment to check if it matches the given commitmentID
-		commitment, err := getCommitmentByID(commitmentID)
+		commitment, err := deps.RequestHandler.GetCommitmentByID(commitmentID)
 		if err != nil {
 			return err
 		}
 
-		resp, err := getUTXOChangesFull(commitment.ID())
+		resp, err := deps.RequestHandler.GetUTXOChangesFull(commitment.ID())
 		if err != nil {
 			return err
 		}
@@ -165,7 +166,7 @@ func configure() error {
 			return err
 		}
 
-		commitment, err := getCommitmentBySlot(index)
+		commitment, err := deps.RequestHandler.GetCommitmentBySlot(index)
 		if err != nil {
 			return err
 		}
@@ -179,12 +180,12 @@ func configure() error {
 			return err
 		}
 
-		commitment, err := getCommitmentBySlot(slot)
+		commitment, err := deps.RequestHandler.GetCommitmentBySlot(slot)
 		if err != nil {
 			return err
 		}
 
-		resp, err := getUTXOChanges(commitment.ID())
+		resp, err := deps.RequestHandler.GetUTXOChanges(commitment.ID())
 		if err != nil {
 			return err
 		}
@@ -198,12 +199,12 @@ func configure() error {
 			return err
 		}
 
-		commitment, err := getCommitmentBySlot(slot)
+		commitment, err := deps.RequestHandler.GetCommitmentBySlot(slot)
 		if err != nil {
 			return err
 		}
 
-		resp, err := getUTXOChangesFull(commitment.ID())
+		resp, err := deps.RequestHandler.GetUTXOChangesFull(commitment.ID())
 		if err != nil {
 			return err
 		}
@@ -327,5 +328,5 @@ func checkNodeSynced() echo.MiddlewareFunc {
 
 func responseByHeader(c echo.Context, obj any, httpStatusCode ...int) error {
 	// TODO: that should take the API that belongs to the object
-	return httpserver.SendResponseByHeader(c, deps.Protocol.CommittedAPI(), obj, httpStatusCode...)
+	return httpserver.SendResponseByHeader(c, deps.RequestHandler.CommittedAPI(), obj, httpStatusCode...)
 }

@@ -106,6 +106,12 @@ func provide(c *dig.Container) error {
 		Component.LogPanic(err.Error())
 	}
 
+	if err := c.Provide(func(deps dependencies) *restapi.RequestHandler {
+		return restapi.NewRequestHandler(deps.Protocol)
+	}); err != nil {
+		Component.LogPanic(err.Error())
+	}
+
 	return nil
 }
 
