@@ -212,7 +212,7 @@ func configure() error {
 	})
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointOutput), func(c echo.Context) error {
-		resp, err := outputByID(c)
+		resp, err := outputFromOutputID(c)
 		if err != nil {
 			return err
 		}
@@ -221,7 +221,7 @@ func configure() error {
 	})
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointOutputMetadata), func(c echo.Context) error {
-		resp, err := outputMetadataByID(c)
+		resp, err := outputMetadataFromOutputID(c)
 		if err != nil {
 			return err
 		}
@@ -230,7 +230,7 @@ func configure() error {
 	})
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointOutputWithMetadata), func(c echo.Context) error {
-		resp, err := outputWithMetadataByID(c)
+		resp, err := outputWithMetadataFromOutputID(c)
 		if err != nil {
 			return err
 		}
@@ -239,12 +239,12 @@ func configure() error {
 	})
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointTransactionsIncludedBlock), func(c echo.Context) error {
-		block, err := blockByTransactionID(c)
+		block, err := blockFromTransactionID(c)
 		if err != nil {
 			return err
 		}
 
-		return responseByHeader(c, block.ProtocolBlock())
+		return responseByHeader(c, block)
 	})
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointTransactionsIncludedBlockMetadata), func(c echo.Context) error {
