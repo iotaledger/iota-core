@@ -1,4 +1,4 @@
-package restapi
+package requesthandler
 
 import (
 	"github.com/labstack/echo/v4"

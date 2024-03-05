@@ -12,8 +12,8 @@ import (
 	"github.com/iotaledger/iota-core/components/metricstracker"
 	"github.com/iotaledger/iota-core/components/protocol"
 	"github.com/iotaledger/iota-core/components/restapi"
-	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/requesthandler"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	"github.com/iotaledger/iota.go/v4/api"
 )
@@ -40,8 +40,7 @@ type dependencies struct {
 	AppInfo          *app.Info
 	RestRouteManager *restapipkg.RestRouteManager
 	Protocol         *protocolpkg.Protocol
-	BlockHandler     *blockhandler.BlockHandler
-	RequestHandler   *restapipkg.RequestHandler
+	RequestHandler   *requesthandler.RequestHandler
 	MetricsTracker   *metricstracker.MetricsTracker
 	BaseToken        *protocol.BaseToken
 }

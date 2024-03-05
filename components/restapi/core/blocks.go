@@ -5,7 +5,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
-	"github.com/iotaledger/iota-core/pkg/blockhandler"
+	"github.com/iotaledger/iota-core/pkg/requesthandler"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
@@ -43,13 +43,13 @@ func sendBlock(c echo.Context) (*api.BlockCreatedResponse, error) {
 		return nil, err
 	}
 
-	blockID, err := deps.BlockHandler.AttachBlock(c.Request().Context(), iotaBlock)
+	blockID, err := deps.RequestHandler.AttachBlock(c.Request().Context(), iotaBlock)
 	if err != nil {
 		switch {
-		case ierrors.Is(err, blockhandler.ErrBlockAttacherInvalidBlock):
+		case ierrors.Is(err, requesthandler.ErrBlockAttacherInvalidBlock):
 			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to attach block: %w", err)
 
-		case ierrors.Is(err, blockhandler.ErrBlockAttacherAttachingNotPossible):
+		case ierrors.Is(err, requesthandler.ErrBlockAttacherAttachingNotPossible):
 			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to attach block: %w", err)
 
 		default:
