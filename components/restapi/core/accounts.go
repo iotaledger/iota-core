@@ -29,13 +29,10 @@ func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error)
 		workScores = append(workScores, workScore)
 	}
 
-	commitment := deps.RequestHandler.GetLatestCommitment()
-	if commitmentID != iotago.EmptyCommitmentID {
-		// a commitment ID was provided, so we use the commitment for that ID
-		commitment, err = deps.RequestHandler.GetCommitmentByID(commitmentID, commitment)
-		if err != nil {
-			return nil, err
-		}
+	// a commitment ID was provided, so we use the commitment for that ID
+	commitment, err := deps.RequestHandler.GetCommitmentByID(commitmentID)
+	if err != nil {
+		return nil, err
 	}
 
 	hrp := deps.RequestHandler.CommittedAPI().ProtocolParameters().Bech32HRP()

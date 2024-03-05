@@ -38,7 +38,7 @@ func blockWithMetadataByID(c echo.Context) (*api.BlockWithMetadataResponse, erro
 }
 
 func sendBlock(c echo.Context) (*api.BlockCreatedResponse, error) {
-	iotaBlock, err := httpserver.ParseRequestByHeader(c, deps.RequestHandler.CommittedAPI(), iotago.BlockFromBytes(deps.Protocol))
+	iotaBlock, err := httpserver.ParseRequestByHeader(c, deps.RequestHandler.CommittedAPI(), iotago.BlockFromBytes(deps.RequestHandler.APIProvider()))
 	if err != nil {
 		return nil, err
 	}

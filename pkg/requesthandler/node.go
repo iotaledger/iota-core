@@ -17,3 +17,7 @@ func (r *RequestHandler) Snapshot() *clock.Snapshot {
 func (r *RequestHandler) SyncStatus() *syncmanager.SyncStatus {
 	return r.protocol.Engines.Main.Get().SyncManager.SyncStatus()
 }
+
+func (r *RequestHandler) IsNodeSynced() bool {
+	return r.protocol.Engines.Main.Get().SyncManager.IsNodeSynced()
+}

@@ -25,12 +25,10 @@ func (r *RequestHandler) GetCommitmentBySlot(slot iotago.SlotIndex) (*model.Comm
 	return commitment, nil
 }
 
-func (r *RequestHandler) GetCommitmentByID(commitmentID iotago.CommitmentID, latestCommitment ...*model.Commitment) (*model.Commitment, error) {
-	var latest *model.Commitment
-	if len(latestCommitment) > 0 {
-		latest = latestCommitment[0]
-	} else {
-		latest = r.protocol.Engines.Main.Get().SyncManager.LatestCommitment()
+func (r *RequestHandler) GetCommitmentByID(commitmentID iotago.CommitmentID) (*model.Commitment, error) {
+	latest := r.protocol.Engines.Main.Get().SyncManager.LatestCommitment()
+	if commitmentID == iotago.EmptyCommitmentID {
+		return latest, nil
 	}
 
 	if commitmentID.Slot() > latest.Slot() {

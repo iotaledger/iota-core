@@ -100,7 +100,12 @@ func provide(c *dig.Container) error {
 		Component.LogPanic(err.Error())
 	}
 
-	if err := c.Provide(func(deps dependencies) *requesthandler.RequestHandler {
+	type requestHandlerDeps struct {
+		dig.In
+		Protocol *protocolpkg.Protocol
+	}
+
+	if err := c.Provide(func(deps requestHandlerDeps) *requesthandler.RequestHandler {
 		return requesthandler.New(deps.Protocol)
 	}); err != nil {
 		Component.LogPanic(err.Error())

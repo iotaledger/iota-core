@@ -12,7 +12,6 @@ import (
 	"github.com/iotaledger/iota-core/components/metricstracker"
 	"github.com/iotaledger/iota-core/components/protocol"
 	"github.com/iotaledger/iota-core/components/restapi"
-	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/requesthandler"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	"github.com/iotaledger/iota.go/v4/api"
@@ -39,7 +38,6 @@ type dependencies struct {
 
 	AppInfo          *app.Info
 	RestRouteManager *restapipkg.RestRouteManager
-	Protocol         *protocolpkg.Protocol
 	RequestHandler   *requesthandler.RequestHandler
 	MetricsTracker   *metricstracker.MetricsTracker
 	BaseToken        *protocol.BaseToken
@@ -316,7 +314,7 @@ func configure() error {
 func checkNodeSynced() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			if !deps.Protocol.Engines.Main.Get().SyncManager.IsNodeSynced() {
+			if !deps.RequestHandler.IsNodeSynced() {
 				return ierrors.Wrap(echo.ErrServiceUnavailable, "node is not synced")
 			}
 

@@ -26,7 +26,7 @@ func blockFromTransactionID(c echo.Context) (*iotago.Block, error) {
 
 	block, err := deps.RequestHandler.BlockByID(blockID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrNotFound, "block not found: %s", err)
+		return nil, err
 	}
 
 	return block, nil
