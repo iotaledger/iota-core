@@ -238,7 +238,10 @@ func (s *Storage) ImportRoots(reader io.ReadSeeker, targetCommitment *model.Comm
 		protocolParametersHash,
 	)
 
-	rootsStorage.Store(commitmentID, roots)
+	errStore := rootsStorage.Store(commitmentID, roots)
+	if errStore != nil {
+		return ierrors.Wrap(err, "unable to store roots in storage")
+	}
 
 	return nil
 
