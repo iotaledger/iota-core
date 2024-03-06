@@ -381,7 +381,7 @@ func expectedTransactions(allBLocks []*blocks.Block) iotago.TransactionIDs {
 			return iotago.EmptyTransactionID
 		}
 
-		return lo.PanicOnErr(tx.Transaction.ID())
+		return tx.Transaction.MustID()
 	}), func(txID iotago.TransactionID) bool {
 		return txID != iotago.EmptyTransactionID
 	})

@@ -153,8 +153,11 @@ func (c *Commitments) publishRootCommitment(mainChain *Chain, mainEngine *engine
 			publishedCommitment.Chain.Set(mainChain)
 		}
 
-		// TODO: USE SET HERE (debug eviction issues)
-		mainChain.ForkingPoint.DefaultTo(publishedCommitment)
+		// Update the forking point of a chain only if the root is empty or root belongs to the main chain or the published commitment is on the main chain.
+		// to avoid updating ForkingPoint of the new mainChain into the past.
+		if c.Root.Get() == nil || c.Root.Get().Chain.Get() == mainChain || publishedCommitment.Chain.Get() == mainChain {
+			mainChain.ForkingPoint.Set(publishedCommitment)
+		}
 
 		c.Root.Set(publishedCommitment)
 	})
@@ -227,7 +230,7 @@ func (c *Commitments) publishCommitment(commitment *model.Commitment) (published
 func (c *Commitments) cachedRequest(commitmentID iotago.CommitmentID, requestIfMissing ...bool) *promise.Promise[*Commitment] {
 	// handle evicted slots
 	slotEvicted := c.protocol.EvictionEvent(commitmentID.Index())
-	if slotEvicted.WasTriggered() && c.protocol.LastEvictedSlot() != 0 {
+	if slotEvicted.WasTriggered() {
 		return promise.New[*Commitment]().Reject(ErrorSlotEvicted)
 	}
 
@@ -271,9 +274,11 @@ func (c *Commitments) initCommitment(commitment *Commitment, slotEvicted reactiv
 	commitment.LogDebug("created", "id", commitment.ID())
 
 	// solidify the parent of the commitment
-	c.cachedRequest(commitment.PreviousCommitmentID(), true).OnSuccess(func(parent *Commitment) {
-		commitment.Parent.Set(parent)
-	})
+	if root := c.Root.Get(); root != nil && commitment.Slot() > root.Slot() {
+		c.cachedRequest(commitment.PreviousCommitmentID(), true).OnSuccess(func(parent *Commitment) {
+			parent.IsEvicted.OnTrigger(commitment.Parent.ToggleValue(parent))
+		})
+	}
 
 	// add commitment to the set
 	c.Add(commitment)

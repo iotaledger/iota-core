@@ -274,6 +274,7 @@ func (t *Tracker) rewardsForAccount(accountID iotago.AccountID, epoch iotago.Epo
 }
 
 func (t *Tracker) poolReward(slot iotago.SlotIndex, totalValidatorsStake iotago.BaseToken, totalStake iotago.BaseToken, poolStake iotago.BaseToken, validatorStake iotago.BaseToken, performanceFactor uint64) (iotago.Mana, error) {
+
 	apiForSlot := t.apiProvider.APIForSlot(slot)
 	epoch := apiForSlot.TimeProvider().EpochFromSlot(slot)
 	params := apiForSlot.ProtocolParameters()
@@ -290,13 +291,17 @@ func (t *Tracker) poolReward(slot iotago.SlotIndex, totalValidatorsStake iotago.
 		return 0, ierrors.Wrapf(err, "failed to calculate pool coefficient for slot %d", slot)
 	}
 
-	// Since `Pool Coefficient` uses at most 12 bits, `Target Reward(n)` uses at most 41 bits, and `Performance Factor` uses at most 8 bits,
+	// Since `Pool Coefficient` uses at most 12 bits and `Target Reward(n)` uses at most 50 bits
 	// this multiplication will not overflow using uint64 variables.
 	result, err := safemath.SafeMul(poolCoefficient, uint64(targetReward))
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to calculate pool scaled reward due to overflow for slot %d", slot)
 	}
 
+	result = result >> params.RewardsParameters().PoolCoefficientExponent
+
+	// Since the result above uses at most 50 bits and `Performance Factor` uses at most 8 bits,
+	// this multiplication will not overflow using uint64 variables.
 	scaledPoolReward, err := safemath.SafeMul(result, performanceFactor)
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to calculate pool reward without fixed costs due to overflow for slot %d", slot)
@@ -306,7 +311,7 @@ func (t *Tracker) poolReward(slot iotago.SlotIndex, totalValidatorsStake iotago.
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to calculate result reward due division by zero for slot %d", slot)
 	}
-	poolRewardFixedCost := iotago.Mana(result >> (params.RewardsParameters().PoolCoefficientExponent + 1))
+	poolRewardFixedCost := iotago.Mana(result >> 1)
 
 	return poolRewardFixedCost, nil
 }

@@ -45,6 +45,23 @@ func (m *Manager) SetLatestCommittedSlot(index iotago.SlotIndex) {
 	m.latestCommittedSlot = index
 }
 
+func (m *Manager) Reset() {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	// Slot work is evicted upon commitment, so it only contains uncommitted data - can safely clear the whole thing.
+	m.slotWork.Clear()
+
+	// RMC is evicted with a maxCommittableAge delay, so we can only remove the uncommitted entries.
+	m.rmc.ForEachKey(func(index iotago.SlotIndex) bool {
+		if m.latestCommittedSlot < index {
+			m.rmc.Delete(index)
+		}
+
+		return true
+	})
+}
+
 func (m *Manager) BlockAccepted(block *blocks.Block) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()

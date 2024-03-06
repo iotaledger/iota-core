@@ -264,7 +264,7 @@ func (o *SybilProtection) Export(writer io.WriteSeeker, targetSlot iotago.SlotIn
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (o *SybilProtection) Reset() {
-	// TODO: check if performance tracker needs to be reset
+	o.performanceTracker.Reset(o.lastCommittedSlot)
 }
 
 func (o *SybilProtection) slotFinalized(slot iotago.SlotIndex) {

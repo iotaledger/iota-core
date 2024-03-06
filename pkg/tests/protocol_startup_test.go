@@ -22,10 +22,13 @@ import (
 )
 
 func Test_BookInCommittedSlot(t *testing.T) {
+	const maxCommittableAge = iotago.SlotIndex(4)
+	const genesisSlot = iotago.SlotIndex(0)
+
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
-				0,
+				genesisSlot,
 				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
 				3,
@@ -34,7 +37,7 @@ func Test_BookInCommittedSlot(t *testing.T) {
 				10,
 				10,
 				2,
-				4,
+				maxCommittableAge,
 				5,
 			),
 		),
@@ -64,15 +67,14 @@ func Test_BookInCommittedSlot(t *testing.T) {
 	}
 
 	// Verify that nodes have the expected states.
-	genesisCommitment := iotago.NewEmptyCommitment(ts.API)
-	genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
+	genesisCommitment := ts.CommitmentOfMainEngine(nodeA, genesisSlot)
 	ts.AssertNodeState(ts.Nodes(),
 		testsuite.WithSnapshotImported(true),
 		testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
-		testsuite.WithLatestCommitment(genesisCommitment),
+		testsuite.WithLatestCommitment(genesisCommitment.Commitment()),
 		testsuite.WithLatestFinalizedSlot(0),
-		testsuite.WithChainID(genesisCommitment.MustID()),
-		testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment}),
+		testsuite.WithMainChainID(genesisCommitment.ID()),
+		testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment.Commitment()}),
 		testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
 		testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 		testsuite.WithEvictedSlot(0),
@@ -84,7 +86,7 @@ func Test_BookInCommittedSlot(t *testing.T) {
 
 	// Epoch 0: issue 4 rows per slot.
 	{
-		ts.IssueBlocksAtEpoch("", 0, 4, "Genesis", ts.Nodes(), true, false)
+		ts.IssueBlocksAtEpoch("", 0, 4, "Genesis", ts.Nodes(), true, true)
 
 		ts.AssertBlocksExist(ts.BlocksWithPrefixes("1", "2", "3", "4", "5", "6", "7"), true, ts.Nodes()...)
 
@@ -102,7 +104,8 @@ func Test_BookInCommittedSlot(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
-			testsuite.WithChainID(genesisCommitment.MustID()),
+			testsuite.WithLatestFinalizedSlot(4),
+			testsuite.WithMainChainID(ts.CommitmentOfMainEngine(nodeA, 4-maxCommittableAge).ID()),
 			testsuite.WithLatestCommitmentSlotIndex(5),
 			testsuite.WithEvictedSlot(5),
 			testsuite.WithActiveRootBlocks(expectedActiveRootBlocks),
@@ -124,10 +127,13 @@ func Test_BookInCommittedSlot(t *testing.T) {
 }
 
 func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
+	const maxCommittableAge = iotago.SlotIndex(4)
+	const genesisSlot = iotago.SlotIndex(0)
+
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
-				0,
+				genesisSlot,
 				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
 				3,
@@ -136,7 +142,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				10,
 				10,
 				2,
-				4,
+				maxCommittableAge,
 				5,
 			),
 		),
@@ -178,15 +184,14 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	}
 
 	// Verify that nodes have the expected states.
-	genesisCommitment := iotago.NewEmptyCommitment(ts.API)
-	genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
+	genesisCommitment := ts.CommitmentOfMainEngine(nodeA, genesisSlot)
 	ts.AssertNodeState(ts.Nodes(),
 		testsuite.WithSnapshotImported(true),
 		testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
-		testsuite.WithLatestCommitment(genesisCommitment),
+		testsuite.WithLatestCommitment(genesisCommitment.Commitment()),
 		testsuite.WithLatestFinalizedSlot(0),
-		testsuite.WithChainID(genesisCommitment.MustID()),
-		testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment}),
+		testsuite.WithMainChainID(genesisCommitment.ID()),
+		testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment.Commitment()}),
 		testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
 		testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 		testsuite.WithEvictedSlot(0),
@@ -222,7 +227,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
-			testsuite.WithChainID(genesisCommitment.MustID()),
+			testsuite.WithMainChainID(ts.CommitmentOfMainEngine(nodeA, 4-maxCommittableAge).ID()),
 			testsuite.WithLatestFinalizedSlot(4),
 			testsuite.WithLatestCommitmentSlotIndex(5),
 			testsuite.WithEqualStoredCommitmentAtIndex(5),
@@ -270,7 +275,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
-			testsuite.WithChainID(genesisCommitment.MustID()),
+			testsuite.WithMainChainID(ts.CommitmentOfMainEngine(nodeA, 11-maxCommittableAge).ID()),
 			testsuite.WithLatestFinalizedSlot(11),
 			testsuite.WithLatestCommitmentSlotIndex(11),
 			testsuite.WithEqualStoredCommitmentAtIndex(11),
@@ -349,12 +354,10 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				ts.AssertStorageRootBlocks(expectedStorageRootBlocksFrom9, ts.Nodes("nodeD")...)
 			}
 
-			slot7Commitment := lo.PanicOnErr(nodeA.Protocol.Engines.Main.Get().Storage.Commitments().Load(7))
-
 			ts.AssertNodeState(ts.Nodes("nodeC-restarted", "nodeD"),
 				testsuite.WithSnapshotImported(true),
 				testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
-				testsuite.WithChainID(slot7Commitment.ID()),
+				testsuite.WithMainChainID(ts.CommitmentOfMainEngine(nodeA, 11-maxCommittableAge).ID()),
 				testsuite.WithLatestFinalizedSlot(11),
 				testsuite.WithLatestCommitmentSlotIndex(11),
 				testsuite.WithEqualStoredCommitmentAtIndex(11),
@@ -412,6 +415,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
 			testsuite.WithLatestFinalizedSlot(36),
+			testsuite.WithMainChainID(ts.CommitmentOfMainEngine(nodeA, 36-maxCommittableAge).ID()),
 			testsuite.WithLatestCommitmentSlotIndex(37),
 			testsuite.WithEqualStoredCommitmentAtIndex(37),
 			testsuite.WithLatestCommitmentCumulativeWeight(68), // 2 for each slot starting from 4

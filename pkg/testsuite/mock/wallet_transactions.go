@@ -3,7 +3,6 @@ package mock
 import (
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -1156,7 +1155,7 @@ func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Tra
 		addressIndexes = []uint32{0}
 	}
 	currentAPI := w.Node.Protocol.CommittedAPI()
-	(lo.PanicOnErr(transaction.ID())).RegisterAlias(transactionName)
+	transaction.MustID().RegisterAlias(transactionName)
 	w.transactions[transactionName] = transaction
 
 	for outputID, output := range lo.PanicOnErr(transaction.OutputsSet()) {
@@ -1170,13 +1169,13 @@ func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Tra
 				immutableAccountUC != nil && immutableAccountUC.Address.AccountID() == w.BlockIssuer.AccountID ||
 				stateControllerUC != nil && w.HasAddress(stateControllerUC.Address, index) {
 				clonedOutput := output.Clone()
-				actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), outputID.Index())
+				actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(transaction.MustID(), outputID.Index())
 				if clonedOutput.Type() == iotago.OutputAccount {
 					if accountOutput, ok := clonedOutput.(*iotago.AccountOutput); ok && accountOutput.AccountID == iotago.EmptyAccountID {
 						accountOutput.AccountID = iotago.AccountIDFromOutputID(actualOutputID)
 					}
 				}
-				w.outputs[fmt.Sprintf("%s:%d", transactionName, outputID.Index())] = utxoledger.CreateOutput(w.Node.Protocol, actualOutputID, iotago.EmptyBlockID, currentAPI.TimeProvider().SlotFromTime(time.Now()), clonedOutput, lo.PanicOnErr(iotago.OutputIDProofFromTransaction(transaction, outputID.Index())))
+				w.outputs[fmt.Sprintf("%s:%d", transactionName, outputID.Index())] = utxoledger.CreateOutput(w.Node.Protocol, actualOutputID, iotago.EmptyBlockID, currentAPI.TimeProvider().CurrentSlot(), clonedOutput, lo.PanicOnErr(iotago.OutputIDProofFromTransaction(transaction, outputID.Index())))
 
 				break
 			}

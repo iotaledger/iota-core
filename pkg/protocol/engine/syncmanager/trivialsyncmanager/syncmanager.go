@@ -151,7 +151,20 @@ func (s *SyncManager) SyncStatus() *syncmanager.SyncStatus {
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (s *SyncManager) Reset() {
-	// TODO: reset last accepted block slot and so on ...
+	s.lastAcceptedBlockSlotLock.Lock()
+	s.lastConfirmedBlockSlotLock.Lock()
+	s.latestCommitmentLock.RLock()
+	s.isSyncedLock.Lock()
+	defer s.lastAcceptedBlockSlotLock.Unlock()
+	defer s.lastConfirmedBlockSlotLock.Unlock()
+	defer s.latestCommitmentLock.RUnlock()
+	defer s.isSyncedLock.Unlock()
+
+	s.lastAcceptedBlockSlot = s.latestCommitment.Slot()
+	s.lastConfirmedBlockSlot = s.latestCommitment.Slot()
+	// Mark the synced flag as false,
+	// because we clear the latest accepted blocks and return the whole state to the last committed slot.
+	s.isSynced = false
 }
 
 func (s *SyncManager) Shutdown() {

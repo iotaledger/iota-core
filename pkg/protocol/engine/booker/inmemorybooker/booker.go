@@ -5,7 +5,6 @@ import (
 
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -218,7 +217,7 @@ func (b *Booker) inheritSpenders(block *blocks.Block) (spenderIDs ds.Set[iotago.
 
 			// Check whether the parent contains a conflicting TX,
 			// otherwise reference is invalid and the block should be marked as invalid as well.
-			if signedTransaction, hasTx := parentBlock.SignedTransaction(); !hasTx || !parentBlock.PayloadSpenderIDs().Has(lo.PanicOnErr(signedTransaction.Transaction.ID())) {
+			if signedTransaction, hasTx := parentBlock.SignedTransaction(); !hasTx || !parentBlock.PayloadSpenderIDs().Has(signedTransaction.Transaction.MustID()) {
 				return nil, ierrors.Wrapf(err, "shallow like parent %s does not contain a conflicting transaction", parent.ID.String())
 			}
 

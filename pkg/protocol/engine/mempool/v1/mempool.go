@@ -230,6 +230,7 @@ func (m *MemPool[VoteRank]) Reset() {
 		if evictedAttachments := m.attachments.Evict(slot); evictedAttachments != nil {
 			evictedAttachments.ForEach(func(id iotago.BlockID, metadata *SignedTransactionMetadata) bool {
 				metadata.evictAttachment(id)
+
 				return true
 			})
 		}

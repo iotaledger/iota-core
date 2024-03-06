@@ -8,7 +8,6 @@ import (
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
-	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	"github.com/iotaledger/iota.go/v4/api"
@@ -19,9 +18,6 @@ func init() {
 		Name:      "ManagementAPIV1",
 		DepsFunc:  func(cDeps dependencies) { deps = cDeps },
 		Configure: configure,
-		IsEnabled: func(_ *dig.Container) bool {
-			return restapi.ParamsRestAPI.Enabled
-		},
 	}
 }
 
@@ -38,11 +34,6 @@ type dependencies struct {
 }
 
 func configure() error {
-	// check if RestAPI plugin is disabled
-	if !Component.App().IsComponentEnabled(restapi.Component.Identifier()) {
-		Component.LogPanicf("RestAPI plugin needs to be enabled to use the %s plugin", Component.Name)
-	}
-
 	routeGroup := deps.RestRouteManager.AddRoute(api.ManagementPluginName)
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.ManagementEndpointPeer), func(c echo.Context) error {

@@ -369,8 +369,10 @@ func (l *Ledger) RMCManager() *rmc.Manager {
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (l *Ledger) Reset() {
+	// ConflictDAG is evicted automatically when transaction are marked as evicted in the mempool.
 	l.memPool.Reset()
 	l.accountsLedger.Reset()
+	l.rmcManager.Reset()
 }
 
 func (l *Ledger) Shutdown() {
