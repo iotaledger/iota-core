@@ -57,6 +57,12 @@ func configure() error {
 		return responseByHeader(c, resp)
 	})
 
+	routeGroup.GET(api.CoreEndpointNetworkMetrics, func(c echo.Context) error {
+		resp := metrics()
+
+		return responseByHeader(c, resp)
+	})
+
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointBlock), func(c echo.Context) error {
 		resp, err := blockByID(c)
 		if err != nil {

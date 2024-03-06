@@ -7,9 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
-	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
@@ -26,26 +24,6 @@ var (
 //  - this can be achieved by remembering the last issued block together with the engine name/chain.
 //  - if the engine name/chain is the same we can always issue a block.
 //  - if the engine name/chain is different we need to make sure to wait "slot ratification" slots.
-
-// RequestHandler contains the logic to handle api requests.
-type RequestHandler struct {
-	workerPool *workerpool.WorkerPool
-
-	protocol *protocol.Protocol
-}
-
-func New(p *protocol.Protocol) *RequestHandler {
-	return &RequestHandler{
-		workerPool: p.Workers.CreatePool("BlockHandler"),
-		protocol:   p,
-	}
-}
-
-// Shutdown shuts down the block issuer.
-func (r *RequestHandler) Shutdown() {
-	r.workerPool.Shutdown()
-	r.workerPool.ShutdownComplete.Wait()
-}
 
 // SubmitBlockWithoutAwaitingBooking submits a block to be processed.
 func (r *RequestHandler) SubmitBlockWithoutAwaitingBooking(block *model.Block) error {
