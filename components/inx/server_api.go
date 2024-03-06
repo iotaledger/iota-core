@@ -9,14 +9,9 @@ import (
 	"google.golang.org/grpc/status"
 
 	inx "github.com/iotaledger/inx/go"
-	"github.com/iotaledger/iota-core/components/restapi"
 )
 
 func (s *Server) RegisterAPIRoute(_ context.Context, req *inx.APIRouteRequest) (*inx.NoParams, error) {
-	if !Component.App().IsComponentEnabled(restapi.Component.Identifier()) {
-		return nil, status.Error(codes.Unavailable, "RestAPI plugin is not enabled")
-	}
-
 	if len(req.GetRoute()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "route can not be empty")
 	}
@@ -37,10 +32,6 @@ func (s *Server) RegisterAPIRoute(_ context.Context, req *inx.APIRouteRequest) (
 }
 
 func (s *Server) UnregisterAPIRoute(_ context.Context, req *inx.APIRouteRequest) (*inx.NoParams, error) {
-	if !Component.App().IsComponentEnabled(restapi.Component.Identifier()) {
-		return nil, status.Error(codes.Unavailable, "RestAPI plugin is not enabled")
-	}
-
 	if len(req.GetRoute()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "route can not be empty")
 	}
@@ -51,10 +42,6 @@ func (s *Server) UnregisterAPIRoute(_ context.Context, req *inx.APIRouteRequest)
 }
 
 func (s *Server) PerformAPIRequest(_ context.Context, req *inx.APIRequest) (*inx.APIResponse, error) {
-	if !Component.App().IsComponentEnabled(restapi.Component.Identifier()) {
-		return nil, status.Error(codes.Unavailable, "RestAPI plugin is not enabled")
-	}
-
 	httpReq := httptest.NewRequest(req.GetMethod(), req.GetPath(), bytes.NewBuffer(req.GetBody()))
 	httpReq.Header = req.HTTPHeader()
 
