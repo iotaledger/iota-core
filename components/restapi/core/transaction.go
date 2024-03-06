@@ -49,7 +49,7 @@ func transactionMetadataFromTransactionID(c echo.Context) (*api.TransactionMetad
 
 	blockID, err := deps.RequestHandler.BlockIDFromTransactionID(txID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrNotFound, "failed to get block ID from transaction ID: %v", err)
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to get block ID from transaction ID: %v", err)
 	}
 
 	metadata, err := deps.RequestHandler.TransactionMetadataByBlockID(blockID)

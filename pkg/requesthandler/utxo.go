@@ -12,7 +12,7 @@ import (
 func (r *RequestHandler) OutputFromOutputID(outputID iotago.OutputID) (*api.OutputResponse, error) {
 	output, err := r.protocol.Engines.Main.Get().Ledger.Output(outputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %s", outputID.ToHex(), err)
+		return nil, ierrors.Wrapf(echo.ErrNotFound, "output %s not found in the Ledger: %s", outputID.ToHex(), err)
 	}
 
 	return &api.OutputResponse{
@@ -24,7 +24,7 @@ func (r *RequestHandler) OutputFromOutputID(outputID iotago.OutputID) (*api.Outp
 func (r *RequestHandler) OutputMetadataFromOutputID(outputID iotago.OutputID) (*api.OutputMetadata, error) {
 	output, spent, err := r.protocol.Engines.Main.Get().Ledger.OutputOrSpent(outputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %s", outputID.ToHex(), err)
+		return nil, ierrors.Wrapf(echo.ErrNotFound, "output %s not found in the ledger: %s", outputID.ToHex(), err)
 	}
 
 	if spent != nil {
@@ -37,7 +37,7 @@ func (r *RequestHandler) OutputMetadataFromOutputID(outputID iotago.OutputID) (*
 func (r *RequestHandler) OutputWithMetadataFromOutputID(outputID iotago.OutputID) (*api.OutputWithMetadataResponse, error) {
 	output, spent, err := r.protocol.Engines.Main.Get().Ledger.OutputOrSpent(outputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %s", outputID.ToHex(), err)
+		return nil, ierrors.Wrapf(echo.ErrNotFound, "output %s not found in the Ledger: %s", outputID.ToHex(), err)
 	}
 
 	if spent != nil {

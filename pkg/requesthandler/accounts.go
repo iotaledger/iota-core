@@ -93,7 +93,7 @@ func (r *RequestHandler) ValidatorByAccountAddress(accountAddress *iotago.Accoun
 func (r *RequestHandler) RewardsByOutputID(outputID iotago.OutputID, slot iotago.SlotIndex) (*api.ManaRewardsResponse, error) {
 	utxoOutput, err := r.protocol.Engines.Main.Get().Ledger.Output(outputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from ledger: %s", outputID.ToHex(), err)
+		return nil, ierrors.Wrapf(echo.ErrNotFound, "output %s not found in the Ledger: %s", outputID.ToHex(), err)
 	}
 
 	var stakingPoolValidatorAccountID iotago.AccountID
@@ -149,16 +149,19 @@ func (r *RequestHandler) RewardsByOutputID(outputID iotago.OutputID, slot iotago
 			delegationEnd,
 			claimingEpoch,
 		)
+	default:
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "output %s is neither a delegation output nor account", outputID.ToHex())
 	}
+
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to calculate reward for output %s: %s", outputID.ToHex(), err)
 	}
 
 	latestCommittedEpochPoolRewards, poolRewardExists, err := r.protocol.Engines.Main.Get().SybilProtection.PoolRewardsForAccount(stakingPoolValidatorAccountID)
-
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to retrieve pool rewards for account %s: %s", stakingPoolValidatorAccountID.ToHex(), err)
 	}
+
 	if !poolRewardExists {
 		latestCommittedEpochPoolRewards = 0
 	}

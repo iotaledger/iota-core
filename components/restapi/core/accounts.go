@@ -11,7 +11,7 @@ import (
 )
 
 func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error) {
-	commitmentID, err := httpserver.ParseCommitmentIDQueryParam(c, api.ParameterCommitmentID)
+	queryCommitmentID, err := httpserver.ParseCommitmentIDQueryParam(c, api.ParameterCommitmentID)
 	if err != nil {
 		return nil, err
 	}
@@ -27,7 +27,7 @@ func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error)
 		workScores = append(workScores, workScore)
 	}
 
-	commitment, err := deps.RequestHandler.GetCommitmentByID(commitmentID)
+	commitment, err := deps.RequestHandler.GetCommitmentByID(queryCommitmentID)
 	if err != nil {
 		return nil, err
 	}
@@ -41,6 +41,16 @@ func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error)
 	accountAddress, ok := address.(*iotago.AccountAddress)
 	if !ok {
 		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "address %s is not an account address", c.Param(api.ParameterBech32Address))
+	}
+
+	maxCommittableAge := deps.RequestHandler.CommittedAPI().ProtocolParameters().MaxCommittableAge()
+	latestCommittedSlot := deps.RequestHandler.GetLatestCommitment().Slot()
+	if latestCommittedSlot >= maxCommittableAge && commitment.Slot()+maxCommittableAge < latestCommittedSlot && queryCommitmentID != iotago.EmptyCommitmentID {
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "invalid commitmentID, target slot index older than allowed (%d<%d)", commitment.Slot(), latestCommittedSlot-maxCommittableAge)
+	}
+
+	if commitment.Slot() > latestCommittedSlot && queryCommitmentID != iotago.EmptyCommitmentID {
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "invalid commitmentID, slot %d is not committed yet, latest committed slot: %d", commitment.Slot(), latestCommittedSlot)
 	}
 
 	return deps.RequestHandler.CongestionByAccountAddress(accountAddress, commitment, workScores...)
@@ -86,6 +96,7 @@ func validatorByAccountAddress(c echo.Context) (*api.ValidatorResponse, error) {
 }
 
 func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
+	var err error
 	outputID, err := httpserver.ParseOutputIDParam(c, api.ParameterOutputID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(api.ParameterOutputID))
@@ -93,7 +104,6 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 
 	var slot iotago.SlotIndex
 	if len(c.QueryParam(api.ParameterSlot)) > 0 {
-		var err error
 		slot, err = httpserver.ParseSlotQueryParam(c, api.ParameterSlot)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to parse slot index %s", c.Param(api.ParameterSlot))
@@ -113,6 +123,7 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 
 func selectedCommittee(c echo.Context) (*api.CommitteeResponse, error) {
 	var epoch iotago.EpochIndex
+
 	if len(c.QueryParam(api.ParameterEpoch)) == 0 {
 		// by default we return current epoch
 		epoch = deps.RequestHandler.CommittedAPI().TimeProvider().CurrentEpoch()
@@ -121,6 +132,10 @@ func selectedCommittee(c echo.Context) (*api.CommitteeResponse, error) {
 		epoch, err = httpserver.ParseEpochQueryParam(c, api.ParameterEpoch)
 		if err != nil {
 			return nil, err
+		}
+		currentEpoch := deps.RequestHandler.CommittedAPI().TimeProvider().CurrentEpoch()
+		if epoch > currentEpoch {
+			return nil, ierrors.Wrapf(echo.ErrBadRequest, "provided epoch %d is from the future, current epoch: %d", epoch, currentEpoch)
 		}
 	}
 
