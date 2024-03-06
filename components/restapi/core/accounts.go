@@ -50,24 +50,23 @@ func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 	var err error
 	pageSize := httpserver.ParsePageSizeQueryParam(c, api.ParameterPageSize, restapi.ParamsRestAPI.MaxPageSize)
 	latestCommittedSlot := deps.RequestHandler.GetLatestCommitment().Slot()
+	currentEpoch := deps.RequestHandler.APIProvider().APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
+	requestedEpoch := currentEpoch
 
 	// no cursor provided will be the first request
-	requestedSlot := latestCommittedSlot
 	var cursorIndex uint32
 	if len(c.QueryParam(api.ParameterCursor)) != 0 {
-		requestedSlot, cursorIndex, err = httpserver.ParseCursorQueryParam(c, api.ParameterCursor)
+		requestedEpoch, cursorIndex, err = httpserver.ParseCursorQueryParam(c, api.ParameterCursor)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	// do not respond to really old requests
-	if requestedSlot+iotago.SlotIndex(restapi.ParamsRestAPI.MaxRequestedSlotAge) < latestCommittedSlot {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "request is too old, request started at %d, latest committed slot index is %d", requestedSlot, latestCommittedSlot)
+	if requestedEpoch > currentEpoch {
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "epoch %d is larger than current epoch %d", requestedEpoch, currentEpoch)
 	}
-	slotRange := uint32(requestedSlot) / restapi.ParamsRestAPI.RequestsMemoryCacheGranularity
 
-	return deps.RequestHandler.Validators(slotRange, pageSize, cursorIndex)
+	return deps.RequestHandler.Validators(requestedEpoch, pageSize, cursorIndex)
 }
 
 func validatorByAccountAddress(c echo.Context) (*api.ValidatorResponse, error) {

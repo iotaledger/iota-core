@@ -31,17 +31,10 @@ func (r *RequestHandler) CongestionByAccountAddress(accountAddress *iotago.Accou
 	}, nil
 }
 
-func (r *RequestHandler) Validators(slotRange, cursorIndex, pageSize uint32) (*api.ValidatorsResponse, error) {
-	latestCommittedSlot := r.protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot()
-	latestEpoch := r.protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
-
-	registeredValidators, exists := r.protocol.Engines.Main.Get().Retainer.RegisteredValidatorsCache(slotRange)
-	if !exists {
-		registeredValidators, err := r.protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(latestEpoch)
-		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get ordered registered validators list for epoch %d : %s", latestEpoch, err)
-		}
-		r.protocol.Engines.Main.Get().Retainer.RetainRegisteredValidatorsCache(slotRange, registeredValidators)
+func (r *RequestHandler) Validators(epochIndex iotago.EpochIndex, cursorIndex, pageSize uint32) (*api.ValidatorsResponse, error) {
+	registeredValidators, err := r.protocol.Engines.Main.Get().Retainer.RegisteredValidators(epochIndex)
+	if err != nil {
+		return nil, err
 	}
 
 	page := registeredValidators[cursorIndex:lo.Min(cursorIndex+pageSize, uint32(len(registeredValidators)))]
@@ -53,7 +46,7 @@ func (r *RequestHandler) Validators(slotRange, cursorIndex, pageSize uint32) (*a
 	if int(cursorIndex+pageSize) > len(registeredValidators) {
 		resp.Cursor = ""
 	} else {
-		resp.Cursor = fmt.Sprintf("%d,%d", slotRange, cursorIndex+pageSize)
+		resp.Cursor = fmt.Sprintf("%d,%d", epochIndex, cursorIndex+pageSize)
 	}
 
 	return resp, nil
