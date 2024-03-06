@@ -5,6 +5,6 @@ import (
 )
 
 var (
-	ErrStateNotFound = ierrors.New("state not found")
-	ErrRequestFailed = ierrors.New("request failed")
+	ErrStateNotFound                    = ierrors.New("state not found")
+	ErrInputSolidificationRequestFailed = ierrors.New("UTXO input solidification failed")
 )

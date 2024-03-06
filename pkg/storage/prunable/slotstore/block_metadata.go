@@ -42,6 +42,7 @@ func blockMetadataFromBytes(bytes []byte) (*BlockMetadata, int, error) {
 }
 
 type BlockMetadataStore struct {
+	// The slot for which this store holds the metadata from all blocks with the corresponding slot.
 	slot               iotago.SlotIndex
 	blockMetadataStore *kvstore.TypedStore[iotago.BlockID, *BlockMetadata]
 }

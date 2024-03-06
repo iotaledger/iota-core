@@ -272,6 +272,7 @@ func assertPrunableEpochStoragesPruned[V any](t *TestFramework, store *epochstor
 		seenEpochs = append(seenEpochs, epoch)
 		return nil
 	})
+	require.NoError(t.t, err)
 	require.NotContainsf(t.t, seenEpochs, epoch, "expected epoch %d to be pruned when calling Stream", epoch)
 
 	seenEpochs = nil
@@ -281,6 +282,7 @@ func assertPrunableEpochStoragesPruned[V any](t *TestFramework, store *epochstor
 		seenEpochs = append(seenEpochs, epochFromBytes)
 		return nil
 	})
+	require.NoError(t.t, err)
 	require.NotContainsf(t.t, seenEpochs, epoch, "expected epoch %d to be pruned when calling StreamBytes", epoch)
 }
 

@@ -410,7 +410,7 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 
 		request.OnError(func(reason error) {
 			// use the sentinel error to mark that the request failed instead of the execution
-			transaction.setInvalid(ierrors.Join(mempool.ErrRequestFailed, reason))
+			transaction.setInvalid(ierrors.Join(mempool.ErrInputSolidificationRequestFailed, reason))
 		})
 	}
 }

@@ -7,9 +7,9 @@ import (
 const (
 	dbNamespace = "db"
 
-	sizeBytesPermanent   = "size_bytes_permanent"
-	sizeBytesPrunable    = "size_bytes_prunable"
-	sizeBytesPrunableSQL = "size_bytes_prunable_SQL"
+	sizeBytesPermanent          = "size_bytes_permanent"
+	sizeBytesPrunable           = "size_bytes_prunable"
+	sizeBytesTxRetainerDatabase = "size_bytes_tx_retainer_database"
 )
 
 var DBMetrics = collector.NewCollection(dbNamespace,
@@ -27,11 +27,11 @@ var DBMetrics = collector.NewCollection(dbNamespace,
 			return float64(deps.Protocol.Engines.Main.Get().Storage.PrunableDatabaseSize()), nil
 		}),
 	)),
-	collector.WithMetric(collector.NewMetric(sizeBytesPrunableSQL,
+	collector.WithMetric(collector.NewMetric(sizeBytesTxRetainerDatabase,
 		collector.WithType(collector.Gauge),
-		collector.WithHelp("DB size in bytes for prunable SQL storage."),
+		collector.WithHelp("DB size in bytes for transaction retainer SQL database."),
 		collector.WithCollectFunc(func() (metricValue float64, labelValues []string) {
-			return float64(deps.Protocol.Engines.Main.Get().Storage.PrunableSQLDatabaseSize()), nil
+			return float64(deps.Protocol.Engines.Main.Get().Storage.TransactionRetainerDatabaseSize()), nil
 		}),
 	)),
 )

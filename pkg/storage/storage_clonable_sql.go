@@ -9,5 +9,5 @@ type (
 )
 
 func (s *Storage) TransactionRetainerDatabaseExecFunc() SQLDatabaseExecFunc {
-	return s.prunableSQL.ExecFunc()
+	return s.txRetainerSQL.ExecDBFunc()
 }

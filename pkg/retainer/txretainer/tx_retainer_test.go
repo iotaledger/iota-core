@@ -101,7 +101,7 @@ func TestTransactionRetainer_UpdateMetadata(t *testing.T) {
 					TransactionState:          api.TransactionStateFailed,
 					EarliestAttachmentSlot:    0,
 					TransactionFailureReason:  api.DetermineTransactionFailureReason(iotago.ErrInputAlreadySpent),
-					TransactionFailureDetails: "input already spent",
+					TransactionFailureDetails: iotago.ErrInputAlreadySpent.Error(),
 				}
 			},
 			targetErr: nil,
@@ -151,7 +151,7 @@ func TestTransactionRetainer_UpdateMetadata(t *testing.T) {
 					TransactionState:          api.TransactionStateFailed,
 					EarliestAttachmentSlot:    10,
 					TransactionFailureReason:  api.DetermineTransactionFailureReason(iotago.ErrInputAlreadySpent),
-					TransactionFailureDetails: "input already spent",
+					TransactionFailureDetails: iotago.ErrInputAlreadySpent.Error(),
 				}
 			},
 			targetErr: nil,
@@ -176,7 +176,7 @@ func TestTransactionRetainer_UpdateMetadata(t *testing.T) {
 					TransactionState:          api.TransactionStateFailed,
 					EarliestAttachmentSlot:    5,
 					TransactionFailureReason:  api.DetermineTransactionFailureReason(iotago.ErrInputAlreadySpent),
-					TransactionFailureDetails: "input already spent",
+					TransactionFailureDetails: iotago.ErrInputAlreadySpent.Error(),
 				}
 			},
 			targetErr: nil,
@@ -208,7 +208,7 @@ func TestTransactionRetainer_UpdateMetadata(t *testing.T) {
 		},
 		// ok - add attachment with valid signature and higher attachment slot set
 		{
-			name:          "add attachment with valid signature and higher attachment slot set",
+			name:          "ok - add attachment with valid signature and higher attachment slot set",
 			transactionID: txID,
 			newTxMetaFunc: func() *testTxMetadata {
 				return &testTxMetadata{
@@ -233,13 +233,38 @@ func TestTransactionRetainer_UpdateMetadata(t *testing.T) {
 		},
 		// ok - add attachment with valid signature and lower attachment slot set
 		{
-			name:          "add attachment with valid signature and lower attachment slot set",
+			name:          "ok - add attachment with valid signature and lower attachment slot set",
 			transactionID: txID,
 			newTxMetaFunc: func() *testTxMetadata {
 				return &testTxMetadata{
 					TransactionID:          txID,
 					ValidSignature:         true,
 					EarliestAttachmentSlot: 10,
+					State:                  api.TransactionStatePending,
+					TransactionError:       nil,
+				}
+			},
+			testFunc: nil,
+			resultFunc: func() *api.TransactionMetadataResponse {
+				return &api.TransactionMetadataResponse{
+					TransactionID:             txID,
+					TransactionState:          api.TransactionStatePending,
+					EarliestAttachmentSlot:    10,
+					TransactionFailureReason:  api.TxFailureNone,
+					TransactionFailureDetails: "",
+				}
+			},
+			targetErr: nil,
+		},
+		// ok - add attachment with invalid signature and lower attachment slot set
+		{
+			name:          "ok - add attachment with invalid signature and lower attachment slot set",
+			transactionID: txID,
+			newTxMetaFunc: func() *testTxMetadata {
+				return &testTxMetadata{
+					TransactionID:          txID,
+					ValidSignature:         false,
+					EarliestAttachmentSlot: 5,
 					State:                  api.TransactionStatePending,
 					TransactionError:       nil,
 				}
@@ -285,6 +310,7 @@ func TestTransactionRetainer_ResetAndPruning(t *testing.T) {
 				}
 			},
 			testFunc: func() {
+				ts.SetLatestCommittedSlot(9)
 				tr.Prune(9)
 			},
 			resultFunc: func() *api.TransactionMetadataResponse {
@@ -293,14 +319,14 @@ func TestTransactionRetainer_ResetAndPruning(t *testing.T) {
 					TransactionState:          api.TransactionStateFailed,
 					EarliestAttachmentSlot:    10,
 					TransactionFailureReason:  api.DetermineTransactionFailureReason(iotago.ErrInputAlreadySpent),
-					TransactionFailureDetails: "input already spent",
+					TransactionFailureDetails: iotago.ErrInputAlreadySpent.Error(),
 				}
 			},
 			targetErr: nil,
 		},
-		// ok - prune at same slot as the earliest attachment slot
+		// fail - prune at same slot as the earliest attachment slot
 		{
-			name:          "ok - prune at same slot as the earliest attachment slot",
+			name:          "fail - prune at same slot as the earliest attachment slot",
 			transactionID: txID,
 			newTxMetaFunc: func() *testTxMetadata {
 				return &testTxMetadata{
@@ -312,14 +338,15 @@ func TestTransactionRetainer_ResetAndPruning(t *testing.T) {
 				}
 			},
 			testFunc: func() {
+				ts.SetLatestCommittedSlot(10)
 				tr.Prune(10)
 			},
 			resultFunc: nil,
 			targetErr:  txretainer.ErrEntryNotFound,
 		},
-		// ok - prune a slot above the earliest attachment slot
+		// fail - prune a slot above the earliest attachment slot
 		{
-			name:          "ok - prune a slot above the earliest attachment slot",
+			name:          "fail - prune a slot above the earliest attachment slot",
 			transactionID: txID,
 			newTxMetaFunc: func() *testTxMetadata {
 				return &testTxMetadata{
@@ -331,6 +358,7 @@ func TestTransactionRetainer_ResetAndPruning(t *testing.T) {
 				}
 			},
 			testFunc: func() {
+				ts.SetLatestCommittedSlot(11)
 				tr.Prune(11)
 			},
 			resultFunc: nil,
@@ -351,7 +379,7 @@ func TestTransactionRetainer_ResetAndPruning(t *testing.T) {
 			},
 			testFunc: func() {
 				ts.SetLatestCommittedSlot(11)
-				tr.Reset()
+				tr.Reset(11)
 			},
 			resultFunc: func() *api.TransactionMetadataResponse {
 				return &api.TransactionMetadataResponse{
@@ -359,7 +387,7 @@ func TestTransactionRetainer_ResetAndPruning(t *testing.T) {
 					TransactionState:          api.TransactionStateFailed,
 					EarliestAttachmentSlot:    10,
 					TransactionFailureReason:  api.DetermineTransactionFailureReason(iotago.ErrInputAlreadySpent),
-					TransactionFailureDetails: "input already spent",
+					TransactionFailureDetails: iotago.ErrInputAlreadySpent.Error(),
 				}
 			},
 			targetErr: nil,
@@ -379,7 +407,7 @@ func TestTransactionRetainer_ResetAndPruning(t *testing.T) {
 			},
 			testFunc: func() {
 				ts.SetLatestCommittedSlot(10)
-				tr.Reset()
+				tr.Reset(10)
 			},
 			resultFunc: func() *api.TransactionMetadataResponse {
 				return &api.TransactionMetadataResponse{
@@ -387,14 +415,14 @@ func TestTransactionRetainer_ResetAndPruning(t *testing.T) {
 					TransactionState:          api.TransactionStateFailed,
 					EarliestAttachmentSlot:    10,
 					TransactionFailureReason:  api.DetermineTransactionFailureReason(iotago.ErrInputAlreadySpent),
-					TransactionFailureDetails: "input already spent",
+					TransactionFailureDetails: iotago.ErrInputAlreadySpent.Error(),
 				}
 			},
 			targetErr: nil,
 		},
-		// ok - reset below the earliest attachment slot
+		// fail - reset below the earliest attachment slot
 		{
-			name:          "ok - reset below the earliest attachment slot",
+			name:          "fail - reset below the earliest attachment slot",
 			transactionID: txID,
 			newTxMetaFunc: func() *testTxMetadata {
 				return &testTxMetadata{
@@ -407,7 +435,7 @@ func TestTransactionRetainer_ResetAndPruning(t *testing.T) {
 			},
 			testFunc: func() {
 				ts.SetLatestCommittedSlot(9)
-				tr.Reset()
+				tr.Reset(9)
 			},
 			resultFunc: nil,
 			targetErr:  txretainer.ErrEntryNotFound,

@@ -4,49 +4,41 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 
-	"github.com/iotaledger/hive.go/db"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/hive.go/sql"
 	"github.com/iotaledger/iota-core/pkg/retainer/txretainer"
-	"github.com/iotaledger/iota-core/pkg/storage/prunablesql"
+	"github.com/iotaledger/iota-core/pkg/storage/clonablesql"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type txRetainerTestsuite struct {
 	T          *testing.T
-	currentDB  *prunablesql.LockableGormDB
+	database   *clonablesql.ClonableSQLiteDatabase
 	TxRetainer *txretainer.TransactionRetainer
 
 	latestCommitedSlot iotago.SlotIndex
 	finalizedSlot      iotago.SlotIndex
 }
 
-func newTestSuite(t *testing.T) *txRetainerTestsuite {
-	dbParams := sql.DatabaseParameters{
-		Engine:   db.EngineSQLite,
-		Path:     t.TempDir(),
-		Filename: "test.db",
-	}
-
+func newClonableSQLiteDatabase(t *testing.T) *clonablesql.ClonableSQLiteDatabase {
 	logger := log.NewLogger().NewChildLogger(t.Name())
 
-	db, _, err := sql.New(logger.NewChildLogger("sql"), dbParams, true, []db.Engine{db.EngineSQLite})
-	require.NoError(t, err)
+	return clonablesql.NewClonableSQLiteDatabase(logger.NewChildLogger("tx-retainer-db"), t.TempDir(), "tx_retainer.db", func(err error) {
+		require.NoError(t, err)
+	})
+}
 
-	lockableDB := prunablesql.NewLockableGormDB(db)
-
+func newTestSuite(t *testing.T) *txRetainerTestsuite {
 	workers := workerpool.NewGroup("TxRetainer")
 	defer workers.Shutdown()
 
 	testSuite := &txRetainerTestsuite{
-		T:         t,
-		currentDB: lockableDB,
+		T:        t,
+		database: newClonableSQLiteDatabase(t),
 	}
 
-	testSuite.TxRetainer = txretainer.New(workers, testSuite.currentDB.ExecDBFunc,
+	testSuite.TxRetainer = txretainer.New(workers, testSuite.database.ExecDBFunc(),
 		func() iotago.SlotIndex {
 			return testSuite.latestCommitedSlot
 		}, func() iotago.SlotIndex {
@@ -57,27 +49,19 @@ func newTestSuite(t *testing.T) *txRetainerTestsuite {
 		txretainer.WithDebugStoreErrorMessages(true),
 	)
 
-	require.NoError(t, testSuite.TxRetainer.CreateTables())
-	require.NoError(t, testSuite.TxRetainer.AutoMigrate())
-
 	return testSuite
 }
 
 func (ts *txRetainerTestsuite) Close() {
-	_ = ts.currentDB.ExecDBFunc(func(database *gorm.DB) error {
-		db, err := database.DB()
-		require.NoError(ts.T, err)
-		require.NoError(ts.T, db.Close())
-		return nil
-	})
-}
-
-func (ts *txRetainerTestsuite) SetCurrentDB(db *gorm.DB) {
-	ts.currentDB = prunablesql.NewLockableGormDB(db)
+	ts.database.Shutdown()
+	ts.TxRetainer.Shutdown()
 }
 
 func (ts *txRetainerTestsuite) SetLatestCommittedSlot(slot iotago.SlotIndex) {
 	ts.latestCommitedSlot = slot
+	if err := ts.TxRetainer.CommitSlot(slot); err != nil {
+		panic(err)
+	}
 }
 
 func (ts *txRetainerTestsuite) SetFinalizedSlot(slot iotago.SlotIndex) {
