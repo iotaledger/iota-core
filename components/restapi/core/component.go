@@ -11,7 +11,6 @@ import (
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/components/metricstracker"
 	"github.com/iotaledger/iota-core/components/protocol"
-	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/requesthandler"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	"github.com/iotaledger/iota.go/v4/api"
@@ -22,9 +21,6 @@ func init() {
 		Name:      "CoreAPIV3",
 		DepsFunc:  func(cDeps dependencies) { deps = cDeps },
 		Configure: configure,
-		IsEnabled: func(_ *dig.Container) bool {
-			return restapi.ParamsRestAPI.Enabled
-		},
 	}
 }
 
@@ -44,11 +40,6 @@ type dependencies struct {
 }
 
 func configure() error {
-	// check if RestAPI plugin is disabled
-	if !Component.App().IsComponentEnabled(restapi.Component.Identifier()) {
-		Component.LogPanicf("RestAPI plugin needs to be enabled to use the %s plugin", Component.Name)
-	}
-
 	routeGroup := deps.RestRouteManager.AddRoute(api.CorePluginName)
 
 	routeGroup.GET(api.CoreEndpointInfo, func(c echo.Context) error {
