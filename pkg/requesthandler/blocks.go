@@ -6,12 +6,11 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/inx-app/pkg/httpserver"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
-func (r *RequestHandler) BlockByID(blockID iotago.BlockID) (*iotago.Block, error) {
+func (r *RequestHandler) BlockFromBlockID(blockID iotago.BlockID) (*iotago.Block, error) {
 	block, exists := r.protocol.Engines.Main.Get().Block(blockID)
 	if !exists {
 		return nil, ierrors.Wrapf(echo.ErrNotFound, "block not found: %s", blockID.ToHex())
@@ -20,7 +19,7 @@ func (r *RequestHandler) BlockByID(blockID iotago.BlockID) (*iotago.Block, error
 	return block.ProtocolBlock(), nil
 }
 
-func (r *RequestHandler) BlockMetadataByBlockID(blockID iotago.BlockID) (*api.BlockMetadataResponse, error) {
+func (r *RequestHandler) BlockMetadataFromBlockID(blockID iotago.BlockID) (*api.BlockMetadataResponse, error) {
 	blockMetadata, err := r.protocol.Engines.Main.Get().Retainer.BlockMetadata(blockID)
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get block metadata %s: %s", blockID.ToHex(), err)
@@ -29,7 +28,7 @@ func (r *RequestHandler) BlockMetadataByBlockID(blockID iotago.BlockID) (*api.Bl
 	return blockMetadata.BlockMetadataResponse(), nil
 }
 
-func (r *RequestHandler) TransactionMetadataByBlockID(blockID iotago.BlockID) (*api.TransactionMetadataResponse, error) {
+func (r *RequestHandler) TransactionMetadataFromBlockID(blockID iotago.BlockID) (*api.TransactionMetadataResponse, error) {
 	blockMetadata, err := r.protocol.Engines.Main.Get().Retainer.BlockMetadata(blockID)
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get block metadata %s: %s", blockID.ToHex(), err)
@@ -43,22 +42,13 @@ func (r *RequestHandler) TransactionMetadataByBlockID(blockID iotago.BlockID) (*
 	return metadata, nil
 }
 
-func (r *RequestHandler) BlockMetadataByID(c echo.Context) (*api.BlockMetadataResponse, error) {
-	blockID, err := httpserver.ParseBlockIDParam(c, api.ParameterBlockID)
-	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(api.ParameterBlockID))
-	}
-
-	return r.BlockMetadataByBlockID(blockID)
-}
-
-func (r *RequestHandler) BlockWithMetadataByID(blockID iotago.BlockID) (*api.BlockWithMetadataResponse, error) {
+func (r *RequestHandler) BlockWithMetadataFromBlockID(blockID iotago.BlockID) (*api.BlockWithMetadataResponse, error) {
 	block, exists := r.protocol.Engines.Main.Get().Block(blockID)
 	if !exists {
 		return nil, ierrors.Wrapf(echo.ErrNotFound, "no transaction found for block ID %s", blockID.ToHex())
 	}
 
-	blockMetadata, err := r.BlockMetadataByBlockID(blockID)
+	blockMetadata, err := r.BlockMetadataFromBlockID(blockID)
 	if err != nil {
 		return nil, err
 	}

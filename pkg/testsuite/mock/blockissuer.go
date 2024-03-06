@@ -328,10 +328,7 @@ func (i *BlockIssuer) setDefaultBlockParams(ctx context.Context, blockParams *Bl
 
 func (i *BlockIssuer) validateReferences(ctx context.Context, issuingTime time.Time, slotCommitmentIndex iotago.SlotIndex, references model.ParentReferences) error {
 	for _, parent := range lo.Flatten(lo.Map(lo.Values(references), func(ds iotago.BlockIDs) []iotago.BlockID { return ds })) {
-		b, err := i.client.BlockByBlockID(ctx, parent)
-		if err != nil {
-			return ierrors.Wrapf(err, "cannot issue block if the parents could not be retrieved: %s", parent)
-		}
+		b := i.client.BlockByBlockID(ctx, parent)
 
 		if b.Header.IssuingTime.After(issuingTime) {
 			return ierrors.Errorf("cannot issue block if the parents issuingTime is ahead block's issuingTime: %s vs %s", b.Header.IssuingTime, issuingTime.UTC())

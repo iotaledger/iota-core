@@ -16,7 +16,7 @@ func blockByID(c echo.Context) (*iotago.Block, error) {
 		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(api.ParameterBlockID))
 	}
 
-	return deps.RequestHandler.BlockByID(blockID)
+	return deps.RequestHandler.BlockFromBlockID(blockID)
 }
 
 func blockMetadataByID(c echo.Context) (*api.BlockMetadataResponse, error) {
@@ -25,7 +25,7 @@ func blockMetadataByID(c echo.Context) (*api.BlockMetadataResponse, error) {
 		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(api.ParameterBlockID))
 	}
 
-	return deps.RequestHandler.BlockMetadataByBlockID(blockID)
+	return deps.RequestHandler.BlockMetadataFromBlockID(blockID)
 }
 
 func blockWithMetadataByID(c echo.Context) (*api.BlockWithMetadataResponse, error) {
@@ -34,7 +34,7 @@ func blockWithMetadataByID(c echo.Context) (*api.BlockWithMetadataResponse, erro
 		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(api.ParameterBlockID))
 	}
 
-	return deps.RequestHandler.BlockWithMetadataByID(blockID)
+	return deps.RequestHandler.BlockWithMetadataFromBlockID(blockID)
 }
 
 func sendBlock(c echo.Context) (*api.BlockCreatedResponse, error) {

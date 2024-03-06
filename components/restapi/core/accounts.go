@@ -21,17 +21,6 @@ func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error)
 		return nil, err
 	}
 
-	// if work score is 0, we don't pass it to the scheduler
-	workScores := []iotago.WorkScore{}
-	if workScore != 0 {
-		workScores = append(workScores, workScore)
-	}
-
-	commitment, err := deps.RequestHandler.GetCommitmentByID(commitmentID)
-	if err != nil {
-		return nil, err
-	}
-
 	hrp := deps.RequestHandler.CommittedAPI().ProtocolParameters().Bech32HRP()
 	address, err := httpserver.ParseBech32AddressParam(c, hrp, api.ParameterBech32Address)
 	if err != nil {
@@ -43,7 +32,7 @@ func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error)
 		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "address %s is not an account address", c.Param(api.ParameterBech32Address))
 	}
 
-	return deps.RequestHandler.CongestionByAccountAddress(accountAddress, commitment, workScores...)
+	return deps.RequestHandler.CongestionByAccountAddress(accountAddress, workScore, commitmentID)
 }
 
 func validators(c echo.Context) (*api.ValidatorsResponse, error) {
@@ -91,24 +80,17 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(api.ParameterOutputID))
 	}
 
-	var slot iotago.SlotIndex
+	var slot []iotago.SlotIndex
 	if len(c.QueryParam(api.ParameterSlot)) > 0 {
 		var err error
-		slot, err = httpserver.ParseSlotQueryParam(c, api.ParameterSlot)
+		slotParam, err := httpserver.ParseSlotQueryParam(c, api.ParameterSlot)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to parse slot index %s", c.Param(api.ParameterSlot))
 		}
-		genesisSlot := deps.RequestHandler.LatestAPI().ProtocolParameters().GenesisSlot()
-		if slot < genesisSlot {
-			return nil, ierrors.Wrapf(echo.ErrBadRequest, "slot index (%d) before genesis slot (%d)", slot, genesisSlot)
-		}
-	} else {
-		// The slot index may be unset for requests that do not want to issue a transaction, such as displaying estimated rewards,
-		// in which case we use latest committed slot.
-		slot = deps.RequestHandler.GetLatestCommitment().Slot()
+		slot = append(slot, slotParam)
 	}
 
-	return deps.RequestHandler.RewardsByOutputID(outputID, slot)
+	return deps.RequestHandler.RewardsByOutputID(outputID, slot...)
 }
 
 func selectedCommittee(c echo.Context) (*api.CommitteeResponse, error) {

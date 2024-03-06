@@ -6,6 +6,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 func (r *RequestHandler) BlockIDFromTransactionID(transactionID iotago.TransactionID) (iotago.BlockID, error) {
@@ -22,4 +23,38 @@ func (r *RequestHandler) BlockIDFromTransactionID(transactionID iotago.Transacti
 	}
 
 	return spent.BlockID(), nil
+}
+
+func (r *RequestHandler) BlockFromTransactionID(transactionID iotago.TransactionID) (*iotago.Block, error) {
+	blockID, err := r.BlockIDFromTransactionID(transactionID)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.BlockFromBlockID(blockID)
+}
+
+func (r *RequestHandler) TransactionMetadataFromTransactionID(txID iotago.TransactionID) (*api.TransactionMetadataResponse, error) {
+	blockID, err := r.BlockIDFromTransactionID(txID)
+	if err != nil {
+		return nil, ierrors.Wrapf(echo.ErrNotFound, "failed to get block ID from transaction ID: %v", err)
+	}
+
+	metadata, err := r.TransactionMetadataFromBlockID(blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	metadata.TransactionID = txID
+
+	return metadata, nil
+}
+
+func (r *RequestHandler) BlockMetadataFromTransactionID(txID iotago.TransactionID) (*api.BlockMetadataResponse, error) {
+	blockID, err := r.BlockIDFromTransactionID(txID)
+	if err != nil {
+		return nil, ierrors.Wrapf(echo.ErrNotFound, "failed to get block ID from transaction ID: %v", err)
+	}
+
+	return r.BlockMetadataFromBlockID(blockID)
 }

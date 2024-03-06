@@ -129,13 +129,7 @@ func configure() error {
 			return err
 		}
 
-		// load the commitment to check if it matches the given commitmentID
-		commitment, err := deps.RequestHandler.GetCommitmentByID(commitmentID)
-		if err != nil {
-			return err
-		}
-
-		resp, err := deps.RequestHandler.GetUTXOChanges(commitment.ID())
+		resp, err := deps.RequestHandler.GetUTXOChangesByCommitmentID(commitmentID)
 		if err != nil {
 			return err
 		}
@@ -149,13 +143,7 @@ func configure() error {
 			return err
 		}
 
-		// load the commitment to check if it matches the given commitmentID
-		commitment, err := deps.RequestHandler.GetCommitmentByID(commitmentID)
-		if err != nil {
-			return err
-		}
-
-		resp, err := deps.RequestHandler.GetUTXOChangesFull(commitment.ID())
+		resp, err := deps.RequestHandler.GetUTXOChangesFullByCommitmentID(commitmentID)
 		if err != nil {
 			return err
 		}
@@ -183,12 +171,7 @@ func configure() error {
 			return err
 		}
 
-		commitment, err := deps.RequestHandler.GetCommitmentBySlot(slot)
-		if err != nil {
-			return err
-		}
-
-		resp, err := deps.RequestHandler.GetUTXOChanges(commitment.ID())
+		resp, err := deps.RequestHandler.GetUTXOChangesBySlot(slot)
 		if err != nil {
 			return err
 		}
@@ -202,12 +185,7 @@ func configure() error {
 			return err
 		}
 
-		commitment, err := deps.RequestHandler.GetCommitmentBySlot(slot)
-		if err != nil {
-			return err
-		}
-
-		resp, err := deps.RequestHandler.GetUTXOChangesFull(commitment.ID())
+		resp, err := deps.RequestHandler.GetUTXOChangesFullBySlot(slot)
 		if err != nil {
 			return err
 		}

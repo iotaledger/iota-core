@@ -52,7 +52,55 @@ func (r *RequestHandler) GetLatestCommitment() *model.Commitment {
 	return r.protocol.Engines.Main.Get().SyncManager.LatestCommitment()
 }
 
-func (r *RequestHandler) GetUTXOChanges(commitmentID iotago.CommitmentID) (*api.UTXOChangesResponse, error) {
+// GetUTXOChangesByCommitmentID returns the UTXO changes for the given commitmentID. If commitmentID is empty, the latest commitment is used.
+func (r *RequestHandler) GetUTXOChangesByCommitmentID(commitmentID iotago.CommitmentID) (*api.UTXOChangesResponse, error) {
+	if commitmentID == iotago.EmptyCommitmentID {
+		// this returns the latest commitment in the case that the commitmentID is empty
+		commitment, err := r.GetCommitmentByID(commitmentID)
+		if err != nil {
+			return nil, err
+		}
+		commitmentID = commitment.ID()
+	}
+
+	return r.getUTXOChanges(commitmentID)
+}
+
+// GetUTXOChangesBySlot returns the UTXO changes for the given slot.
+func (r *RequestHandler) GetUTXOChangesBySlot(slot iotago.SlotIndex) (*api.UTXOChangesResponse, error) {
+	commitment, err := r.GetCommitmentBySlot(slot)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.getUTXOChanges(commitment.ID())
+}
+
+// GetUTXOChangesFullByCommitmentID returns the UTXO changes for the given commitmentID. If commitmentID is empty, the latest commitment is used.
+func (r *RequestHandler) GetUTXOChangesFullByCommitmentID(commitmentID iotago.CommitmentID) (*api.UTXOChangesFullResponse, error) {
+	if commitmentID == iotago.EmptyCommitmentID {
+		// this returns the latest commitment in the case that the commitmentID is empty
+		commitment, err := r.GetCommitmentByID(commitmentID)
+		if err != nil {
+			return nil, err
+		}
+		commitmentID = commitment.ID()
+	}
+
+	return r.getUTXOChangesFull(commitmentID)
+}
+
+// GetUTXOChangesFullBySlot returns the UTXO changes for the given slot.
+func (r *RequestHandler) GetUTXOChangesFullBySlot(slot iotago.SlotIndex) (*api.UTXOChangesFullResponse, error) {
+	commitment, err := r.GetCommitmentBySlot(slot)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.getUTXOChangesFull(commitment.ID())
+}
+
+func (r *RequestHandler) getUTXOChanges(commitmentID iotago.CommitmentID) (*api.UTXOChangesResponse, error) {
 	diffs, err := r.protocol.Engines.Main.Get().Ledger.SlotDiffs(commitmentID.Slot())
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get slot diffs, commitmentID: %s, slot: %d, error: %w", commitmentID, commitmentID.Slot(), err)
@@ -76,7 +124,7 @@ func (r *RequestHandler) GetUTXOChanges(commitmentID iotago.CommitmentID) (*api.
 	}, nil
 }
 
-func (r *RequestHandler) GetUTXOChangesFull(commitmentID iotago.CommitmentID) (*api.UTXOChangesFullResponse, error) {
+func (r *RequestHandler) getUTXOChangesFull(commitmentID iotago.CommitmentID) (*api.UTXOChangesFullResponse, error) {
 	diffs, err := r.protocol.Engines.Main.Get().Ledger.SlotDiffs(commitmentID.Slot())
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get slot diffs, commitmentID: %s, slot: %d, error: %w", commitmentID, commitmentID.Slot(), err)

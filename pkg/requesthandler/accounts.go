@@ -8,12 +8,22 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/account"
-	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
-func (r *RequestHandler) CongestionByAccountAddress(accountAddress *iotago.AccountAddress, commitment *model.Commitment, workScores ...iotago.WorkScore) (*api.CongestionResponse, error) {
+func (r *RequestHandler) CongestionByAccountAddress(accountAddress *iotago.AccountAddress, workScore iotago.WorkScore, commitmentID iotago.CommitmentID) (*api.CongestionResponse, error) {
+	// if work score is 0, we don't pass it to the scheduler
+	workScores := []iotago.WorkScore{}
+	if workScore != 0 {
+		workScores = append(workScores, workScore)
+	}
+
+	commitment, err := r.GetCommitmentByID(commitmentID)
+	if err != nil {
+		return nil, err
+	}
+
 	accountID := accountAddress.AccountID()
 	acc, exists, err := r.protocol.Engines.Main.Get().Ledger.Account(accountID, commitment.Slot())
 	if err != nil {
@@ -90,7 +100,18 @@ func (r *RequestHandler) ValidatorByAccountAddress(accountAddress *iotago.Accoun
 	}, nil
 }
 
-func (r *RequestHandler) RewardsByOutputID(outputID iotago.OutputID, slot iotago.SlotIndex) (*api.ManaRewardsResponse, error) {
+func (r *RequestHandler) RewardsByOutputID(outputID iotago.OutputID, optSlot ...iotago.SlotIndex) (*api.ManaRewardsResponse, error) {
+	var slot iotago.SlotIndex
+	if len(optSlot) > 0 {
+		genesisSlot := r.LatestAPI().ProtocolParameters().GenesisSlot()
+		if optSlot[0] < genesisSlot {
+			return nil, ierrors.Wrapf(echo.ErrBadRequest, "slot index (%d) before genesis slot (%d)", slot, genesisSlot)
+		}
+		slot = optSlot[0]
+	} else {
+		slot = r.GetLatestCommitment().Slot()
+	}
+
 	utxoOutput, err := r.protocol.Engines.Main.Get().Ledger.Output(outputID)
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from ledger: %s", outputID.ToHex(), err)
