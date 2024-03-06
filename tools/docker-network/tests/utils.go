@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"sort"
-	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -112,12 +111,12 @@ func (d *DockerTestFramework) AssertCommittee(expectedEpoch iotago.EpochIndex, e
 	sort.Strings(expectedCommitteeMember)
 
 	status := d.NodeStatus("V1")
-	api := d.wallet.DefaultClient().CommittedAPI()
-	expectedSlotStart := api.TimeProvider().EpochStart(expectedEpoch)
+	testAPI := d.wallet.DefaultClient().CommittedAPI()
+	expectedSlotStart := testAPI.TimeProvider().EpochStart(expectedEpoch)
 	require.Greater(d.Testing, expectedSlotStart, status.LatestAcceptedBlockSlot)
 
 	slotToWait := expectedSlotStart - status.LatestAcceptedBlockSlot
-	secToWait := time.Duration(slotToWait) * time.Duration(api.ProtocolParameters().SlotDurationInSeconds()) * time.Second
+	secToWait := time.Duration(slotToWait) * time.Duration(testAPI.ProtocolParameters().SlotDurationInSeconds()) * time.Second
 	fmt.Println("Wait for ", secToWait, "until expected epoch: ", expectedEpoch)
 	time.Sleep(secToWait)
 
@@ -309,7 +308,7 @@ func createLogDirectory(testName string) string {
 	return dir
 }
 
-func AwaitEventAPITopics(t *testing.T, duration time.Duration, cancleFunc context.CancelFunc, receiveChan chan struct{}, numOfTopics int) error {
+func AwaitEventAPITopics(duration time.Duration, cancleFunc context.CancelFunc, receiveChan chan struct{}, numOfTopics int) error {
 	counter := 0
 	timer := time.NewTimer(duration)
 	defer timer.Stop()
@@ -338,5 +337,6 @@ func getDelegationStartEpoch(api iotago.API, commitmentSlot iotago.SlotIndex) io
 	if pastBoundedSlot <= registrationSlot {
 		return pastBoundedEpoch + 1
 	}
+
 	return pastBoundedEpoch + 2
 }

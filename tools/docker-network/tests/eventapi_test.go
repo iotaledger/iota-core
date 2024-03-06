@@ -68,12 +68,12 @@ func test_Commitments(t *testing.T, d *DockerTestFramework) {
 	// prepare the expected commitments to be received
 	expectedLatestSlots := make([]iotago.SlotIndex, 0)
 	for i := infoResp.Status.LatestCommitmentID.Slot() + 2; i < infoResp.Status.LatestCommitmentID.Slot()+6; i++ {
-		expectedLatestSlots = append(expectedLatestSlots, iotago.SlotIndex(i))
+		expectedLatestSlots = append(expectedLatestSlots, i)
 	}
 
 	expectedFinalizedSlots := make([]iotago.SlotIndex, 0)
 	for i := infoResp.Status.LatestFinalizedSlot + 2; i < infoResp.Status.LatestFinalizedSlot+6; i++ {
-		expectedFinalizedSlots = append(expectedFinalizedSlots, iotago.SlotIndex(i))
+		expectedFinalizedSlots = append(expectedFinalizedSlots, i)
 	}
 
 	assertions := []func(){
@@ -87,7 +87,7 @@ func test_Commitments(t *testing.T, d *DockerTestFramework) {
 	}
 
 	// wait until all topics receives all expected objects
-	err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+	err = AwaitEventAPITopics(d.optsWaitFor, cancel, finish, totalTopics)
 	require.NoError(t, err)
 }
 
@@ -104,7 +104,7 @@ func test_ValidationBlocks(t *testing.T, d *DockerTestFramework) {
 	defer eventClt.Close()
 
 	// prepare the expected commitments to be received
-	validators := make(map[string]struct{}, 0)
+	validators := make(map[string]struct{})
 	nodes := d.Nodes("V1", "V2", "V3", "V4")
 	for _, node := range nodes {
 		validators[node.AccountAddressBech32] = struct{}{}
@@ -122,7 +122,7 @@ func test_ValidationBlocks(t *testing.T, d *DockerTestFramework) {
 	}
 
 	// wait until all topics receives all expected objects
-	err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+	err = AwaitEventAPITopics(d.optsWaitFor, cancel, finish, totalTopics)
 	require.NoError(t, err)
 }
 
@@ -140,7 +140,7 @@ func test_BasicTaggedDataBlocks(t *testing.T, d *DockerTestFramework) {
 	account := d.CreateAccount()
 
 	// prepare data blocks to send
-	expectedBlocks := make(map[string]*iotago.Block, 0)
+	expectedBlocks := make(map[string]*iotago.Block)
 	for i := 0; i < 10; i++ {
 		blk := d.CreateTaggedDataBlock(account.ID, []byte("tag"))
 		expectedBlocks[blk.MustID().ToHex()] = blk
@@ -162,7 +162,7 @@ func test_BasicTaggedDataBlocks(t *testing.T, d *DockerTestFramework) {
 	}
 
 	// wait until all topics starts listening
-	err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+	err = AwaitEventAPITopics(d.optsWaitFor, cancel, finish, totalTopics)
 	require.NoError(t, err)
 
 	// issue blocks
@@ -174,7 +174,7 @@ func test_BasicTaggedDataBlocks(t *testing.T, d *DockerTestFramework) {
 	}()
 
 	// wait until all topics receives all expected objects
-	err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+	err = AwaitEventAPITopics(d.optsWaitFor, cancel, finish, totalTopics)
 	require.NoError(t, err)
 }
 
@@ -224,7 +224,7 @@ func test_DelegationTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 	// d.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID(), finish)
 
 	// wait until all topics starts listening
-	err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+	err = AwaitEventAPITopics(d.optsWaitFor, cancel, finish, totalTopics)
 	require.NoError(t, err)
 
 	// issue blocks
@@ -236,7 +236,7 @@ func test_DelegationTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 	}()
 
 	// wait until all topics receives all expected objects
-	err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+	err = AwaitEventAPITopics(d.optsWaitFor, cancel, finish, totalTopics)
 	require.NoError(t, err)
 }
 
@@ -286,7 +286,7 @@ func test_AccountTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 		// d.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID(), finish)
 
 		// wait until all topics starts listening
-		err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+		err = AwaitEventAPITopics(d.optsWaitFor, cancel, finish, totalTopics)
 		require.NoError(t, err)
 
 		// issue blocks
@@ -301,7 +301,7 @@ func test_AccountTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 		d.wallet.AddAccount(fullAccount.ID, fullAccount)
 
 		// wait until all topics receives all expected objects
-		err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+		err = AwaitEventAPITopics(d.optsWaitFor, cancel, finish, totalTopics)
 		require.NoError(t, err)
 	}
 }
@@ -354,7 +354,7 @@ func test_FoundryTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 		// d.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID(), finish)
 
 		// wait until all topics starts listening
-		err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+		err = AwaitEventAPITopics(d.optsWaitFor, cancel, finish, totalTopics)
 		require.NoError(t, err)
 
 		// issue blocks
@@ -366,7 +366,7 @@ func test_FoundryTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 		}()
 
 		// wait until all topics receives all expected objects
-		err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+		err = AwaitEventAPITopics(d.optsWaitFor, cancel, finish, totalTopics)
 		require.NoError(t, err)
 	}
 }
@@ -413,11 +413,8 @@ func test_NFTTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 			assertion()
 		}
 
-		// d.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID(), finish)
-		// d.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID(), finish)
-
 		// wait until all topics starts listening
-		err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+		err = AwaitEventAPITopics(d.optsWaitFor, cancel, finish, totalTopics)
 		require.NoError(t, err)
 
 		// issue blocks
@@ -429,7 +426,7 @@ func test_NFTTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 		}()
 
 		// wait until all topics receives all expected objects
-		err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+		err = AwaitEventAPITopics(d.optsWaitFor, cancel, finish, totalTopics)
 		require.NoError(t, err)
 	}
 }

@@ -31,8 +31,8 @@ func Test_CoreAPI(t *testing.T) {
 	d.AddValidatorNode("V4", "docker-network-inx-validator-4-1", "http://localhost:8040", "rms1pr8cxs3dzu9xh4cduff4dd4cxdthpjkpwmz2244f75m0urslrsvtsshrrjw")
 	d.AddNode("node5", "docker-network-node-5-1", "http://localhost:8090")
 
-	err := d.Run()
-	require.NoError(t, err)
+	runErr := d.Run()
+	require.NoError(t, runErr)
 
 	d.WaitUntilNetworkReady()
 
@@ -103,11 +103,11 @@ func Test_CoreAPI(t *testing.T) {
 		{
 			name: "Test_CommitmentBySlot",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				assetsPerSlot.forEachSlot(t, func(t *testing.T, slot iotago.SlotIndex, sharedCommitments map[string]iotago.CommitmentID) {
+				assetsPerSlot.forEachSlot(t, func(t *testing.T, slot iotago.SlotIndex, commitmentsPerNode map[string]iotago.CommitmentID) {
 					resp, err := d.wallet.Clients[nodeAlias].CommitmentByIndex(context.Background(), slot)
 					require.NoError(t, err)
 					require.NotNil(t, resp)
-					sharedCommitments[nodeAlias] = resp.MustID()
+					commitmentsPerNode[nodeAlias] = resp.MustID()
 				})
 			},
 		},
