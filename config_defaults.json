@@ -40,12 +40,12 @@
     "bindAddress": "localhost:6060"
   },
   "restAPI": {
-    "enabled": true,
     "bindAddress": "0.0.0.0:14265",
     "publicRoutes": [
       "/health",
       "/api/routes",
       "/api/core/v3/info",
+      "/api/core/v3/network*",
       "/api/core/v3/blocks*",
       "/api/core/v3/transactions*",
       "/api/core/v3/commitments*",
