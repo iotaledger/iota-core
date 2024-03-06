@@ -8,9 +8,9 @@ import (
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/iota-core/components/protocol"
-	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/requesthandler"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 )
 
@@ -35,7 +35,7 @@ var (
 type dependencies struct {
 	dig.In
 	Protocol         *protocolpkg.Protocol
-	BlockHandler     *blockhandler.BlockHandler
+	RequestHandler   *requesthandler.RequestHandler
 	Echo             *echo.Echo `optional:"true"`
 	RestRouteManager *restapipkg.RestRouteManager
 	INXServer        *Server

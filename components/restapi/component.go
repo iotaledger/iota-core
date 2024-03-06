@@ -15,7 +15,6 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
-	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/jwt"
 	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
@@ -85,23 +84,6 @@ func provide(c *dig.Container) error {
 		e.Use(middleware.BodyLimit(ParamsRestAPI.Limits.MaxBodyLength))
 
 		return e
-	}); err != nil {
-		Component.LogPanic(err.Error())
-	}
-
-	type proxyDeps struct {
-		dig.In
-		Echo *echo.Echo
-	}
-
-	if err := c.Provide(func(deps proxyDeps) *restapi.RestRouteManager {
-		return restapi.NewRestRouteManager(deps.Echo)
-	}); err != nil {
-		Component.LogPanic(err.Error())
-	}
-
-	if err := c.Provide(func(deps dependencies) *blockhandler.BlockHandler {
-		return blockhandler.New(deps.Protocol)
 	}); err != nil {
 		Component.LogPanic(err.Error())
 	}
