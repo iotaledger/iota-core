@@ -349,7 +349,7 @@ func (i *BlockIssuer) SubmitBlock(ctx context.Context, block *model.Block) error
 }
 
 func (i *BlockIssuer) SubmitBlockWithoutAwaitingBooking(block *model.Block, node *Node) error {
-	if err := node.BlockHandler.SubmitBlockWithoutAwaitingBooking(block); err != nil {
+	if err := node.RequestHandler.SubmitBlockWithoutAwaitingBooking(block); err != nil {
 		return err
 	}
 

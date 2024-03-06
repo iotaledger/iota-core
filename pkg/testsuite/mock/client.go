@@ -270,7 +270,7 @@ func (c *TestClient) StakingAccount(ctx context.Context, accountAddress *iotago.
 }
 
 func (c *TestClient) SubmitBlock(ctx context.Context, block *iotago.Block) (iotago.BlockID, error) {
-	return c.Node.BlockHandler.SubmitBlockAndAwaitBooking(ctx, block)
+	return c.Node.RequestHandler.SubmitBlockAndAwaitBooking(ctx, block)
 }
 
 func (c *TestClient) TransactionIncludedBlock(ctx context.Context, txID iotago.TransactionID) *iotago.Block {

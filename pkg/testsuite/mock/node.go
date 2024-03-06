@@ -16,7 +16,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -24,6 +23,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/requesthandler"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/wallet"
 )
@@ -51,11 +51,11 @@ type Node struct {
 	Testing *testing.T
 	logger  log.Logger
 
-	Name         string
-	isValidator  bool
-	Validator    *BlockIssuer
-	KeyManager   *wallet.KeyManager
-	BlockHandler *blockhandler.BlockHandler
+	Name           string
+	isValidator    bool
+	Validator      *BlockIssuer
+	KeyManager     *wallet.KeyManager
+	RequestHandler *requesthandler.RequestHandler
 
 	ctx       context.Context
 	ctxCancel context.CancelFunc
@@ -135,7 +135,7 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 		n.Endpoint,
 		opts...,
 	)
-	n.BlockHandler = blockhandler.New(n.Protocol)
+	n.RequestHandler = requesthandler.New(n.Protocol)
 
 	_, pub := n.KeyManager.KeyPair()
 	accountID := iotago.AccountID(blake2b.Sum256(pub))
