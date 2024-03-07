@@ -204,6 +204,7 @@ func (m *Manager) isCommittable(slot iotago.SlotIndex, acceptedBlockSlot iotago.
 }
 
 func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, error) {
+	m.LogTrace("Trying to create commitment for slot", "slot", slot)
 	m.commitmentMutex.Lock()
 	defer m.commitmentMutex.Unlock()
 

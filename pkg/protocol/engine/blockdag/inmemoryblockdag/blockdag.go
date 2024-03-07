@@ -57,6 +57,7 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 
 			e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 				for _, block := range b.uncommittedSlotBlocks.GetValuesAndEvict(commitment.ID()) {
+					b.LogTrace("remove from uncommittedSlotBlocks", "block", block.ID(), "commitmentID", block.SlotCommitmentID())
 					b.setupBlock(block)
 				}
 			}, event.WithWorkerPool(wp))
@@ -130,6 +131,7 @@ func (b *BlockDAG) Attach(data *model.Block) (block *blocks.Block, wasAttached b
 		if b.uncommittedSlotBlocks.AddWithFunc(block.SlotCommitmentID(), block, func() bool {
 			return block.SlotCommitmentID().Slot() > b.latestCommitmentFunc().Commitment().Slot
 		}) {
+			b.LogTrace("add to uncommittedSlotBlocks", "block", block.ID(), "commitmentID", block.SlotCommitmentID())
 			return
 		}
 
