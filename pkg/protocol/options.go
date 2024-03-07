@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"time"
+
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -51,6 +53,9 @@ type Options struct {
 
 	// SnapshotPath is the path to the snapshot file that should be used to initialize the protocol.
 	SnapshotPath string
+
+	// MaxAllowedWallClockDrift specifies how far in the future are blocks allowed to be ahead of our own wall clock (defaults to 0 seconds).
+	MaxAllowedWallClockDrift time.Duration
 
 	// EngineOptions contains the options for the Engines.
 	EngineOptions []options.Option[engine.Engine]
@@ -154,6 +159,13 @@ func WithBaseDirectory(baseDirectory string) options.Option[Protocol] {
 func WithSnapshotPath(snapshot string) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.Options.SnapshotPath = snapshot
+	}
+}
+
+// WithMaxAllowedWallClockDrift specifies how far in the future are blocks allowed to be ahead of our own wall clock (defaults to 0 seconds).
+func WithMaxAllowedWallClockDrift(d time.Duration) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.Options.MaxAllowedWallClockDrift = d
 	}
 }
 

@@ -7,20 +7,13 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	inx "github.com/iotaledger/inx/go"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
 )
 
 func inxNodeStatus(status *syncmanager.SyncStatus) *inx.NodeStatus {
-	var finalizedCommitment *model.Commitment
-	// HasPruned is false when a node just started from a snapshot and keeps data of the LastPrunedEpoch, thus still need
-	// to send finalized commitment.
-	if !status.HasPruned || status.LatestFinalizedSlot > deps.Protocol.CommittedAPI().TimeProvider().EpochEnd(status.LastPrunedEpoch) {
-		var err error
-		finalizedCommitment, err = deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(status.LatestFinalizedSlot)
-		if err != nil {
-			return nil
-		}
+	finalizedCommitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(status.LatestFinalizedSlot)
+	if err != nil {
+		return nil
 	}
 
 	return &inx.NodeStatus{
@@ -31,6 +24,7 @@ func inxNodeStatus(status *syncmanager.SyncStatus) *inx.NodeStatus {
 		LatestCommitment:          inxCommitment(status.LatestCommitment),
 		LatestFinalizedCommitment: inxCommitment(finalizedCommitment),
 		PruningEpoch:              uint32(status.LastPrunedEpoch),
+		HasPruned:                 status.HasPruned,
 	}
 }
 

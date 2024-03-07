@@ -55,7 +55,7 @@ func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 	requestedSlot := latestCommittedSlot
 	var cursorIndex uint32
 	if len(c.QueryParam(api.ParameterCursor)) != 0 {
-		requestedSlot, cursorIndex, err = httpserver.ParseCursorQueryParam(c, api.ParameterCursor)
+		requestedSlot, cursorIndex, err = httpserver.ParseSlotCursorQueryParam(c, api.ParameterCursor)
 		if err != nil {
 			return nil, err
 		}
