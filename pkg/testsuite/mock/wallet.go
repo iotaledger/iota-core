@@ -59,8 +59,6 @@ type Wallet struct {
 	// LatestBlockIssuanceResp is the cached response from the latest query to the block issuance endpoint.
 	latestBlockIssuanceResp *api.IssuanceBlockHeaderResponse
 
-	Node *Node
-
 	keyManager *wallet.KeyManager
 
 	BlockIssuer   *BlockIssuer
@@ -88,7 +86,6 @@ func NewWallet(t *testing.T, name string, node *Node, keyManager ...*wallet.KeyM
 		Testing:       t,
 		Name:          name,
 		Client:        client,
-		Node:          node,
 		outputs:       make(map[string]*OutputData),
 		transactions:  make(map[string]*iotago.Transaction),
 		keyManager:    km,
@@ -104,7 +101,6 @@ func (w *Wallet) SetBlockIssuer(accountData *AccountData) {
 func (w *Wallet) SetDefaultNode(node *Node) {
 	w.Client = &TestSuiteClient{node}
 	w.BlockIssuer.client = w.Client
-	w.Node = node
 }
 
 func (w *Wallet) SetCurrentSlot(slot iotago.SlotIndex) {

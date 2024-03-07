@@ -275,6 +275,29 @@ func (t *TestSuite) Nodes(names ...string) []*mock.Node {
 	return nodes
 }
 
+func (t *TestSuite) ClientsForNodes(names ...string) []mock.Client {
+	if len(names) == 0 {
+		t.mutex.RLock()
+		defer t.mutex.RUnlock()
+
+		clients := make([]mock.Client, 0, t.nodes.Size())
+		t.nodes.ForEach(func(_ string, node *mock.Node) bool {
+			clients = append(clients, node.Client)
+
+			return true
+		})
+
+		return clients
+	}
+
+	clients := make([]mock.Client, len(names))
+	for i, name := range names {
+		clients[i] = t.Node(name).Client
+	}
+
+	return clients
+}
+
 func (t *TestSuite) AccountsOfNodes(names ...string) []iotago.AccountID {
 	nodes := t.Nodes(names...)
 

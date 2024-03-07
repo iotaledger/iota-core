@@ -428,7 +428,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{5}, 1, "4.0", ts.Nodes("node1"), false, false)
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("5.0"), true, ts.Nodes()...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("5.0"), true, mock.ClientsForNodes(ts.Nodes())...)
 	}
 
 	partitions := map[string][]*mock.Node{
@@ -678,7 +678,7 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{5}, 1, "4.0", ts.Nodes("node1"), false, false)
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("5.0"), true, ts.Nodes()...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("5.0"), true, mock.ClientsForNodes(ts.Nodes())...)
 	}
 
 	partitions := map[string][]*mock.Node{

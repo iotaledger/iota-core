@@ -56,7 +56,7 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 		// Reviving the chain should select one parent from the last committed slot.
 		require.Len(t, block0.Parents(), 1)
 		require.Equal(t, block0.Parents()[0].Alias(), "Genesis")
-		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.Nodes("node0")...)
+		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.ClientsForNodes("node0")...)
 	}
 
 	// Need to issue to slot 52 so that all other nodes can warp sync up to slot 49 and then commit slot 50 themselves.
@@ -65,7 +65,7 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 
 		ts.AssertLatestCommitmentSlotIndex(50, ts.Nodes()...)
 		ts.AssertEqualStoredCommitmentAtIndex(50, ts.Nodes()...)
-		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.Nodes()...)
+		ts.AssertBlocksExist(ts.Blocks("block0"), true, mock.ClientsForNodes(ts.Nodes())...)
 	}
 
 	// Continue issuing on all nodes for a few slots.
@@ -166,7 +166,7 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 		// Reviving the chain should select one parent from the last committed slot.
 		require.Len(t, block0.Parents(), 1)
 		require.EqualValues(t, block0.Parents()[0].Slot(), 8)
-		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.Nodes("node0-restarted")...)
+		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.ClientsForNodes("node0-restarted")...)
 	}
 
 	// Need to issue to slot 22 so that all other nodes can warp sync up to slot 19 and then commit slot 20 themselves.
@@ -256,7 +256,7 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 		// Reviving the chain should select one parent from the last committed slot.
 		require.Len(t, block0.Parents(), 1)
 		require.EqualValues(t, block0.Parents()[0].Slot(), 8)
-		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.Nodes("node0-restarted")...)
+		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.ClientsForNodes("node0-restarted")...)
 	}
 
 	// Need to issue to slot 22 so that all other nodes can warp sync up to slot 19 and then commit slot 20 themselves.
@@ -332,7 +332,7 @@ func TestLossOfAcceptanceWithoutRestart(t *testing.T) {
 		// Reviving the chain should select one parent from the last committed slot.
 		require.Len(t, block0.Parents(), 1)
 		require.EqualValues(t, block0.Parents()[0].Slot(), 8)
-		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.Nodes("node0")...)
+		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.ClientsForNodes("node0")...)
 	}
 
 	// Need to issue to slot 22 so that all other nodes can warp sync up to slot 19 and then commit slot 20 themselves.

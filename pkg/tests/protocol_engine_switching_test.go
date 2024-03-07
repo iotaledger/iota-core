@@ -197,7 +197,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		}
 		ts.AssertStrongTips(tipBlocks, ts.Nodes()...)
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.Nodes()...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, mock.ClientsForNodes(ts.Nodes())...)
 	}
 
 	// Split into partitions P1 and P2.
@@ -377,9 +377,9 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	// Make sure that nodes that switched their engine still have blocks with prefix P0 from before the fork.
 	// Those nodes should also have all the blocks from the target fork P1 and should not have blocks from P2.
 	// This is to make sure that the storage was copied correctly during engine switching.
-	ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.Nodes()...)
-	ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, ts.Nodes()...)
-	ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, ts.Nodes()...)
+	ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, mock.ClientsForNodes(ts.Nodes())...)
+	ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, mock.ClientsForNodes(ts.Nodes())...)
+	ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, mock.ClientsForNodes(ts.Nodes())...)
 
 	ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
 
@@ -453,6 +453,8 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 	const expectedCommittedSlotAfterPartitionMerge = 19
 	nodesP1 := []*mock.Node{node0, node1, node2}
 	nodesP2 := []*mock.Node{node3}
+	clientsP1 := []mock.Client{node0.Client, node1.Client, node2.Client}
+	clientsP2 := []mock.Client{node3.Client}
 
 	nodeOpts := []options.Option[protocol.Protocol]{
 		protocol.WithNotarizationProvider(
@@ -530,7 +532,7 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 
 		ts.AssertStrongTips(ts.Blocks("P0:7.3-node0", "P0:7.3-node1", "P0:7.3-node2", "P0:7.3-node3"), ts.Nodes()...)
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.Nodes()...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, mock.ClientsForNodes(ts.Nodes())...)
 	}
 
 	// Split into partitions P1 and P2.
@@ -579,8 +581,8 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 
 		ts.AssertStrongTips(ts.Blocks("P1:20.3-node0", "P1:20.3-node1", "P1:20.3-node2"), nodesP1...)
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, nodesP1...)
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), false, nodesP2...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, clientsP1...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), false, clientsP2...)
 
 		// Assert Protocol.Chains and Protocol.Commitments state.
 		engineCommitmentsP1 := ts.CommitmentsOfMainEngine(nodesP1[0], 12, 18)
@@ -630,8 +632,8 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 
 		ts.AssertStrongTips(ts.Blocks("P2:20.3-node3"), nodesP2...)
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), true, nodesP2...)
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, nodesP1...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), true, clientsP2...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, clientsP1...)
 
 		// Assert Protocol.Chains and Protocol.Commitments state.
 		engineCommitmentsP2 = ts.CommitmentsOfMainEngine(nodesP2[0], 0, 18)
@@ -667,9 +669,9 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 	// Make sure that nodes that switched their engine still have blocks with prefix P0 from before the fork.
 	// Those nodes should also have all the blocks from the target fork P1 and should not have blocks from P2.
 	// This is to make sure that the storage was copied correctly during engine switching.
-	ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.Nodes()...)
-	ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, ts.Nodes()...)
-	ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, ts.Nodes()...)
+	ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, mock.ClientsForNodes(ts.Nodes())...)
+	ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, mock.ClientsForNodes(ts.Nodes())...)
+	ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, mock.ClientsForNodes(ts.Nodes())...)
 
 	ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
 

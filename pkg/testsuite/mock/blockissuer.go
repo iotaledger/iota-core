@@ -106,7 +106,11 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, o
 			commitment.Slot > protoParams.MinCommittableAge() {
 
 			commitmentSlot := commitment.Slot - protoParams.MinCommittableAge()
-			commitment = i.client.CommitmentByIndex(ctx, commitmentSlot)
+			var err error
+			commitment, err = i.client.CommitmentByIndex(ctx, commitmentSlot)
+			if err != nil {
+				return nil, ierrors.Errorf("can't issue block: failed to get commitment at slot %d", commitmentSlot)
+			}
 		}
 
 		blockParams.BlockHeader.SlotCommitment = commitment
@@ -329,7 +333,10 @@ func (i *BlockIssuer) setDefaultBlockParams(ctx context.Context, blockParams *Bl
 
 func (i *BlockIssuer) validateReferences(ctx context.Context, issuingTime time.Time, slotCommitmentIndex iotago.SlotIndex, references model.ParentReferences) error {
 	for _, parent := range lo.Flatten(lo.Map(lo.Values(references), func(ds iotago.BlockIDs) []iotago.BlockID { return ds })) {
-		b := i.client.BlockByBlockID(ctx, parent)
+		b, err := i.client.BlockByBlockID(ctx, parent)
+		if err != nil {
+			return ierrors.Wrapf(err, "cannot issue block if parent %s does not exist", parent)
+		}
 
 		if b.Header.IssuingTime.After(issuingTime) {
 			return ierrors.Errorf("cannot issue block if the parents issuingTime is ahead block's issuingTime: %s vs %s", b.Header.IssuingTime, issuingTime.UTC())

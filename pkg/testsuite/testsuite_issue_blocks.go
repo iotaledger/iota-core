@@ -14,24 +14,24 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (t *TestSuite) assertParentsCommitmentExistFromBlockOptions(blockOpts []options.Option[mock.BlockHeaderParams], node *mock.Node) {
+func (t *TestSuite) assertParentsCommitmentExistFromBlockOptions(blockOpts []options.Option[mock.BlockHeaderParams], client mock.Client) {
 	params := options.Apply(&mock.BlockHeaderParams{}, blockOpts)
 	parents := params.References[iotago.StrongParentType]
 	parents = append(parents, params.References[iotago.WeakParentType]...)
 	parents = append(parents, params.References[iotago.ShallowLikeParentType]...)
 
 	for _, block := range t.Blocks(lo.Map(parents, func(id iotago.BlockID) string { return id.Alias() })...) {
-		t.AssertCommitmentSlotIndexExists(block.SlotCommitmentID().Slot(), node)
+		t.AssertCommitmentSlotIndexExists(block.SlotCommitmentID().Slot(), client)
 	}
 }
 
-func (t *TestSuite) assertParentsExistFromBlockOptions(blockOpts []options.Option[mock.BlockHeaderParams], node *mock.Node) {
+func (t *TestSuite) assertParentsExistFromBlockOptions(blockOpts []options.Option[mock.BlockHeaderParams], client mock.Client) {
 	params := options.Apply(&mock.BlockHeaderParams{}, blockOpts)
 	parents := params.References[iotago.StrongParentType]
 	parents = append(parents, params.References[iotago.WeakParentType]...)
 	parents = append(parents, params.References[iotago.ShallowLikeParentType]...)
 
-	t.AssertBlocksExist(t.Blocks(lo.Map(parents, func(id iotago.BlockID) string { return id.Alias() })...), true, node)
+	t.AssertBlocksExist(t.Blocks(lo.Map(parents, func(id iotago.BlockID) string { return id.Alias() })...), true, client)
 }
 
 func (t *TestSuite) limitParentsCountInBlockOptions(blockOpts []options.Option[mock.BlockHeaderParams], maxCount int) []options.Option[mock.BlockHeaderParams] {
@@ -63,8 +63,8 @@ func (t *TestSuite) registerBlock(blockName string, block *blocks.Block) {
 
 func (t *TestSuite) IssueValidationBlockWithHeaderOptions(blockName string, node *mock.Node, blockHeaderOpts ...options.Option[mock.BlockHeaderParams]) (*blocks.Block, error) {
 	t.Wait(t.Nodes()...)
-	t.assertParentsExistFromBlockOptions(blockHeaderOpts, node)
-	t.assertParentsCommitmentExistFromBlockOptions(blockHeaderOpts, node)
+	t.assertParentsExistFromBlockOptions(blockHeaderOpts, node.Client)
+	t.assertParentsCommitmentExistFromBlockOptions(blockHeaderOpts, node.Client)
 
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
@@ -105,8 +105,8 @@ func (t *TestSuite) IssueValidationBlockWithOptions(blockName string, node *mock
 
 func (t *TestSuite) IssueBasicBlockWithOptions(blockName string, wallet *mock.Wallet, payload iotago.Payload, blockOpts ...options.Option[mock.BlockHeaderParams]) (*blocks.Block, error) {
 	t.Wait(t.Nodes()...)
-	t.assertParentsExistFromBlockOptions(blockOpts, wallet.Node)
-	t.assertParentsCommitmentExistFromBlockOptions(blockOpts, wallet.Node)
+	t.assertParentsExistFromBlockOptions(blockOpts, wallet.Client)
+	t.assertParentsCommitmentExistFromBlockOptions(blockOpts, wallet.Client)
 
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
@@ -153,8 +153,8 @@ func (t *TestSuite) issueBlockRow(prefix string, row int, parentsPrefix string, 
 		// Only issue validation blocks if account has staking feature and is part of committee.
 		if node.Validator != nil && lo.Return1(node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(t.currentSlot)).HasAccount(node.Validator.AccountData.ID) {
 			blockHeaderOptions := append(issuingOptionsCopy[node.Name], mock.WithIssuingTime(issuingTime))
-			t.assertParentsCommitmentExistFromBlockOptions(blockHeaderOptions, node)
-			t.assertParentsExistFromBlockOptions(blockHeaderOptions, node)
+			t.assertParentsCommitmentExistFromBlockOptions(blockHeaderOptions, node.Client)
+			t.assertParentsExistFromBlockOptions(blockHeaderOptions, node.Client)
 
 			b, err = t.IssueValidationBlockWithOptions(blockName, node, mock.WithValidationBlockHeaderOptions(blockHeaderOptions...), mock.WithHighestSupportedVersion(node.HighestSupportedVersion()), mock.WithProtocolParametersHash(node.ProtocolParametersHash()))
 			require.NoError(t.Testing, err)
@@ -171,8 +171,8 @@ func (t *TestSuite) issueBlockRow(prefix string, row int, parentsPrefix string, 
 			tx := t.DefaultWallet().CreateBasicOutputsEquallyFromInput(txName, 1, inputName)
 
 			issuingOptionsCopy[node.Name] = t.limitParentsCountInBlockOptions(issuingOptionsCopy[node.Name], iotago.BasicBlockMaxParents)
-			t.assertParentsCommitmentExistFromBlockOptions(issuingOptionsCopy[node.Name], node)
-			t.assertParentsExistFromBlockOptions(issuingOptionsCopy[node.Name], node)
+			t.assertParentsCommitmentExistFromBlockOptions(issuingOptionsCopy[node.Name], node.Client)
+			t.assertParentsExistFromBlockOptions(issuingOptionsCopy[node.Name], node.Client)
 
 			t.DefaultWallet().SetDefaultNode(node)
 			b, err = t.IssueBasicBlockWithOptions(blockName, t.DefaultWallet(), tx, issuingOptionsCopy[node.Name]...)
@@ -222,7 +222,7 @@ func (t *TestSuite) IssueBlocksAtSlots(prefix string, slots []iotago.SlotIndex, 
 				if useCommitmentAtMinCommittableAge {
 					// Make sure that all nodes create blocks throughout the slot that commit to the same commitment at slot-minCommittableAge-1.
 					commitmentSlot := slot - t.API.ProtocolParameters().MinCommittableAge()
-					t.AssertCommitmentSlotIndexExists(commitmentSlot, nodes...)
+					t.AssertCommitmentSlotIndexExists(commitmentSlot, mock.ClientsForNodes(nodes)...)
 					for _, node := range nodes {
 						commitment, err := node.Protocol.Engines.Main.Get().Storage.Commitments().Load(commitmentSlot)
 						require.NoError(t.Testing, err)
@@ -233,7 +233,7 @@ func (t *TestSuite) IssueBlocksAtSlots(prefix string, slots []iotago.SlotIndex, 
 					}
 				}
 			}
-			t.AssertBlocksExist(blocksInSlot, true, nodes...)
+			t.AssertBlocksExist(blocksInSlot, true, mock.ClientsForNodes(nodes)...)
 		}
 	}
 

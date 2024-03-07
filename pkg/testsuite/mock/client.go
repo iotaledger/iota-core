@@ -18,12 +18,12 @@ type Client interface {
 	APIForSlot(slot iotago.SlotIndex) iotago.API
 	APIForTime(t time.Time) iotago.API
 	APIForVersion(version iotago.Version) iotago.API
-	BlockByBlockID(ctx context.Context, blockID iotago.BlockID) *iotago.Block
+	BlockByBlockID(ctx context.Context, blockID iotago.BlockID) (*iotago.Block, error)
 	BlockIssuance(ctx context.Context) *api.IssuanceBlockHeaderResponse
 	BlockIssuer(ctx context.Context) nodeclient.BlockIssuerClient
-	BlockMetadataByBlockID(ctx context.Context, blockID iotago.BlockID) *api.BlockMetadataResponse
+	BlockMetadataByBlockID(ctx context.Context, blockID iotago.BlockID) (*api.BlockMetadataResponse, error)
 	CommitmentByID(ctx context.Context, commitmentID iotago.CommitmentID) *iotago.Commitment
-	CommitmentByIndex(ctx context.Context, slot iotago.SlotIndex) *iotago.Commitment
+	CommitmentByIndex(ctx context.Context, slot iotago.SlotIndex) (*iotago.Commitment, error)
 	CommitmentUTXOChangesByID(ctx context.Context, commitmentID iotago.CommitmentID) *api.UTXOChangesResponse
 	CommitmentUTXOChangesByIndex(ctx context.Context, slot iotago.SlotIndex) *api.UTXOChangesResponse
 	CommitmentUTXOChangesFullByID(ctx context.Context, commitmentID iotago.CommitmentID) *api.UTXOChangesFullResponse
@@ -40,6 +40,7 @@ type Client interface {
 	Info(ctx context.Context) *api.InfoResponse
 	LatestAPI() iotago.API
 	Management(ctx context.Context) nodeclient.ManagementClient
+	Name() string
 	NodeSupportsRoute(ctx context.Context, route string) bool
 	OutputByID(ctx context.Context, outputID iotago.OutputID) iotago.Output
 	OutputMetadataByID(ctx context.Context, outputID iotago.OutputID) *api.OutputMetadata
@@ -57,6 +58,14 @@ type Client interface {
 
 type TestSuiteClient struct {
 	Node *Node
+}
+
+func NewTestSuiteClient(node *Node) *TestSuiteClient {
+	return &TestSuiteClient{Node: node}
+}
+
+func (c *TestSuiteClient) Name() string {
+	return c.Node.Name
 }
 
 func (c *TestSuiteClient) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
@@ -78,11 +87,8 @@ func (c *TestSuiteClient) APIForVersion(version iotago.Version) iotago.API {
 	return api
 }
 
-func (c *TestSuiteClient) BlockByBlockID(ctx context.Context, blockID iotago.BlockID) *iotago.Block {
-	block, err := c.Node.RequestHandler.BlockFromBlockID(blockID)
-	require.NoError(c.Node.Testing, err, "failed to get block by ID %s", blockID)
-
-	return block
+func (c *TestSuiteClient) BlockByBlockID(ctx context.Context, blockID iotago.BlockID) (*iotago.Block, error) {
+	return c.Node.RequestHandler.BlockFromBlockID(blockID)
 }
 
 func (c *TestSuiteClient) BlockIssuance(ctx context.Context) *api.IssuanceBlockHeaderResponse {
@@ -96,11 +102,8 @@ func (c *TestSuiteClient) BlockIssuer(_ context.Context) nodeclient.BlockIssuerC
 	panic("not implemented")
 }
 
-func (c *TestSuiteClient) BlockMetadataByBlockID(_ context.Context, blockID iotago.BlockID) *api.BlockMetadataResponse {
-	blockMetadataResponse, err := c.Node.RequestHandler.BlockMetadataFromBlockID(blockID)
-	require.NoError(c.Node.Testing, err, "failed to get block metadata by ID %s", blockID)
-
-	return blockMetadataResponse
+func (c *TestSuiteClient) BlockMetadataByBlockID(_ context.Context, blockID iotago.BlockID) (*api.BlockMetadataResponse, error) {
+	return c.Node.RequestHandler.BlockMetadataFromBlockID(blockID)
 }
 
 func (c *TestSuiteClient) CommitmentByID(_ context.Context, commitmentID iotago.CommitmentID) *iotago.Commitment {
@@ -110,11 +113,10 @@ func (c *TestSuiteClient) CommitmentByID(_ context.Context, commitmentID iotago.
 	return commitment.Commitment()
 }
 
-func (c *TestSuiteClient) CommitmentByIndex(_ context.Context, slot iotago.SlotIndex) *iotago.Commitment {
+func (c *TestSuiteClient) CommitmentByIndex(_ context.Context, slot iotago.SlotIndex) (*iotago.Commitment, error) {
 	commitment, err := c.Node.RequestHandler.GetCommitmentBySlot(slot)
-	require.NoError(c.Node.Testing, err, "failed to get commitment by slot %d", slot)
 
-	return commitment.Commitment()
+	return commitment.Commitment(), err
 }
 
 func (c *TestSuiteClient) CommitmentUTXOChangesByID(ctx context.Context, commitmentID iotago.CommitmentID) *api.UTXOChangesResponse {

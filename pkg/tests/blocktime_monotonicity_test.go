@@ -31,7 +31,7 @@ func Test_BlockTimeMonotonicity(t *testing.T) {
 		mock.WithIssuingTime(time0),
 	))
 
-	ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.Nodes()...)
+	ts.AssertBlocksExist(ts.Blocks("block0"), true, mock.ClientsForNodes(ts.Nodes())...)
 	ts.AssertBlocksInCacheBooked(ts.Blocks("block0"), true, ts.Nodes()...)
 
 	// Issue block1 with time0 -1 nanosecond

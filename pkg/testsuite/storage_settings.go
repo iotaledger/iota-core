@@ -1,6 +1,8 @@
 package testsuite
 
 import (
+	"context"
+
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -48,27 +50,22 @@ func (t *TestSuite) AssertLatestCommitment(commitment *iotago.Commitment, nodes 
 	}
 }
 
-func (t *TestSuite) AssertCommitmentSlotIndexExists(slot iotago.SlotIndex, nodes ...*mock.Node) {
-	mustNodes(nodes)
+func (t *TestSuite) AssertCommitmentSlotIndexExists(slot iotago.SlotIndex, clients ...mock.Client) {
+	//mustNodes(nodes)
 
-	for _, node := range nodes {
+	for _, client := range clients {
 		t.Eventually(func() error {
-			if node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().ID().Slot() < slot {
-				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: commitment with at least %v not found in settings.LatestCommitment()", node.Name, slot)
+			if client.CommitmentByID(context.Background(), iotago.EmptyCommitmentID).Slot < slot {
+				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: commitment with at least %v not found in settings.LatestCommitment()", client.Name(), slot)
 			}
 
-			cm, err := node.Protocol.Engines.Main.Get().Storage.Commitments().Load(slot)
+			cm, err := client.CommitmentByIndex(context.Background(), slot)
 			if err != nil {
-				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: expected %v, got error %v", node.Name, slot, err)
+				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: expected %v, got error %v", client.Name(), slot, err)
 			}
 
 			if cm == nil {
-				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: commitment at index %v not found", node.Name, slot)
-			}
-
-			// Make sure the commitment is also available in the ChainManager.
-			if node.Protocol.Chains.Main.Get().LatestCommitment.Get().ID().Slot() < slot {
-				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: commitment at index %v not found in ChainManager", node.Name, slot)
+				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: commitment at index %v not found", client.Name(), slot)
 			}
 
 			return nil

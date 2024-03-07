@@ -51,7 +51,9 @@ type Node struct {
 	Testing *testing.T
 	logger  log.Logger
 
-	Name           string
+	Name string
+
+	Client         *TestSuiteClient
 	isValidator    bool
 	Validator      *BlockIssuer
 	KeyManager     *wallet.KeyManager
@@ -140,9 +142,9 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 	_, pub := n.KeyManager.KeyPair()
 	accountID := iotago.AccountID(blake2b.Sum256(pub))
 
-	client := &TestSuiteClient{n}
+	n.Client = NewTestSuiteClient(n)
 	if n.isValidator {
-		n.Validator = NewBlockIssuer(n.Testing, n.Name, n.KeyManager, client, 0, accountID, n.isValidator)
+		n.Validator = NewBlockIssuer(n.Testing, n.Name, n.KeyManager, n.Client, 0, accountID, n.isValidator)
 	}
 	n.hookEvents()
 	n.hookEngineEvents(failOnBlockFiltered)
@@ -369,4 +371,13 @@ func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...o
 	}
 
 	return n.Validator.IssueValidationBlock(ctx, alias, opts...)
+}
+
+func ClientsForNodes(nodes []*Node) []Client {
+	clients := make([]Client, len(nodes))
+	for i, node := range nodes {
+		clients[i] = node.Client
+	}
+
+	return clients
 }

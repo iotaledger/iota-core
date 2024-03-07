@@ -88,7 +88,7 @@ func Test_BookInCommittedSlot(t *testing.T) {
 	{
 		ts.IssueBlocksAtEpoch("", 0, 4, "Genesis", ts.Nodes(), true, true)
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefixes("1", "2", "3", "4", "5", "6", "7"), true, ts.Nodes()...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefixes("1", "2", "3", "4", "5", "6", "7"), true, mock.ClientsForNodes(ts.Nodes())...)
 
 		ts.AssertBlocksInCachePreAccepted(ts.BlocksWithPrefixes("7.3"), true, ts.Nodes()...)
 
@@ -122,7 +122,7 @@ func Test_BookInCommittedSlot(t *testing.T) {
 		commitment := lo.PanicOnErr(nodeA.Protocol.Engines.Main.Get().Storage.Commitments().Load(3)).Commitment()
 		ts.IssueValidationBlockWithHeaderOptions("5*", ts.Node("nodeA"), mock.WithSlotCommitment(commitment), mock.WithStrongParents(ts.BlockIDsWithPrefix("4.3-")...))
 
-		ts.AssertBlocksExist(ts.Blocks("5*"), false, ts.Nodes("nodeA")...)
+		ts.AssertBlocksExist(ts.Blocks("5*"), false, ts.ClientsForNodes("nodeA")...)
 	}
 }
 
@@ -205,7 +205,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	{
 		ts.IssueBlocksAtEpoch("", 0, 4, "Genesis", ts.Nodes(), true, false)
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefixes("1", "2", "3", "4", "5", "6", "7"), true, ts.Nodes()...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefixes("1", "2", "3", "4", "5", "6", "7"), true, mock.ClientsForNodes(ts.Nodes())...)
 
 		ts.AssertBlocksInCachePreAccepted(ts.BlocksWithPrefixes("7.3"), false, ts.Nodes()...)
 		ts.AssertBlocksInCachePreConfirmed(ts.BlocksWithPrefixes("7.3"), false, ts.Nodes()...)
@@ -251,7 +251,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	{
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{8, 9, 11, 12, 13}, 6, "7.3", ts.Nodes(), true, false)
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefixes("8", "9", "11", "12", "13"), true, ts.Nodes()...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefixes("8", "9", "11", "12", "13"), true, mock.ClientsForNodes(ts.Nodes())...)
 
 		ts.AssertBlocksInCachePreAccepted(ts.BlocksWithPrefixes("13.5"), false, ts.Nodes()...)
 		ts.AssertBlocksInCachePreConfirmed(ts.BlocksWithPrefixes("13.5"), false, ts.Nodes()...)
