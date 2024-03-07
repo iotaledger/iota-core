@@ -14,7 +14,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
-	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
@@ -49,7 +48,7 @@ func init() {
 		Configure: configure,
 		Params:    params,
 		IsEnabled: func(_ *dig.Container) bool {
-			return restapi.ParamsRestAPI.Enabled && ParamsDebugAPI.Enabled
+			return ParamsDebugAPI.Enabled
 		},
 	}
 }
@@ -71,11 +70,6 @@ type dependencies struct {
 }
 
 func configure() error {
-	// check if RestAPI plugin is disabled
-	if !Component.App().IsComponentEnabled(restapi.Component.Identifier()) {
-		Component.LogPanic("RestAPI plugin needs to be enabled to use the DebugAPIV3 plugin")
-	}
-
 	blocksPerSlot = shrinkingmap.New[iotago.SlotIndex, []*blocks.Block]()
 	blocksPrunableStorage = prunable.NewBucketManager(database.Config{
 		Engine:    db.EngineRocksDB,

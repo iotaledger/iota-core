@@ -17,7 +17,8 @@ import (
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/jwt"
-	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/requesthandler"
 	"github.com/iotaledger/iota-core/pkg/restapi"
 )
 
@@ -30,9 +31,6 @@ func init() {
 		Provide:          provide,
 		Configure:        configure,
 		Run:              run,
-		IsEnabled: func(_ *dig.Container) bool {
-			return ParamsRestAPI.Enabled
-		},
 	}
 }
 
@@ -50,7 +48,7 @@ type dependencies struct {
 	NodePrivateKey     crypto.PrivKey `name:"nodePrivateKey"`
 	RestRouteManager   *restapi.RestRouteManager
 
-	Protocol *protocolpkg.Protocol
+	Protocol *protocol.Protocol
 }
 
 func initConfigParams(c *dig.Container) error {
@@ -73,6 +71,28 @@ func initConfigParams(c *dig.Container) error {
 }
 
 func provide(c *dig.Container) error {
+	type routeManagerDeps struct {
+		dig.In
+		Echo *echo.Echo
+	}
+
+	if err := c.Provide(func(deps routeManagerDeps) *restapi.RestRouteManager {
+		return restapi.NewRestRouteManager(deps.Echo)
+	}); err != nil {
+		Component.LogPanic(err.Error())
+	}
+
+	type requestHandlerDeps struct {
+		dig.In
+		Protocol *protocol.Protocol
+	}
+
+	if err := c.Provide(func(deps requestHandlerDeps) *requesthandler.RequestHandler {
+		return requesthandler.New(deps.Protocol)
+	}); err != nil {
+		Component.LogPanic(err.Error())
+	}
+
 	if err := c.Provide(func() *echo.Echo {
 		e := httpserver.NewEcho(
 			Component.Logger,
