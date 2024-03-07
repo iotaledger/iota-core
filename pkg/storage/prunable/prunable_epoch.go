@@ -27,14 +27,14 @@ func (p *Prunable) Rewards() *epochstore.EpochKVStore {
 	return p.poolRewards
 }
 
-func (p *Prunable) PoolStats() *epochstore.Store[*model.PoolsStats] {
+func (p *Prunable) PoolStats() *epochstore.BaseStore[*model.PoolsStats] {
 	return p.poolStats
 }
 
-func (p *Prunable) DecidedUpgradeSignals() *epochstore.Store[model.VersionAndHash] {
+func (p *Prunable) DecidedUpgradeSignals() *epochstore.BaseStore[model.VersionAndHash] {
 	return p.decidedUpgradeSignals
 }
 
-func (p *Prunable) Committee() *epochstore.Store[*account.SeatedAccounts] {
+func (p *Prunable) Committee() *epochstore.CachedStore[*account.SeatedAccounts] {
 	return p.committee
 }
