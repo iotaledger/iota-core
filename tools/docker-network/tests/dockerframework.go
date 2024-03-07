@@ -352,6 +352,16 @@ func (d *DockerTestFramework) StopIssueCandidacyPayload(nodes ...*Node) {
 	d.DockerComposeUp(true)
 }
 
+func (d *DockerTestFramework) IssueCandidacyPayloadFromAccount(issuerId iotago.AccountID) iotago.BlockID {
+	issuer := d.wallet.Account(issuerId)
+	ctx := context.TODO()
+	clt := d.wallet.DefaultClient()
+
+	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, issuer.Address)
+
+	return d.SubmitPayload(ctx, &iotago.CandidacyAnnouncement{}, issuerId, congestionResp, issuerResp)
+}
+
 // CreateTaggedDataBlock creates a block of a tagged data payload.
 func (d *DockerTestFramework) CreateTaggedDataBlock(issuerId iotago.AccountID, tag []byte) *iotago.Block {
 	issuer := d.wallet.Account(issuerId)
