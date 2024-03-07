@@ -262,18 +262,15 @@ func (w *DockerWallet) TransitionImplicitAccountToAccountOutput(inputID iotago.O
 	return accountInfo, signedTx
 }
 
-func (w *DockerWallet) CreateDelegationFromInput(issuerID iotago.AccountID, validator *Node, inputID iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
+func (w *DockerWallet) CreateDelegationFromInput(issuerID iotago.AccountID, validatorAccountAddr *iotago.AccountAddress, inputID iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
 	input := w.Output(inputID)
-
-	_, validatorAccountAddr, err := iotago.ParseBech32(validator.AccountAddressBech32)
-	require.NoError(w.Testing, err)
 
 	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().CurrentSlot()
 	apiForSlot := w.DefaultClient().APIForSlot(currentSlot)
 
 	// construct delegation transaction
 	//nolint:forcetypeassert
-	delegationOutput := builder.NewDelegationOutputBuilder(validatorAccountAddr.(*iotago.AccountAddress), input.Address, input.Output.BaseTokenAmount()).
+	delegationOutput := builder.NewDelegationOutputBuilder(validatorAccountAddr, input.Address, input.Output.BaseTokenAmount()).
 		StartEpoch(getDelegationStartEpoch(apiForSlot, issuerResp.LatestCommitment.Slot)).
 		DelegatedAmount(input.Output.BaseTokenAmount()).MustBuild()
 	signedTx, err := builder.NewTransactionBuilder(apiForSlot, w.AddressSigner(input.AddressIndex)).

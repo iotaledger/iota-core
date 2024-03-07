@@ -4,6 +4,7 @@ package tests
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -26,6 +27,12 @@ func (a coreAPIAssets) setupAssetsForSlot(slot iotago.SlotIndex) {
 func (a coreAPIAssets) assertCommitments(t *testing.T) {
 	for _, asset := range a {
 		asset.assertCommitments(t)
+	}
+}
+
+func (a coreAPIAssets) assertBICs(t *testing.T) {
+	for _, asset := range a {
+		asset.assertBICs(t)
 	}
 }
 
@@ -53,6 +60,12 @@ func (a coreAPIAssets) forEachOutput(t *testing.T, f func(*testing.T, iotago.Out
 		for outID, out := range asset.basicOutputs {
 			f(t, outID, out)
 		}
+		for outID, out := range asset.faucetOutputs {
+			f(t, outID, out)
+		}
+		for outID, out := range asset.delegationOutputs {
+			f(t, outID, out)
+		}
 	}
 }
 
@@ -68,13 +81,13 @@ func (a coreAPIAssets) forEachCommitment(t *testing.T, f func(*testing.T, map[st
 	}
 }
 
-func (a coreAPIAssets) forEachAccountAddress(t *testing.T, f func(*testing.T, *iotago.AccountAddress, map[string]iotago.CommitmentID)) {
+func (a coreAPIAssets) forEachAccountAddress(t *testing.T, f func(t *testing.T, accountAddress *iotago.AccountAddress, commitmentPerNode map[string]iotago.CommitmentID, bicPerNode map[string]iotago.BlockIssuanceCredits)) {
 	for _, asset := range a {
 		if asset.accountAddress == nil {
 			// no account created in this slot
 			continue
 		}
-		f(t, asset.accountAddress, asset.commitmentPerNode)
+		f(t, asset.accountAddress, asset.commitmentPerNode, asset.bicPerNode)
 	}
 }
 
@@ -124,14 +137,16 @@ func (a coreAPIAssets) assertUTXOOutputsInSlot(t *testing.T, slot iotago.SlotInd
 }
 
 type coreAPISlotAssets struct {
-	accountAddress *iotago.AccountAddress
-	dataBlocks     []*iotago.Block
-	valueBlocks    []*iotago.Block
-	transactions   []*iotago.SignedTransaction
-	basicOutputs   map[iotago.OutputID]iotago.Output
-	faucetOutputs  map[iotago.OutputID]iotago.Output
+	accountAddress    *iotago.AccountAddress
+	dataBlocks        []*iotago.Block
+	valueBlocks       []*iotago.Block
+	transactions      []*iotago.SignedTransaction
+	basicOutputs      map[iotago.OutputID]iotago.Output
+	faucetOutputs     map[iotago.OutputID]iotago.Output
+	delegationOutputs map[iotago.OutputID]iotago.Output
 
 	commitmentPerNode map[string]iotago.CommitmentID
+	bicPerNode        map[string]iotago.BlockIssuanceCredits
 }
 
 func (a *coreAPISlotAssets) assertCommitments(t *testing.T) {
@@ -145,14 +160,23 @@ func (a *coreAPISlotAssets) assertCommitments(t *testing.T) {
 	}
 }
 
+func (a *coreAPISlotAssets) assertBICs(t *testing.T) {
+	prevBIC := a.bicPerNode["V1"]
+	for _, bic := range a.bicPerNode {
+		require.Equal(t, bic, prevBIC)
+	}
+}
+
 func newAssetsPerSlot() *coreAPISlotAssets {
 	return &coreAPISlotAssets{
-		commitmentPerNode: make(map[string]iotago.CommitmentID),
 		dataBlocks:        make([]*iotago.Block, 0),
 		valueBlocks:       make([]*iotago.Block, 0),
 		transactions:      make([]*iotago.SignedTransaction, 0),
 		basicOutputs:      make(map[iotago.OutputID]iotago.Output),
 		faucetOutputs:     make(map[iotago.OutputID]iotago.Output),
+		delegationOutputs: make(map[iotago.OutputID]iotago.Output),
+		commitmentPerNode: make(map[string]iotago.CommitmentID),
+		bicPerNode:        make(map[string]iotago.BlockIssuanceCredits),
 	}
 }
 
@@ -179,15 +203,24 @@ func (d *DockerTestFramework) prepareAssets(totalAssetsNum int) (coreAPIAssets, 
 		valueBlock, signedTx, faucetOutput, basicOut := d.CreateValueBlock(account.ID)
 		valueBlockSlot := valueBlock.MustID().Slot()
 		assets.setupAssetsForSlot(valueBlockSlot)
-
+		// transaction and outputs are stored with the earliest included block
 		assets[valueBlockSlot].valueBlocks = append(assets[valueBlockSlot].valueBlocks, valueBlock)
 		assets[valueBlockSlot].transactions = append(assets[valueBlockSlot].transactions, signedTx)
-		assets[valueBlockSlot].basicOutputs[iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)] = basicOut
+		basicOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
+		assets[valueBlockSlot].basicOutputs[basicOutputID] = basicOut
 		assets[valueBlockSlot].faucetOutputs[faucetOutput.ID] = faucetOutput.Output
 		d.SubmitBlock(ctx, valueBlock)
 		d.AwaitTransactionPayloadAccepted(ctx, valueBlock.MustID())
 
-		latestSlot = lo.Max[iotago.SlotIndex](latestSlot, blockSlot, valueBlockSlot)
+		delegationOutputID, delegationOutput := d.DelegateToValidator(account.ID, d.Node("V1").AccountAddress(d.Testing))
+		assets.setupAssetsForSlot(delegationOutputID.CreationSlot())
+		assets[delegationOutputID.CreationSlot()].delegationOutputs[delegationOutputID] = delegationOutput
+
+		latestSlot = lo.Max[iotago.SlotIndex](latestSlot, blockSlot, valueBlockSlot, delegationOutputID.CreationSlot())
+
+		fmt.Printf("Assets for slot %d\n: dataBlock: %s block: %s\ntx: %s\nbasic output: %s, faucet output: %s\n delegation output: %s\n",
+			valueBlockSlot, block.MustID().String(), valueBlock.MustID().String(), lo.PanicOnErr(signedTx.ID()).String(),
+			basicOutputID.String(), faucetOutput.ID.String(), delegationOutputID.String())
 	}
 
 	return assets, latestSlot

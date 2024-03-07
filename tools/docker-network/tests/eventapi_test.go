@@ -193,7 +193,7 @@ func test_DelegationTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 	fundsOutputID := d.RequestFaucetFunds(ctx, iotago.AddressEd25519)
 
 	// prepare data blocks to send
-	delegationId, outputId, blk := d.CreateDelegationBlockFromInput(account.ID, d.Node("V2"), fundsOutputID)
+	delegationId, outputId, blk := d.CreateDelegationBlockFromInput(account.ID, d.Node("V2").AccountAddress(t), fundsOutputID)
 	expectedBlocks := map[string]*iotago.Block{
 		blk.MustID().ToHex(): blk,
 	}

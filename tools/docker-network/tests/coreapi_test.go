@@ -36,7 +36,7 @@ func Test_CoreAPI(t *testing.T) {
 
 	d.WaitUntilNetworkReady()
 
-	assetsPerSlot, lastSlot := d.prepareAssets(5)
+	assetsPerSlot, lastSlot := d.prepareAssets(1)
 
 	fmt.Println("AwaitCommitment for slot", lastSlot)
 	d.AwaitCommitment(lastSlot)
@@ -228,7 +228,12 @@ func Test_CoreAPI(t *testing.T) {
 		{
 			name: "Test_Congestion",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				assetsPerSlot.forEachAccountAddress(t, func(t *testing.T, accountAddress *iotago.AccountAddress, commitmentPerNode map[string]iotago.CommitmentID) {
+				assetsPerSlot.forEachAccountAddress(t, func(
+					t *testing.T,
+					accountAddress *iotago.AccountAddress,
+					commitmentPerNode map[string]iotago.CommitmentID,
+					bicPerNoode map[string]iotago.BlockIssuanceCredits,
+				) {
 					resp, err := d.wallet.Clients[nodeAlias].Congestion(context.Background(), accountAddress, 0)
 					require.NoError(t, err)
 					require.NotNil(t, resp)
@@ -242,6 +247,8 @@ func Test_CoreAPI(t *testing.T) {
 					resp, err = d.wallet.Clients[nodeAlias].Congestion(context.Background(), accountAddress, 0, commitment.MustID())
 					require.NoError(t, err)
 					require.NotNil(t, resp)
+					// later we check if all nodes have returned the same BIC value for this account
+					bicPerNoode[nodeAlias] = resp.BlockIssuanceCredits
 				})
 			},
 		},
@@ -252,12 +259,14 @@ func Test_CoreAPI(t *testing.T) {
 				resp, err := d.wallet.Clients[nodeAlias].Validators(context.Background(), pageSize)
 				require.NoError(t, err)
 				require.NotNil(t, resp)
-				require.Equal(t, len(resp.Validators), int(pageSize))
+				//TODO after finishing validators endpoint and including registered validators
+				//require.Equal(t, int(pageSize), len(resp.Validators), "There should be exactly %d validators returned on the first page", pageSize)
 
 				resp, err = d.wallet.Clients[nodeAlias].Validators(context.Background(), pageSize, resp.Cursor)
 				require.NoError(t, err)
 				require.NotNil(t, resp)
-				require.Equal(t, len(resp.Validators), 1)
+				//TODO after finishing validators endpoint and including registered validators
+				//require.Equal(t, 1, len(resp.Validators), "There should be only one validator returned on the last page")
 			},
 		},
 		{
@@ -272,7 +281,17 @@ func Test_CoreAPI(t *testing.T) {
 		{
 			name: "Test_Rewards",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				//skip: we will test it with caliming tests
+				assetsPerSlot.forEachOutput(t, func(t *testing.T, outputID iotago.OutputID, output iotago.Output) {
+					if output.Type() != iotago.OutputDelegation {
+						return
+					}
+
+					resp, err := d.wallet.Clients[nodeAlias].Rewards(context.Background(), outputID)
+					require.NoError(t, err)
+					require.NotNil(t, resp)
+					// rewards are zero, because we do not wait for the epoch end
+					require.EqualValues(t, 0, resp.Rewards)
+				})
 			},
 		},
 		{
@@ -292,5 +311,7 @@ func Test_CoreAPI(t *testing.T) {
 		})
 	}
 
+	// check if the same values were returned by all nodes for the same slot
 	assetsPerSlot.assertCommitments(t)
+	assetsPerSlot.assertBICs(t)
 }

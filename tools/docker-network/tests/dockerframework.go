@@ -405,14 +405,14 @@ func (d *DockerTestFramework) CreateValueBlock(issuerAccountID iotago.AccountID)
 }
 
 // CreateDelegationBlockFromInput consumes the given basic output, then build a block of a transaction that includes a delegation output, in order to delegate the given validator.
-func (d *DockerTestFramework) CreateDelegationBlockFromInput(issuerID iotago.AccountID, validator *Node, inputID iotago.OutputID) (iotago.DelegationID, iotago.OutputID, *iotago.Block) {
+func (d *DockerTestFramework) CreateDelegationBlockFromInput(issuerID iotago.AccountID, accountAdddress *iotago.AccountAddress, inputID iotago.OutputID) (iotago.DelegationID, iotago.OutputID, *iotago.Block) {
 	issuer := d.wallet.Account(issuerID)
 	ctx := context.TODO()
 	clt := d.wallet.DefaultClient()
 
 	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, issuer.Address)
 
-	signedTx := d.wallet.CreateDelegationFromInput(issuerID, validator, inputID, issuerResp)
+	signedTx := d.wallet.CreateDelegationFromInput(issuerID, accountAdddress, inputID, issuerResp)
 	outputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
 
 	return iotago.DelegationIDFromOutputID(outputID),
@@ -540,16 +540,16 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 }
 
 // DelegateToValidator requests faucet funds and delegate the UTXO output to the validator.
-func (d *DockerTestFramework) DelegateToValidator(fromID iotago.AccountID, validator *Node) iotago.EpochIndex {
+func (d *DockerTestFramework) DelegateToValidator(fromID iotago.AccountID, accountAddress *iotago.AccountAddress) (iotago.OutputID, *iotago.DelegationOutput) {
 	from := d.wallet.Account(fromID)
-	clt := d.wallet.Clients[validator.Name]
+	clt := d.wallet.DefaultClient()
 
 	// requesting faucet funds as delegation input
 	ctx := context.TODO()
 	fundsOutputID := d.RequestFaucetFunds(ctx, iotago.AddressEd25519)
 
 	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, from.Address)
-	signedTx := d.wallet.CreateDelegationFromInput(fromID, validator, fundsOutputID, issuerResp)
+	signedTx := d.wallet.CreateDelegationFromInput(fromID, accountAddress, fundsOutputID, issuerResp)
 
 	blkID := d.SubmitPayload(ctx, signedTx, from.ID, congestionResp, issuerResp)
 	d.AwaitTransactionPayloadAccepted(ctx, blkID)
@@ -557,7 +557,9 @@ func (d *DockerTestFramework) DelegateToValidator(fromID iotago.AccountID, valid
 	delegationOutput, ok := signedTx.Transaction.Outputs[0].(*iotago.DelegationOutput)
 	require.True(d.Testing, ok)
 
-	return delegationOutput.StartEpoch
+	delegationOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
+
+	return delegationOutputID, delegationOutput
 }
 
 // PrepareBlockIssuance prepares the BlockIssuance and Congestion response, and increase BIC of the issuer if necessary.
