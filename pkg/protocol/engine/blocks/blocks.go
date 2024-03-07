@@ -40,8 +40,10 @@ func (b *Blocks) Block(id iotago.BlockID) (block *Block, exists bool) {
 		}
 	}
 
-	if commitmentID, isRootBlock := b.evictionState.RootBlockCommitmentID(id); isRootBlock {
-		return NewRootBlock(id, commitmentID, b.apiProvider.APIForSlot(id.Slot()).TimeProvider().SlotEndTime(id.Slot())), true
+	if _, isInRange := b.evictionState.BelowOrInActiveRootBlockRange(id); isInRange {
+		if commitmentID, isRootBlock := b.evictionState.RootBlockCommitmentID(id); isRootBlock {
+			return NewRootBlock(id, commitmentID, b.apiProvider.APIForSlot(id.Slot()).TimeProvider().SlotEndTime(id.Slot())), true
+		}
 	}
 
 	return nil, false
