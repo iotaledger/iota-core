@@ -9,7 +9,20 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type Store[V any] struct {
+type Store[V any] interface {
+	RestoreLastPrunedEpoch() error
+	LastAccessedEpoch() (iotago.EpochIndex, error)
+	LastPrunedEpoch() (iotago.EpochIndex, bool)
+	Load(epoch iotago.EpochIndex) (V, error)
+	Store(epoch iotago.EpochIndex, value V) error
+	Stream(consumer func(epoch iotago.EpochIndex, value V) error) error
+	StreamBytes(consumer func([]byte, []byte) error) error
+	DeleteEpoch(epoch iotago.EpochIndex) error
+	Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago.EpochIndex) ([]iotago.EpochIndex, error)
+	RollbackEpochs(epoch iotago.EpochIndex) (iotago.EpochIndex, []iotago.EpochIndex, error)
+}
+
+type BaseStore[V any] struct {
 	realm            kvstore.Realm
 	kv               *kvstore.TypedStore[iotago.EpochIndex, V]
 	prunginDelayFunc func(iotago.EpochIndex) iotago.EpochIndex
@@ -18,8 +31,8 @@ type Store[V any] struct {
 	lastPrunedEpoch   *model.PruningIndex
 }
 
-func NewStore[V any](storeRealm kvstore.Realm, kv kvstore.KVStore, prunginDelayFunc func(iotago.EpochIndex) iotago.EpochIndex, vToBytes kvstore.ObjectToBytes[V], bytesToV kvstore.BytesToObject[V]) *Store[V] {
-	return &Store[V]{
+func NewStore[V any](storeRealm kvstore.Realm, kv kvstore.KVStore, prunginDelayFunc func(iotago.EpochIndex) iotago.EpochIndex, vToBytes kvstore.ObjectToBytes[V], bytesToV kvstore.BytesToObject[V]) *BaseStore[V] {
+	return &BaseStore[V]{
 		realm:             storeRealm,
 		kv:                kvstore.NewTypedStore(lo.PanicOnErr(kv.WithExtendedRealm(append(storeRealm, entriesKey))), iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes, vToBytes, bytesToV),
 		prunginDelayFunc:  prunginDelayFunc,
@@ -28,11 +41,11 @@ func NewStore[V any](storeRealm kvstore.Realm, kv kvstore.KVStore, prunginDelayF
 	}
 }
 
-func (s *Store[V]) RestoreLastPrunedEpoch() error {
+func (s *BaseStore[V]) RestoreLastPrunedEpoch() error {
 	return s.lastPrunedEpoch.RestoreFromDisk()
 }
 
-func (s *Store[V]) LastAccessedEpoch() (lastAccessedEpoch iotago.EpochIndex, err error) {
+func (s *BaseStore[V]) LastAccessedEpoch() (lastAccessedEpoch iotago.EpochIndex, err error) {
 	if lastAccessedEpoch, err = s.lastAccessedEpoch.Get(); err != nil {
 		if !ierrors.Is(err, kvstore.ErrKeyNotFound) {
 			err = ierrors.Wrap(err, "failed to get last accessed epoch")
@@ -44,12 +57,12 @@ func (s *Store[V]) LastAccessedEpoch() (lastAccessedEpoch iotago.EpochIndex, err
 	return lastAccessedEpoch, err
 }
 
-func (s *Store[V]) LastPrunedEpoch() (iotago.EpochIndex, bool) {
+func (s *BaseStore[V]) LastPrunedEpoch() (iotago.EpochIndex, bool) {
 	return s.lastPrunedEpoch.Index()
 }
 
 // Load loads the value for the given epoch.
-func (s *Store[V]) Load(epoch iotago.EpochIndex) (V, error) {
+func (s *BaseStore[V]) Load(epoch iotago.EpochIndex) (V, error) {
 	var zeroValue V
 
 	if s.isTooOld(epoch) {
@@ -68,7 +81,7 @@ func (s *Store[V]) Load(epoch iotago.EpochIndex) (V, error) {
 	return value, nil
 }
 
-func (s *Store[V]) Store(epoch iotago.EpochIndex, value V) error {
+func (s *BaseStore[V]) Store(epoch iotago.EpochIndex, value V) error {
 	//nolint:revive
 	_, _ = s.lastAccessedEpoch.Compute(func(lastAccessedEpoch iotago.EpochIndex, exists bool) (newValue iotago.EpochIndex, err error) {
 		if lastAccessedEpoch >= epoch {
@@ -85,7 +98,7 @@ func (s *Store[V]) Store(epoch iotago.EpochIndex, value V) error {
 	return s.kv.Set(epoch, value)
 }
 
-func (s *Store[V]) Stream(consumer func(epoch iotago.EpochIndex, value V) error) error {
+func (s *BaseStore[V]) Stream(consumer func(epoch iotago.EpochIndex, value V) error) error {
 	var innerErr error
 	if storageErr := s.kv.Iterate(kvstore.EmptyPrefix, func(epoch iotago.EpochIndex, value V) (advance bool) {
 		innerErr = consumer(epoch, value)
@@ -102,7 +115,7 @@ func (s *Store[V]) Stream(consumer func(epoch iotago.EpochIndex, value V) error)
 	return nil
 }
 
-func (s *Store[V]) StreamBytes(consumer func([]byte, []byte) error) error {
+func (s *BaseStore[V]) StreamBytes(consumer func([]byte, []byte) error) error {
 	var innerErr error
 	if storageErr := s.kv.KVStore().Iterate(kvstore.EmptyPrefix, func(key kvstore.Key, value kvstore.Value) (advance bool) {
 		innerErr = consumer(key, value)
@@ -118,11 +131,12 @@ func (s *Store[V]) StreamBytes(consumer func([]byte, []byte) error) error {
 	return innerErr
 }
 
-func (s *Store[V]) DeleteEpoch(epoch iotago.EpochIndex) error {
+func (s *BaseStore[V]) DeleteEpoch(epoch iotago.EpochIndex) error {
 	return s.kv.DeletePrefix(epoch.MustBytes())
 }
 
-func (s *Store[V]) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago.EpochIndex) error {
+func (s *BaseStore[V]) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago.EpochIndex) ([]iotago.EpochIndex, error) {
+	prunedEpochs := make([]iotago.EpochIndex, 0)
 	minPruningDelay := s.prunginDelayFunc(epoch)
 
 	// The epoch we're trying to prune already takes into account the defaultPruningDelay.
@@ -136,39 +150,45 @@ func (s *Store[V]) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago.Epo
 
 	// No need to prune.
 	if epoch < pruningDelay {
-		return nil
+		return prunedEpochs, nil
 	}
 
 	for i := s.lastPrunedEpoch.NextIndex(); i <= epoch-pruningDelay; i++ {
 		err := s.kv.DeletePrefix(i.MustBytes())
 		if err != nil {
-			return ierrors.Wrapf(err, "failed to prune epoch store for realm %v at epoch %d", s.realm, i)
+			return prunedEpochs, ierrors.Wrapf(err, "failed to prune epoch store for realm %v at epoch %d", s.realm, i)
 		}
 		err = s.lastPrunedEpoch.MarkEvicted(i)
 		if err != nil {
-			return ierrors.Wrapf(err, "failed to store lastPrunedEpoch for epoch %d in Prune", i)
+			return prunedEpochs, ierrors.Wrapf(err, "failed to store lastPrunedEpoch for epoch %d in Prune", i)
 		}
+
+		prunedEpochs = append(prunedEpochs, i)
 	}
 
-	return nil
+	return prunedEpochs, nil
 }
 
-func (s *Store[V]) RollbackEpochs(epoch iotago.EpochIndex) (lastPrunedEpoch iotago.EpochIndex, err error) {
+func (s *BaseStore[V]) RollbackEpochs(epoch iotago.EpochIndex) (lastPrunedEpoch iotago.EpochIndex, rollbackEpochs []iotago.EpochIndex, err error) {
+	rollbackEpochs = make([]iotago.EpochIndex, 0)
+
 	lastAccessedEpoch, err := s.LastAccessedEpoch()
 	if err != nil {
-		return lastAccessedEpoch, ierrors.Wrap(err, "failed to get last accessed epoch")
+		return lastAccessedEpoch, rollbackEpochs, ierrors.Wrap(err, "failed to get last accessed epoch")
 	}
 
 	for epochToPrune := epoch; epochToPrune <= lastAccessedEpoch; epochToPrune++ {
 		if err = s.DeleteEpoch(epochToPrune); err != nil {
-			return epochToPrune, ierrors.Wrapf(err, "error while deleting epoch %d", epochToPrune)
+			return epochToPrune, rollbackEpochs, ierrors.Wrapf(err, "error while deleting epoch %d", epochToPrune)
 		}
+
+		rollbackEpochs = append(rollbackEpochs, epochToPrune)
 	}
 
-	return lastAccessedEpoch, nil
+	return lastAccessedEpoch, rollbackEpochs, nil
 }
 
-func (s *Store[V]) isTooOld(epoch iotago.EpochIndex) bool {
+func (s *BaseStore[V]) isTooOld(epoch iotago.EpochIndex) bool {
 	prunedEpoch, hasPruned := s.lastPrunedEpoch.Index()
 
 	return hasPruned && epoch <= prunedEpoch
