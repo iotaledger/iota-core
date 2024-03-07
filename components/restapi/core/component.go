@@ -61,7 +61,7 @@ func configure() error {
 		}
 
 		return responseByHeader(c, resp)
-	}, checkNodeSynced())
+	})
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointBlockMetadata), func(c echo.Context) error {
 		resp, err := blockMetadataByID(c)
@@ -112,7 +112,7 @@ func configure() error {
 		}
 
 		return responseByHeader(c, commitment.Commitment())
-	}, checkNodeSynced())
+	})
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointCommitmentByIDUTXOChanges), func(c echo.Context) error {
 		commitmentID, err := httpserver.ParseCommitmentIDParam(c, api.ParameterCommitmentID)
@@ -132,7 +132,7 @@ func configure() error {
 		}
 
 		return responseByHeader(c, resp)
-	}, checkNodeSynced())
+	})
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointCommitmentByIDUTXOChangesFull), func(c echo.Context) error {
 		commitmentID, err := httpserver.ParseCommitmentIDParam(c, api.ParameterCommitmentID)
@@ -152,7 +152,7 @@ func configure() error {
 		}
 
 		return responseByHeader(c, resp)
-	}, checkNodeSynced())
+	})
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointCommitmentBySlot), func(c echo.Context) error {
 		index, err := httpserver.ParseSlotParam(c, api.ParameterSlot)
@@ -166,7 +166,7 @@ func configure() error {
 		}
 
 		return responseByHeader(c, commitment.Commitment())
-	}, checkNodeSynced())
+	})
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointCommitmentBySlotUTXOChanges), func(c echo.Context) error {
 		slot, err := httpserver.ParseSlotParam(c, api.ParameterSlot)
@@ -185,7 +185,7 @@ func configure() error {
 		}
 
 		return responseByHeader(c, resp)
-	}, checkNodeSynced())
+	})
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointCommitmentBySlotUTXOChangesFull), func(c echo.Context) error {
 		slot, err := httpserver.ParseSlotParam(c, api.ParameterSlot)
@@ -204,7 +204,7 @@ func configure() error {
 		}
 
 		return responseByHeader(c, resp)
-	}, checkNodeSynced())
+	})
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointOutput), func(c echo.Context) error {
 		resp, err := outputFromOutputID(c)
@@ -213,7 +213,7 @@ func configure() error {
 		}
 
 		return responseByHeader(c, resp)
-	}, checkNodeSynced())
+	})
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointOutputMetadata), func(c echo.Context) error {
 		resp, err := outputMetadataFromOutputID(c)
@@ -240,7 +240,7 @@ func configure() error {
 		}
 
 		return responseByHeader(c, block)
-	}, checkNodeSynced())
+	})
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointTransactionsIncludedBlockMetadata), func(c echo.Context) error {
 		resp, err := blockMetadataFromTransactionID(c)
