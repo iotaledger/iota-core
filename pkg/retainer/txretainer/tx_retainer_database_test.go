@@ -62,7 +62,7 @@ func TestTransactionRetainerDatabase(t *testing.T) {
 	require.Nil(t, txMeta)
 
 	// add the transaction metadata
-	err = txRetainerDatabase.UpdateTxMetadata(newTxMeta1)
+	err = txRetainerDatabase.InsertTxMetadata(newTxMeta1)
 	require.NoError(t, err)
 
 	// check that the transaction metadata exists
@@ -71,7 +71,7 @@ func TestTransactionRetainerDatabase(t *testing.T) {
 	require.Equal(t, newTxMeta1, txMeta)
 
 	// update the transaction metadata
-	err = txRetainerDatabase.UpdateTxMetadata(newTxMeta1_2)
+	err = txRetainerDatabase.InsertTxMetadata(newTxMeta1_2)
 	require.NoError(t, err)
 
 	// check that the transaction metadata has been updated
@@ -80,11 +80,11 @@ func TestTransactionRetainerDatabase(t *testing.T) {
 	require.Equal(t, newTxMeta1_2, txMeta)
 
 	// add the transaction metadata
-	err = txRetainerDatabase.UpdateTxMetadata(newTxMeta2)
+	err = txRetainerDatabase.InsertTxMetadata(newTxMeta2)
 	require.NoError(t, err)
 
 	// add the transaction metadata
-	err = txRetainerDatabase.UpdateTxMetadata(newTxMeta3)
+	err = txRetainerDatabase.InsertTxMetadata(newTxMeta3)
 	require.NoError(t, err)
 
 }

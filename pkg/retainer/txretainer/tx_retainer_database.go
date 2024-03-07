@@ -1,6 +1,8 @@
 package txretainer
 
 import (
+	"fmt"
+
 	"gorm.io/gorm"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -38,58 +40,16 @@ func NewTransactionRetainerDB(dbExecFunc storage.SQLDatabaseExecFunc) *transacti
 	}
 }
 
-// updateTransactionMetadata updates the transaction metadata for the given txID in the given database transaction.
-func (r *transactionRetainerDatabase) updateTransactionMetadata(dbTx *gorm.DB, newTxMeta *TransactionMetadata) error {
-	txMeta := &TransactionMetadata{}
-	entryFound := false
-
-	txID := newTxMeta.TransactionID
-
-	// check if a txMeta with accepted state for the given txID already exists.
-	// if yes, we don't store new txMetas at all.
-	if err := dbTx.First(txMeta, &TransactionMetadata{TransactionID: txID, ValidSignature: true, State: byte(api.TransactionStateAccepted)}).Error; err == nil {
-		// a txMeta with accepted state for the given txID already exists, this is the final state of a txMeta and should not be overwritten.
-		return nil
-	} else if !ierrors.Is(err, gorm.ErrRecordNotFound) {
-		return ierrors.Wrapf(err, "failed to check if an accepted transaction metadata with valid signature exists for txID %s", iotago.TransactionID(txID).ToHex())
-	}
-
-	// check if a signed txMeta for the given txID already exists.
-	// if yes, we only store new txMetas with a valid signature as well,
-	// otherwise an attacker could overwrite valid txMeta with invalid txMeta.
-	if err := dbTx.First(txMeta, &TransactionMetadata{TransactionID: txID, ValidSignature: true}).Error; err == nil {
-		// a signed txMeta for the given txID already exists, we only store new txMetas with a valid signature as well.
-		if !newTxMeta.ValidSignature {
-			// this can for example happen if there is a new attachment with an invalid signature.
-			return nil
-		}
-		entryFound = true
-	} else if !ierrors.Is(err, gorm.ErrRecordNotFound) {
-		return ierrors.Wrapf(err, "failed to check if a transaction metadata with valid signature exists for txID %s", iotago.TransactionID(txID).ToHex())
-	}
-
-	if entryFound {
-		// an existing txMeta was found, we need to update it.
-		txMeta.TransactionID = newTxMeta.TransactionID
-		txMeta.ValidSignature = newTxMeta.ValidSignature
-		txMeta.EarliestAttachmentSlot = newTxMeta.EarliestAttachmentSlot
-		txMeta.State = newTxMeta.State
-		txMeta.FailureReason = newTxMeta.FailureReason
-		txMeta.ErrorMsg = newTxMeta.ErrorMsg
-	} else {
-		// no existing txMeta was found, we need to create a new one.
-		txMeta = newTxMeta
-	}
-
-	// create or update the txMeta
-	return dbTx.Save(txMeta).Error
+// insertTransactionMetadata inserts the given transaction metadata into the database.
+func (r *transactionRetainerDatabase) insertTransactionMetadata(dbTx *gorm.DB, txMeta *TransactionMetadata) error {
+	return dbTx.Create(txMeta).Error
 }
 
-// UpdateTxMetadata updates the transaction metadata for the given txID.
-func (r *transactionRetainerDatabase) UpdateTxMetadata(newTxMeta *TransactionMetadata) error {
+// InsertTxMetadata inserts the given transaction metadata into the database.
+func (r *transactionRetainerDatabase) InsertTxMetadata(newTxMeta *TransactionMetadata) error {
 	if err := r.dbExecFunc(func(db *gorm.DB) error {
 		return db.Transaction(func(tx *gorm.DB) error {
-			return r.updateTransactionMetadata(tx, newTxMeta)
+			return r.insertTransactionMetadata(tx, newTxMeta)
 		})
 	}); err != nil {
 		return ierrors.Wrap(err, "failed to update transaction metadata")
@@ -103,7 +63,7 @@ func (r *transactionRetainerDatabase) ApplyTxMetadataChanges(uncommitedTxMetadat
 	if err := r.dbExecFunc(func(db *gorm.DB) error {
 		return db.Transaction(func(tx *gorm.DB) error {
 			for _, newTxMeta := range uncommitedTxMetadataChanges {
-				if err := r.updateTransactionMetadata(tx, newTxMeta); err != nil {
+				if err := r.insertTransactionMetadata(tx, newTxMeta); err != nil {
 					return err
 				}
 			}
@@ -142,31 +102,24 @@ func (r *transactionRetainerDatabase) Prune(targetSlot iotago.SlotIndex) error {
 	return nil
 }
 
+// TransactionMetadataByID returns the transaction metadata of a transaction by its ID.
+// If no transaction metadata is found, nil is returned.
+// There can be several entries for the same transaction ID in the database, but only one with the highest priority is returned.
+// The priority is determined by the following conditions:
+//   - txMeta with "accepted state" has the highest priority
+//   - then txMeta with valid signature (True over False)
+//   - then txMeta with the earliest attachment slot (descending order)
+//   - then everything else
 func (r *transactionRetainerDatabase) TransactionMetadataByID(transactionID iotago.TransactionID) (*TransactionMetadata, error) {
 	txMeta := &TransactionMetadata{}
 
 	if err := r.dbExecFunc(func(dbTx *gorm.DB) error {
-		// txMeta with accepted state has the highest priority
-		if err := dbTx.First(txMeta, &TransactionMetadata{TransactionID: transactionID[:], ValidSignature: true, State: byte(api.TransactionStateAccepted)}).Error; err == nil {
-			// entry found
-			return nil
-		} else if !ierrors.Is(err, gorm.ErrRecordNotFound) {
-			return ierrors.Wrapf(err, "failed to check if an accepted transaction metadata with valid signature exists for txID %s", transactionID.ToHex())
-		}
-
-		// then txMeta with valid signature
-		if err := dbTx.First(txMeta, &TransactionMetadata{TransactionID: transactionID[:], ValidSignature: true}).Error; err == nil {
-			// entry found
-			return nil
-		} else if !ierrors.Is(err, gorm.ErrRecordNotFound) {
-			return ierrors.Wrapf(err, "failed to check if a transaction metadata with valid signature exists for txID %s", transactionID.ToHex())
-		}
-
-		// then everything else
-		return dbTx.First(txMeta, &TransactionMetadata{TransactionID: transactionID[:]}).Error
+		return dbTx.Where("transaction_id = ?", transactionID[:]).
+			Order(fmt.Sprintf("state = %d DESC, valid_signature DESC, earliest_attachment_slot DESC", api.TransactionStateAccepted)).
+			Take(txMeta).Error
 	}); err != nil {
 		if !ierrors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ierrors.Wrap(err, "failed to query transaction metadata")
+			return nil, ierrors.Wrapf(err, "failed to query transaction metadata for transaction ID %s", transactionID.ToHex())
 		}
 
 		// no entry found
