@@ -252,7 +252,7 @@ func (t *TestFramework) AssertPrunedUntil(
 	}
 }
 
-func assertPrunableEpochStoragesPruned[V any](t *TestFramework, store *epochstore.Store[V], epoch iotago.EpochIndex) {
+func assertPrunableEpochStoragesPruned[V any](t *TestFramework, store epochstore.Store[V], epoch iotago.EpochIndex) {
 	// Check that all store returns the expected error when trying to access the data.
 	_, err := store.Load(epoch)
 	require.ErrorIsf(t.t, err, database.ErrEpochPruned, "expected epoch %d to be pruned when calling Load", epoch)
