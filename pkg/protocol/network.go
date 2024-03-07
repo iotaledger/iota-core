@@ -12,6 +12,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
 )
 
+var ErrBlockTimeTooFarAheadInFuture = ierrors.New("a block cannot be too far ahead in the future")
+
 // Network is a subcomponent of the protocol that is responsible for handling the network communication.
 type Network struct {
 	// Protocol contains the network endpoint of the protocol.
@@ -41,8 +43,8 @@ func newNetwork(protocol *Protocol, networkEndpoint network.Endpoint) *Network {
 func (n *Network) OnBlockReceived(callback func(block *model.Block, src peer.ID)) (unsubscribe func()) {
 	return n.Protocol.OnBlockReceived(func(block *model.Block, src peer.ID) {
 		// filter blocks from the future
-		if maxIssuingTime := time.Now().Add(maxTimeDrift); block.ProtocolBlock().Header.IssuingTime.After(maxIssuingTime) {
-			n.LogError("filtered block", "block", block.ID(), "issuingTime", block.ProtocolBlock().Header.IssuingTime, "maxIssuingTime", maxIssuingTime, "from", src, "err", ierrors.New("invalid issuing time"))
+		if timeDelta := time.Since(block.ProtocolBlock().Header.IssuingTime); timeDelta < -n.protocol.Options.MaxAllowedWallClockDrift {
+			n.LogWarn("filtered block, issuing time ahead", "block", block.ID(), "issuingTime", block.ProtocolBlock().Header.IssuingTime, "timeDelta", timeDelta, "deltaAllowed", n.protocol.Options.MaxAllowedWallClockDrift, "from", src, "err", ErrBlockTimeTooFarAheadInFuture)
 
 			return
 		}
@@ -50,6 +52,3 @@ func (n *Network) OnBlockReceived(callback func(block *model.Block, src peer.ID)
 		callback(block, src)
 	})
 }
-
-// maxTimeDrift defines the maximum time drift that is allowed for incoming blocks.
-const maxTimeDrift = 5 * time.Second

@@ -146,6 +146,7 @@ func provide(c *dig.Container) error {
 				),
 			),
 			protocol.WithSnapshotPath(ParamsProtocol.Snapshot.Path),
+			protocol.WithMaxAllowedWallClockDrift(ParamsProtocol.Filter.MaxAllowedClockDrift),
 			protocol.WithSybilProtectionProvider(
 				sybilprotectionv1.NewProvider(),
 			),
@@ -156,9 +157,7 @@ func provide(c *dig.Container) error {
 				slotattestation.NewProvider(),
 			),
 			protocol.WithPreSolidFilterProvider(
-				presolidblockfilter.NewProvider(
-					presolidblockfilter.WithMaxAllowedWallClockDrift(ParamsProtocol.Filter.MaxAllowedClockDrift),
-				),
+				presolidblockfilter.NewProvider(),
 			),
 			protocol.WithUpgradeOrchestratorProvider(
 				signalingupgradeorchestrator.NewProvider(signalingupgradeorchestrator.WithProtocolParameters(deps.ProtocolParameters...)),
