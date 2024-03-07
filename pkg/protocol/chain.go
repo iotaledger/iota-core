@@ -163,9 +163,9 @@ func (c *Chain) Commitment(slot iotago.SlotIndex) (commitment *Commitment, exist
 
 // CumulativeVerifiedWeightAt returns the cumulative verified weight at the given slot for this chain.
 func (c *Chain) CumulativeVerifiedWeightAt(slot iotago.SlotIndex) uint64 {
-	lastCommitment, exists := c.Commitment(slot)
-	if exists && lastCommitment.IsVerified.Get() {
-		return lastCommitment.CumulativeVerifiedWeight.Get()
+	commitmentAtSlot, exists := c.Commitment(slot)
+	if exists && commitmentAtSlot.IsVerified.Get() {
+		return commitmentAtSlot.CumulativeVerifiedWeight.Get()
 	}
 
 	if latestProducedCommitment := c.LatestProducedCommitment.Get(); latestProducedCommitment != nil {
