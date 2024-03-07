@@ -9,14 +9,9 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	iotago "github.com/iotaledger/iota.go/v4"
-)
-
-var (
-	ErrBlockAttacherInvalidBlock              = ierrors.New("invalid block")
-	ErrBlockAttacherAttachingNotPossible      = ierrors.New("attaching not possible")
-	ErrBlockAttacherIncompleteBlockNotAllowed = ierrors.New("incomplete block is not allowed on this node")
 )
 
 // TODO: make sure an honest validator does not issue blocks within the same slot ratification period in two conflicting chains.
@@ -31,7 +26,7 @@ func (r *RequestHandler) SubmitBlock(block *model.Block) error {
 
 // SubmitBlockAndAwaitEvent submits a block to be processed and waits for the event to be triggered.
 func (r *RequestHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *model.Block, evt *event.Event1[*blocks.Block]) error {
-	triggered := make(chan error, 1)
+	filtered := make(chan error, 1)
 	exit := make(chan struct{})
 	defer close(exit)
 
@@ -48,7 +43,7 @@ func (r *RequestHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *mo
 			return
 		}
 		select {
-		case triggered <- nil:
+		case filtered <- nil:
 		case <-exit:
 		}
 	}, event.WithWorkerPool(r.workerPool)).Unhook
@@ -58,12 +53,22 @@ func (r *RequestHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *mo
 			return
 		}
 		select {
-		case triggered <- event.Reason:
+		case filtered <- event.Reason:
+		case <-exit:
+		}
+	}, event.WithWorkerPool(r.workerPool)).Unhook
+	postfilteredUnhook := r.protocol.Events.Engine.PostSolidFilter.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
+		if blockID != event.Block.ID() {
+			return
+		}
+		select {
+		case filtered <- event.Reason:
 		case <-exit:
 		}
 	}, event.WithWorkerPool(r.workerPool)).Unhook
 
 	defer lo.Batch(evtUnhook, prefilteredUnhook)()
+	defer lo.Batch(evtUnhook, postfilteredUnhook)()
 
 	if err := r.submitBlock(block); err != nil {
 		return ierrors.Wrapf(err, "failed to issue block %s", blockID)
@@ -72,9 +77,9 @@ func (r *RequestHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *mo
 	select {
 	case <-processingCtx.Done():
 		return ierrors.Errorf("context canceled whilst waiting for event on block %s", blockID)
-	case err := <-triggered:
+	case err := <-filtered:
 		if err != nil {
-			return ierrors.Wrapf(err, "block filtered out %s", blockID)
+			return ierrors.Wrapf(err, "block filtered %s", blockID)
 		}
 
 		return nil
@@ -87,7 +92,7 @@ func (r *RequestHandler) AttachBlock(ctx context.Context, iotaBlock *iotago.Bloc
 		return iotago.EmptyBlockID, ierrors.Wrap(err, "error serializing block to model block")
 	}
 
-	if err = r.SubmitBlockAndAwaitEvent(ctx, modelBlock, r.protocol.Events.Engine.BlockDAG.BlockAttached); err != nil {
+	if err = r.SubmitBlockAndAwaitEvent(ctx, modelBlock, r.protocol.Events.Engine.Retainer.BlockRetained); err != nil {
 		return iotago.EmptyBlockID, ierrors.Wrap(err, "error issuing model block")
 	}
 

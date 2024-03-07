@@ -206,11 +206,11 @@ func (d *DockerTestFramework) prepareAssets(totalAssetsNum int) (coreAPIAssets, 
 		// transaction and outputs are stored with the earliest included block
 		assets[valueBlockSlot].valueBlocks = append(assets[valueBlockSlot].valueBlocks, valueBlock)
 		assets[valueBlockSlot].transactions = append(assets[valueBlockSlot].transactions, signedTx)
-		basicOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
+		basicOutputID := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0)
 		assets[valueBlockSlot].basicOutputs[basicOutputID] = basicOut
 		assets[valueBlockSlot].faucetOutputs[faucetOutput.ID] = faucetOutput.Output
 		d.SubmitBlock(ctx, valueBlock)
-		d.AwaitTransactionPayloadAccepted(ctx, valueBlock.MustID())
+		d.AwaitTransactionPayloadAccepted(ctx, signedTx.Transaction.MustID())
 
 		delegationOutputID, delegationOutput := d.DelegateToValidator(account.ID, d.Node("V1").AccountAddress(d.Testing))
 		assets.setupAssetsForSlot(delegationOutputID.CreationSlot())

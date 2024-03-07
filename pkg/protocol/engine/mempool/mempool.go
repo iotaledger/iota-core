@@ -9,6 +9,8 @@ import (
 type MemPool[VoteRank spenddag.VoteRankType[VoteRank]] interface {
 	AttachSignedTransaction(signedTransaction SignedTransaction, transaction Transaction, blockID iotago.BlockID) (signedTransactionMetadata SignedTransactionMetadata, err error)
 
+	OnAttachTransactionFailed(callback func(transactionID iotago.TransactionID, blockID iotago.BlockID, err error), opts ...event.Option) *event.Hook[func(transactionID iotago.TransactionID, blockID iotago.BlockID, err error)]
+
 	OnSignedTransactionAttached(callback func(signedTransactionMetadata SignedTransactionMetadata), opts ...event.Option) *event.Hook[func(metadata SignedTransactionMetadata)]
 
 	OnTransactionAttached(callback func(metadata TransactionMetadata), opts ...event.Option) *event.Hook[func(metadata TransactionMetadata)]

@@ -1155,7 +1155,7 @@ func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Tra
 		addressIndexes = []uint32{0}
 	}
 	currentAPI := w.Node.Protocol.CommittedAPI()
-	(lo.PanicOnErr(transaction.ID())).RegisterAlias(transactionName)
+	transaction.MustID().RegisterAlias(transactionName)
 	w.transactions[transactionName] = transaction
 
 	for outputID, output := range lo.PanicOnErr(transaction.OutputsSet()) {
@@ -1169,7 +1169,7 @@ func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Tra
 				immutableAccountUC != nil && immutableAccountUC.Address.AccountID() == w.BlockIssuer.AccountID ||
 				stateControllerUC != nil && w.HasAddress(stateControllerUC.Address, index) {
 				clonedOutput := output.Clone()
-				actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), outputID.Index())
+				actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(transaction.MustID(), outputID.Index())
 				if clonedOutput.Type() == iotago.OutputAccount {
 					if accountOutput, ok := clonedOutput.(*iotago.AccountOutput); ok && accountOutput.AccountID == iotago.EmptyAccountID {
 						accountOutput.AccountID = iotago.AccountIDFromOutputID(actualOutputID)

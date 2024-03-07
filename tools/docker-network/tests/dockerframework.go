@@ -413,7 +413,7 @@ func (d *DockerTestFramework) CreateDelegationBlockFromInput(issuerID iotago.Acc
 	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, issuer.Address)
 
 	signedTx := d.wallet.CreateDelegationFromInput(issuerID, accountAdddress, inputID, issuerResp)
-	outputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
+	outputID := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0)
 
 	return iotago.DelegationIDFromOutputID(outputID),
 		outputID,
@@ -445,7 +445,7 @@ func (d *DockerTestFramework) CreateNFTBlockFromInput(issuerID iotago.AccountID,
 
 	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, issuer.Address)
 	signedTx := d.wallet.CreateNFTFromInput(issuerID, inputId, issuerResp, opts...)
-	outputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
+	outputID := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0)
 
 	return iotago.NFTIDFromOutputID(outputID),
 		outputID,
@@ -528,13 +528,13 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 	blkID := d.SubmitPayload(ctx, signedTx, fullAccount.ID, congestionResp, issuerResp)
 
 	// check if the account is committed
-	accOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
-	d.CheckAccountStatus(ctx, blkID, lo.PanicOnErr(signedTx.Transaction.ID()), accOutputID, fullAccount.Address, true)
+	accOutputID := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0)
+	d.CheckAccountStatus(ctx, blkID, signedTx.Transaction.MustID(), accOutputID, fullAccount.Address, true)
 
 	// update account info after it's transitioned to full account
 	d.wallet.AddAccount(fullAccount.ID, fullAccount)
 
-	fmt.Printf("Account created, Bech addr: %s, in txID: %s, slot: %d\n", fullAccount.Address.Bech32(clt.CommittedAPI().ProtocolParameters().Bech32HRP()), lo.PanicOnErr(signedTx.Transaction.ID()).ToHex(), blkID.Slot())
+	fmt.Printf("Account created, Bech addr: %s, in txID: %s, slot: %d\n", fullAccount.Address.Bech32(clt.CommittedAPI().ProtocolParameters().Bech32HRP()), signedTx.Transaction.MustID().ToHex(), blkID.Slot())
 
 	return fullAccount
 }
@@ -551,13 +551,13 @@ func (d *DockerTestFramework) DelegateToValidator(fromID iotago.AccountID, accou
 	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, from.Address)
 	signedTx := d.wallet.CreateDelegationFromInput(fromID, accountAddress, fundsOutputID, issuerResp)
 
-	blkID := d.SubmitPayload(ctx, signedTx, from.ID, congestionResp, issuerResp)
-	d.AwaitTransactionPayloadAccepted(ctx, blkID)
+	d.SubmitPayload(ctx, signedTx, from.ID, congestionResp, issuerResp)
+	d.AwaitTransactionPayloadAccepted(ctx, signedTx.Transaction.MustID())
 
 	delegationOutput, ok := signedTx.Transaction.Outputs[0].(*iotago.DelegationOutput)
 	require.True(d.Testing, ok)
 
-	delegationOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
+	delegationOutputID := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0)
 
 	return delegationOutputID, delegationOutput
 }
@@ -586,9 +586,9 @@ func (d *DockerTestFramework) AllotManaTo(fromID iotago.AccountID, toID iotago.A
 	signedTx := d.wallet.AllotManaFromAccount(fromID, toID, manaToAllot, fundsOutputID)
 	blkID := d.SubmitPayload(ctx, signedTx, from.ID, congestionResp, issuerResp)
 
-	fmt.Println("Allot mana transaction sent, blkID:", blkID.ToHex(), ", txID:", lo.PanicOnErr(signedTx.Transaction.ID()).ToHex(), ", slot:", blkID.Slot())
+	fmt.Println("Allot mana transaction sent, blkID:", blkID.ToHex(), ", txID:", signedTx.Transaction.MustID().ToHex(), ", slot:", blkID.Slot())
 
-	d.AwaitTransactionPayloadAccepted(ctx, blkID)
+	d.AwaitTransactionPayloadAccepted(ctx, signedTx.Transaction.MustID())
 
 	// allotment is updated until the transaction is committed
 	d.AwaitCommitment(blkID.Slot())
@@ -620,9 +620,10 @@ func (d *DockerTestFramework) CreateNativeToken(fromID iotago.AccountID, mintedA
 
 	blkID := d.SubmitPayload(ctx, signedTx, from.ID, congestionResp, issuerResp)
 
-	d.AwaitTransactionPayloadAccepted(ctx, blkID)
+	txID := signedTx.Transaction.MustID()
+	d.AwaitTransactionPayloadAccepted(ctx, txID)
 
-	fmt.Println("Create native tokens transaction sent, blkID:", blkID.ToHex(), ", txID:", lo.PanicOnErr(signedTx.Transaction.ID()).ToHex(), ", slot:", blkID.Slot())
+	fmt.Println("Create native tokens transaction sent, blkID:", blkID.ToHex(), ", txID:", signedTx.Transaction.MustID().ToHex(), ", slot:", blkID.Slot())
 
 	// wait for the account to be committed
 	d.AwaitCommitment(blkID.Slot())

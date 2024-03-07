@@ -119,6 +119,9 @@
       "decimals": 6
     }
   },
+  "retainer": {
+    "debugStoreErrorMessages": false
+  },
   "dashboard": {
     "enabled": true,
     "bindAddress": "0.0.0.0:8081",

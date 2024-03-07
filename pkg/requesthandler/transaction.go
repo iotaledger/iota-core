@@ -5,7 +5,9 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 
+	"github.com/iotaledger/iota-core/pkg/retainer/txretainer"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 func (r *RequestHandler) BlockIDFromTransactionID(transactionID iotago.TransactionID) (iotago.BlockID, error) {
@@ -22,4 +24,17 @@ func (r *RequestHandler) BlockIDFromTransactionID(transactionID iotago.Transacti
 	}
 
 	return spent.BlockID(), nil
+}
+
+func (r *RequestHandler) TransactionMetadataByID(txID iotago.TransactionID) (*api.TransactionMetadataResponse, error) {
+	txMetadata, err := r.protocol.Engines.Main.Get().TxRetainer.TransactionMetadata(txID)
+	if err != nil {
+		if ierrors.Is(err, txretainer.ErrEntryNotFound) {
+			return nil, ierrors.WithMessagef(echo.ErrNotFound, "transaction metadata not found: %s", txID.ToHex())
+		}
+
+		return nil, ierrors.Join(echo.ErrInternalServerError, ierrors.Wrapf(err, "error when retrieving transaction metadata: %s", txID.ToHex()))
+	}
+
+	return txMetadata, nil
 }

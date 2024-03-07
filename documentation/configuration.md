@@ -391,7 +391,23 @@ Example:
   }
 ```
 
-## <a id="dashboard"></a> 10. Dashboard
+## <a id="retainer"></a> 10. Retainer
+
+| Name                    | Description                                           | Type    | Default value |
+| ----------------------- | ----------------------------------------------------- | ------- | ------------- |
+| debugStoreErrorMessages | Whether to store debug error messages in the database | boolean | false         |
+
+Example:
+
+```json
+  {
+    "retainer": {
+      "debugStoreErrorMessages": false
+    }
+  }
+```
+
+## <a id="dashboard"></a> 11. Dashboard
 
 | Name                              | Description                             | Type    | Default value  |
 | --------------------------------- | --------------------------------------- | ------- | -------------- |
@@ -433,7 +449,7 @@ Example:
   }
 ```
 
-## <a id="prometheus"></a> 11. Prometheus
+## <a id="prometheus"></a> 12. Prometheus
 
 | Name            | Description                                          | Type    | Default value  |
 | --------------- | ---------------------------------------------------- | ------- | -------------- |
@@ -457,7 +473,7 @@ Example:
   }
 ```
 
-## <a id="inx"></a> 12. Inx
+## <a id="inx"></a> 13. Inx
 
 | Name        | Description                                            | Type    | Default value    |
 | ----------- | ------------------------------------------------------ | ------- | ---------------- |

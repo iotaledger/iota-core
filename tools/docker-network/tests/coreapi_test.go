@@ -82,7 +82,7 @@ func Test_CoreAPI(t *testing.T) {
 			name: "Test_BlockWithMetadata",
 			testFunc: func(t *testing.T, nodeAlias string) {
 				assetsPerSlot.forEachBlock(t, func(t *testing.T, block *iotago.Block) {
-					resp, err := d.wallet.Clients[nodeAlias].BlockWithMetadataByID(context.Background(), block.MustID())
+					resp, err := d.wallet.Clients[nodeAlias].BlockWithMetadataByBlockID(context.Background(), block.MustID())
 					require.NoError(t, err)
 					require.NotNil(t, resp)
 					require.Equal(t, block.MustID(), resp.Block.MustID(), "BlockID of retrieved block does not match: %s != %s", block.MustID(), resp.Block.MustID())
@@ -104,7 +104,7 @@ func Test_CoreAPI(t *testing.T) {
 			name: "Test_CommitmentBySlot",
 			testFunc: func(t *testing.T, nodeAlias string) {
 				assetsPerSlot.forEachSlot(t, func(t *testing.T, slot iotago.SlotIndex, commitmentsPerNode map[string]iotago.CommitmentID) {
-					resp, err := d.wallet.Clients[nodeAlias].CommitmentByIndex(context.Background(), slot)
+					resp, err := d.wallet.Clients[nodeAlias].CommitmentBySlot(context.Background(), slot)
 					require.NoError(t, err)
 					require.NotNil(t, resp)
 					commitmentsPerNode[nodeAlias] = resp.MustID()
@@ -150,7 +150,7 @@ func Test_CoreAPI(t *testing.T) {
 			name: "Test_CommitmentUTXOChangesBySlot",
 			testFunc: func(t *testing.T, nodeAlias string) {
 				assetsPerSlot.forEachCommitment(t, func(t *testing.T, commitmentsPerNode map[string]iotago.CommitmentID) {
-					resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesByIndex(context.Background(), commitmentsPerNode[nodeAlias].Slot())
+					resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesBySlot(context.Background(), commitmentsPerNode[nodeAlias].Slot())
 					require.NoError(t, err)
 					require.NotNil(t, resp)
 					assetsPerSlot.assertUTXOOutputIDsInSlot(t, commitmentsPerNode[nodeAlias].Slot(), resp.CreatedOutputs, resp.ConsumedOutputs)
@@ -162,7 +162,7 @@ func Test_CoreAPI(t *testing.T) {
 			name: "Test_CommitmentUTXOChangesFullBySlot",
 			testFunc: func(t *testing.T, nodeAlias string) {
 				assetsPerSlot.forEachCommitment(t, func(t *testing.T, commitmentsPerNode map[string]iotago.CommitmentID) {
-					resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesFullByIndex(context.Background(), commitmentsPerNode[nodeAlias].Slot())
+					resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesFullBySlot(context.Background(), commitmentsPerNode[nodeAlias].Slot())
 					require.NoError(t, err)
 					require.NotNil(t, resp)
 					assetsPerSlot.assertUTXOOutputsInSlot(t, commitmentsPerNode[nodeAlias].Slot(), resp.CreatedOutputs, resp.ConsumedOutputs)
@@ -243,7 +243,7 @@ func Test_CoreAPI(t *testing.T) {
 					// node allows to get account only for the slot newer than lastCommittedSlot - MCA, we need fresh commitment
 					infoRes, err := d.wallet.Clients[nodeAlias].Info(context.Background())
 					require.NoError(t, err)
-					commitment, err := d.wallet.Clients[nodeAlias].CommitmentByIndex(context.Background(), infoRes.Status.LatestCommitmentID.Slot())
+					commitment, err := d.wallet.Clients[nodeAlias].CommitmentBySlot(context.Background(), infoRes.Status.LatestCommitmentID.Slot())
 					require.NoError(t, err)
 
 					resp, err = d.wallet.Clients[nodeAlias].Congestion(context.Background(), accountAddress, 0, commitment.MustID())
@@ -367,7 +367,7 @@ func TestCoreAPI_BadRequests(t *testing.T) {
 			name: "Test_BlockWithMetadata_Failure",
 			testFunc: func(t *testing.T, nodeAlias string) {
 				blockID := tpkg.RandBlockID()
-				resp, err := d.wallet.Clients[nodeAlias].BlockWithMetadataByID(context.Background(), blockID)
+				resp, err := d.wallet.Clients[nodeAlias].BlockWithMetadataByBlockID(context.Background(), blockID)
 				require.Error(t, err)
 				require.True(t, isStatusCode(err, http.StatusNotFound))
 				require.Nil(t, resp)
@@ -377,7 +377,7 @@ func TestCoreAPI_BadRequests(t *testing.T) {
 			name: "Test_CommitmentBySlot_Failure",
 			testFunc: func(t *testing.T, nodeAlias string) {
 				slot := iotago.SlotIndex(1000_000_000)
-				resp, err := d.wallet.Clients[nodeAlias].CommitmentByIndex(context.Background(), slot)
+				resp, err := d.wallet.Clients[nodeAlias].CommitmentBySlot(context.Background(), slot)
 				require.Error(t, err)
 				require.True(t, isStatusCode(err, http.StatusBadRequest))
 				require.Nil(t, resp)
@@ -418,7 +418,7 @@ func TestCoreAPI_BadRequests(t *testing.T) {
 			name: "Test_CommitmentUTXOChangesBySlot_Failure",
 			testFunc: func(t *testing.T, nodeAlias string) {
 				slot := iotago.SlotIndex(1000_000_000)
-				resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesByIndex(context.Background(), slot)
+				resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesBySlot(context.Background(), slot)
 				require.Error(t, err)
 				require.True(t, isStatusCode(err, http.StatusBadRequest))
 				require.Nil(t, resp)
@@ -429,7 +429,7 @@ func TestCoreAPI_BadRequests(t *testing.T) {
 			testFunc: func(t *testing.T, nodeAlias string) {
 				slot := iotago.SlotIndex(1000_000_000)
 
-				resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesFullByIndex(context.Background(), slot)
+				resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesFullBySlot(context.Background(), slot)
 				require.Error(t, err)
 				require.True(t, isStatusCode(err, http.StatusBadRequest))
 				require.Nil(t, resp)

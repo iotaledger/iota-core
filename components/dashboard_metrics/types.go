@@ -12,8 +12,6 @@ const (
 	Issued
 	// Allowed denotes blocks that passed the filter checks.
 	Allowed
-	// Attached denotes blocks stored by the block store.
-	Attached
 	// Solidified denotes blocks solidified by the solidifier.
 	Solidified
 	// Scheduled denotes blocks scheduled by the scheduler.
@@ -38,10 +36,11 @@ type NodeInfoExtended struct {
 
 // DatabaseSizesMetric represents database size metrics.
 type DatabaseSizesMetric struct {
-	Prunable  int64 `json:"prunable"`
-	Permanent int64 `json:"permanent"`
-	Total     int64 `json:"total"`
-	Time      int64 `json:"ts"`
+	Permanent  int64 `json:"permanent"`
+	Prunable   int64 `json:"prunable"`
+	TxRetainer int64 `json:"txRetainer"`
+	Total      int64 `json:"total"`
+	Time       int64 `json:"ts"`
 }
 
 // String returns the stringified component type.
@@ -53,8 +52,6 @@ func (c ComponentType) String() string {
 		return "Issued"
 	case Allowed:
 		return "Allowed"
-	case Attached:
-		return "Attached"
 	case Solidified:
 		return "Solidified"
 	case Scheduled:

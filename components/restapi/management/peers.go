@@ -48,7 +48,7 @@ func getPeer(_ echo.Context) (*api.PeerInfo, error) {
 
 		info := deps.PeeringManager.PeerInfoSnapshot(peerID)
 		if info == nil {
-			return nil, errors.WithMessagef(echo.ErrNotFound, "peer not found, peerID: %s", peerID.String())
+			return nil, ierrors.WithMessagef(echo.ErrNotFound, "peer not found, peerID: %s", peerID.String())
 		}
 
 		return WrapInfoSnapshot(info), nil
@@ -68,7 +68,7 @@ func removePeer(_ echo.Context) error {
 		// error is ignored because we don't care about the config here
 		_ = deps.PeeringConfigManager.RemovePeer(peerID)
 
-		return deps.PeeringManager.DisconnectPeer(peerID, errors.New("peer was removed via API"))
+		return deps.PeeringManager.DisconnectPeer(peerID, ierrors.New("peer was removed via API"))
 	*/
 	return nil
 }
@@ -95,17 +95,17 @@ func addPeer(_ echo.Context, _ log.Logger) (*api.PeerInfo, error) {
 		request := &addPeerRequest{}
 
 		if err := c.Bind(request); err != nil {
-			return nil, errors.WithMessagef(httpserver.ErrInvalidParameter, "invalid addPeerRequest, error: %s", err)
+			return nil, ierrors.WithMessagef(httpserver.ErrInvalidParameter, "invalid addPeerRequest, error: %s", err)
 		}
 
 		multiAddr, err := multiaddr.NewMultiaddr(request.MultiAddress)
 		if err != nil {
-			return nil, errors.WithMessagef(httpserver.ErrInvalidParameter, "invalid multiAddress, error: %s", err)
+			return nil, ierrors.WithMessagef(httpserver.ErrInvalidParameter, "invalid multiAddress, error: %s", err)
 		}
 
 		addrInfo, err := peer.AddrInfoFromP2pAddr(multiAddr)
 		if err != nil {
-			return nil, errors.WithMessagef(httpserver.ErrInvalidParameter, "invalid multiAddress, error: %s", err)
+			return nil, ierrors.WithMessagef(httpserver.ErrInvalidParameter, "invalid multiAddress, error: %s", err)
 		}
 
 		var alias string
@@ -118,7 +118,7 @@ func addPeer(_ echo.Context, _ log.Logger) (*api.PeerInfo, error) {
 
 		info := deps.PeeringManager.PeerInfoSnapshot(addrInfo.ID)
 		if info == nil {
-			return nil, errors.WithMessagef(echo.ErrNotFound, "peer not found, peerID: %s", addrInfo.ID.String())
+			return nil, ierrors.WithMessagef(echo.ErrNotFound, "peer not found, peerID: %s", addrInfo.ID.String())
 		}
 
 		// error is ignored because we don't care about the config here
