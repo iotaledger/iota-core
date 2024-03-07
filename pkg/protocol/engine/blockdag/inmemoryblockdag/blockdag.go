@@ -54,6 +54,7 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 
 			e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 				for _, block := range b.uncommittedSlotBlocks.GetValuesAndEvict(commitment.ID()) {
+					b.LogTrace("remove from uncommittedSlotBlocks", "block", block.ID(), "commitmentID", block.SlotCommitmentID())
 					b.setupBlock(block)
 				}
 			}, event.WithWorkerPool(wp))
@@ -126,6 +127,7 @@ func (b *BlockDAG) Append(modelBlock *model.Block) (block *blocks.Block, wasAppe
 		if b.uncommittedSlotBlocks.AddWithFunc(block.SlotCommitmentID(), block, func() bool {
 			return block.SlotCommitmentID().Slot() > b.latestCommitmentFunc().Commitment().Slot
 		}) {
+			b.LogTrace("add to uncommittedSlotBlocks", "block", block.ID(), "commitmentID", block.SlotCommitmentID())
 			return
 		}
 
@@ -190,7 +192,7 @@ func (b *BlockDAG) append(modelBlock *model.Block) (block *blocks.Block, wasAppe
 
 // shouldAppend determines if the Block can be appended (does not exist and addresses a recent slot).
 func (b *BlockDAG) shouldAppend(modelBlock *model.Block) (shouldAppend bool, err error) {
-	if b.evictionState.InActiveRootBlockRange(modelBlock.ID()) && !b.evictionState.IsActiveRootBlock(modelBlock.ID()) {
+	if isBelowRange, isInRange := b.evictionState.BelowOrInActiveRootBlockRange(modelBlock.ID()); isBelowRange || isInRange {
 		return false, ierrors.Errorf("block data with %s is too old (issued at: %s)", modelBlock.ID(), modelBlock.ProtocolBlock().Header.IssuingTime)
 	}
 
@@ -216,7 +218,7 @@ func (b *BlockDAG) shouldAppend(modelBlock *model.Block) (shouldAppend bool, err
 // this condition but exists as a missing entry, we mark it as invalid.
 func (b *BlockDAG) canAppendToParents(modelBlock *model.Block) (parentsValid bool, err error) {
 	for _, parentID := range modelBlock.ProtocolBlock().Parents() {
-		if b.evictionState.InActiveRootBlockRange(parentID) && !b.evictionState.IsActiveRootBlock(parentID) {
+		if isBelowRange, isInRange := b.evictionState.BelowOrInActiveRootBlockRange(parentID); isBelowRange || isInRange && !b.evictionState.IsActiveRootBlock(parentID) {
 			return false, ierrors.Errorf("parent %s of block %s is too old", parentID, modelBlock.ID())
 		}
 	}

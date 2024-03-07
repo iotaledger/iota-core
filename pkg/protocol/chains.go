@@ -96,6 +96,10 @@ func attachEngineLogs(instance *engine.Engine) func() {
 			instance.LogTrace("BlockDAG.BlockAppended", "block", block.ID())
 		}).Unhook,
 
+		events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
+			instance.LogTrace("BlockDAG.BlockSolid", "block", block.ID())
+		}).Unhook,
+
 		events.BlockDAG.BlockInvalid.Hook(func(block *blocks.Block, err error) {
 			instance.LogTrace("BlockDAG.BlockInvalid", "block", block.ID(), "err", err)
 		}).Unhook,
