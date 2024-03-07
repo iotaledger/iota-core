@@ -194,6 +194,20 @@ func Test_CoreAPI(t *testing.T) {
 			},
 		},
 		{
+			name: "Test_OutputWithMetadata",
+			testFunc: func(t *testing.T, nodeAlias string) {
+				assetsPerSlot.forEachOutput(t, func(t *testing.T, outputID iotago.OutputID, output iotago.Output) {
+					out, outMetadata, err := d.wallet.Clients[nodeAlias].OutputWithMetadataByID(context.Background(), outputID)
+					require.NoError(t, err)
+					require.NotNil(t, outMetadata)
+					require.NotNil(t, out)
+					require.EqualValues(t, outputID, outMetadata.OutputID, "OutputID of retrieved output does not match: %s != %s", outputID, outMetadata.OutputID)
+					require.EqualValues(t, outputID.TransactionID(), outMetadata.Included.TransactionID, "TransactionID of retrieved output does not match: %s != %s", outputID.TransactionID(), outMetadata.Included.TransactionID)
+					require.EqualValues(t, output, out, "OutputID of retrieved output does not match: %s != %s", output, out)
+				})
+			},
+		},
+		{
 			name: "Test_TransactionsIncludedBlock",
 			testFunc: func(t *testing.T, nodeAlias string) {
 				assetsPerSlot.forEachTransaction(t, func(t *testing.T, transaction *iotago.SignedTransaction) {
@@ -318,7 +332,7 @@ func Test_CoreAPI(t *testing.T) {
 	assetsPerSlot.assertBICs(t)
 }
 
-func TestCoreAPI_BadRequests(t *testing.T) {
+func Test_CoreAPI_BadRequests(t *testing.T) {
 	d := NewDockerTestFramework(t,
 		WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 4),
