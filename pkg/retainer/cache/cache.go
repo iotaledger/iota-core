@@ -16,7 +16,9 @@ func NewCache(maxSize int) *Cache {
 
 func (c *Cache) Get(key []byte) []byte {
 	if c.Has(key) {
-		return c.Get(key)
+		value := make([]byte, 0)
+
+		return c.Cache.Get(value, key)
 	}
 
 	return nil

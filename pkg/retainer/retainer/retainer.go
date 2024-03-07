@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
@@ -28,6 +29,8 @@ type (
 	RegisteredValidatorsFunc func(iotago.EpochIndex) ([]*api.ValidatorResponse, error)
 	APIFunc                  func(iotago.EpochIndex) iotago.API
 )
+
+var validatorResponsesTypeSettings = serix.TypeSettings{}.WithLengthPrefixType(serix.LengthPrefixTypeAsByte)
 
 const MaxStakersResponsesCacheNum = 10
 
@@ -253,15 +256,17 @@ func (r *Retainer) registeredValidatorsFromCache(index iotago.EpochIndex) ([]*ap
 		}
 
 		// store validator responses in cache.
-		registeredValidatorsBytes, err := apiForEpoch.Encode(registeredValidators)
+		registeredValidatorsBytes, err := apiForEpoch.Encode(registeredValidators, serix.WithTypeSettings(validatorResponsesTypeSettings))
 		if err != nil {
 			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to encode ordered registered validators list for epoch %d : %s", index, err)
 		}
 		r.registeredValidatorsCache.Set(index.MustBytes(), registeredValidatorsBytes)
+
+		return registeredValidators, nil
 	}
 
 	validatorResp := make([]*api.ValidatorResponse, 0)
-	_, err := apiForEpoch.Decode(registeredValidatorsBytes, validatorResp)
+	_, err := apiForEpoch.Decode(registeredValidatorsBytes, &validatorResp, serix.WithTypeSettings(validatorResponsesTypeSettings))
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to decode validator responses for epoch %d", index)
 	}
