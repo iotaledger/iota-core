@@ -103,7 +103,11 @@ func (b *Booker) Queue(block *blocks.Block) error {
 	signedTransactionMetadata.OnSignaturesValid(func() {
 		transactionMetadata := signedTransactionMetadata.TransactionMetadata()
 
-		if orphanedSlot, isOrphaned := transactionMetadata.OrphanedSlot(); isOrphaned && orphanedSlot <= block.SlotCommitmentID().Slot() {
+		// If the transaction has been rejected and is orphaned, then it should stay orphaned despite new attachment coming in.
+		// The new attachment should be marked as objectively invalid, because it's reattaching something that is rejected,
+		// while committing to a slot in which the conflict was resolved.
+		// If the transaction is pending, then it should be marked not orphaned anymore by the mem-pool.
+		if orphanedSlot, isOrphaned := transactionMetadata.OrphanedSlot(); isOrphaned && transactionMetadata.IsRejected() && orphanedSlot <= block.SlotCommitmentID().Slot() {
 			block.SetInvalid()
 
 			return

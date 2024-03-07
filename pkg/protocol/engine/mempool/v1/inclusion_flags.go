@@ -29,8 +29,8 @@ func newInclusionFlags() *inclusionFlags {
 		rejected:      promise.NewEvent(),
 		// Make sure the oldest orphaned index doesn't get overridden by newer TX spending the orphaned spender resources further.
 		orphanedSlot: reactive.NewVariable[iotago.SlotIndex](func(currentValue iotago.SlotIndex, newValue iotago.SlotIndex) iotago.SlotIndex {
-			if currentValue != 0 {
-				return currentValue
+			if currentValue > 0 {
+				return min(currentValue, newValue)
 			}
 
 			return newValue
@@ -93,8 +93,8 @@ func (s *inclusionFlags) OrphanedSlot() (slot iotago.SlotIndex, isOrphaned bool)
 }
 
 // OnOrphanedSlotUpdated registers a callback that gets triggered when the orphaned slot is updated.
-func (s *inclusionFlags) OnOrphanedSlotUpdated(callback func(slot iotago.SlotIndex)) {
-	s.orphanedSlot.OnUpdate(func(_ iotago.SlotIndex, newValue iotago.SlotIndex) {
-		callback(newValue)
+func (s *inclusionFlags) OnOrphanedSlotUpdated(callback func(prevValue iotago.SlotIndex, newValue iotago.SlotIndex)) {
+	s.orphanedSlot.OnUpdate(func(prevValue iotago.SlotIndex, newValue iotago.SlotIndex) {
+		callback(prevValue, newValue)
 	})
 }

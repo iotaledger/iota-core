@@ -1,10 +1,12 @@
 package tests
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -730,7 +732,7 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 
 	ts.MergePartitionsToMain(lo.Keys(partitions)...)
 
-	// Sync up the nodes to he same point and check consistency between them.
+	// Sync up the nodes to he same point and check consistency between them.+
 	{
 		// Let node1 catch up with commitment 1
 		ts.IssueBlocksAtSlots("5.1", []iotago.SlotIndex{5}, 1, "5.0", ts.Nodes("node2"), false, false)
@@ -878,4 +880,319 @@ func Test_BlockWithInvalidTransactionGetsBooked(t *testing.T) {
 
 	ts.AssertStorageCommitmentBlockAccepted(block1Slot, block1.ID(), true, ts.Nodes()...)
 	ts.AssertStorageCommitmentTransactionAccepted(block1Slot, lo.PanicOnErr(tx1.Transaction.ID()), false, ts.Nodes()...)
+}
+
+// This test checks that a fresh attachment of an orphaned transaction before it's evicted, can mark it as unorphaned.
+// On the other node, the transaction is evicted before a fresh attachment arrives,
+// simulating a possible race that could cause a divergence if both cases weren't handled correctly.
+// In the end, both nodes accept the transaction,
+// commit it and then commit far enough for the committed transaction to be fully evicted.
+func Test_OrphanedTransactionRace_Scenario1(t *testing.T) {
+	ts := testsuite.NewTestSuite(t,
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				0,
+				testsuite.GenesisTimeWithOffsetBySlots(20, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				testsuite.DefaultSlotsPerEpochExponent,
+			),
+			iotago.WithLivenessOptions(
+				15,
+				15,
+				2,
+				5,
+				testsuite.DefaultEpochNearingThreshold,
+			),
+		),
+	)
+	defer ts.Shutdown()
+
+	node1 := ts.AddValidatorNode("node1")
+	node2 := ts.AddNode("node2")
+	wallet := ts.AddDefaultWallet(node1)
+
+	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
+
+	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
+		node1.Validator.AccountID,
+	}, ts.Nodes()...)
+
+	tx1 := wallet.CreateBasicOutputsEquallyFromInput("tx1", 1, "Genesis:0")
+
+	// Create a transaction to be orphaned.
+	{
+
+		ts.SetCurrentSlot(1)
+		ts.IssueBasicBlockWithOptions("attachment-1-tx1-orphaned", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
+
+		ts.AssertTransactionsExist(wallet.Transactions("tx1"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1"), true, node1, node2)
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("attachment-1-tx1-orphaned"): {"tx1"},
+		}, node1, node2)
+
+		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
+			wallet.Transaction("tx1"): {"tx1"},
+		}, node1, node2)
+	}
+
+	// Advance both nodes at the edge of slot 1 committability
+	{
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{2, 3, 4, 5, 6, 7, 8}, 1, "Genesis", ts.Nodes("node1"), false, false)
+
+		ts.AssertNodeState(ts.Nodes(),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(5),
+			testsuite.WithEqualStoredCommitmentAtIndex(5),
+			testsuite.WithEvictedSlot(5),
+		)
+
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1"), true, node1, node2)
+	}
+
+	partitions := map[string][]*mock.Node{
+		"node1": {node1},
+		"node2": {node2},
+	}
+
+	// Split the nodes into partitions and commit slot 1 only on node2
+	{
+		ts.SplitIntoPartitions(partitions)
+
+		// Issue validation blocks on the validator node so that it commits further and performs the delayed eviction of TX1 from the mempool.
+		ts.IssueBlocksAtSlots("more-", []iotago.SlotIndex{8}, 3, "8.0", ts.Nodes("node1"), true, true)
+
+		ts.AssertNodeState(ts.Nodes("node1"),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(6),
+			testsuite.WithEqualStoredCommitmentAtIndex(6),
+			testsuite.WithEvictedSlot(6),
+		)
+		ts.AssertTransactionsExist(wallet.Transactions("tx1"), false, node1)
+
+		//Node 2 didn't perform the delayed eviction of TX1.
+		ts.AssertNodeState(ts.Nodes("node2"),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(5),
+			testsuite.WithEqualStoredCommitmentAtIndex(5),
+			testsuite.WithEvictedSlot(5),
+		)
+
+		ts.AssertTransactionsExist(wallet.Transactions("tx1"), true, node2)
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1"), true, node2)
+
+	}
+
+	// Issue the block on two partitions, to simulate a situation in which one node already committed and evicted the transaction,
+	// while on the other node transaction is still present.
+	{
+		wallet.SetDefaultNode(node2)
+		ts.SetCurrentSlot(8)
+		ts.IssueBasicBlockWithOptions("more-attachment-2-tx1", wallet, tx1, mock.WithStrongParents(ts.BlockIDsWithPrefix("8.0")...), mock.WithSlotCommitment(ts.CommitmentOfMainEngine(node1, 5).Commitment()))
+
+		wallet.SetDefaultNode(node1)
+		ts.IssueExistingBlock("more-attachment-2-tx1", wallet)
+
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("more-attachment-2-tx1"), false, ts.Nodes()...)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1"), false, node1)
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1"), false, node2)
+	}
+
+	ts.MergePartitionsToMain(lo.Keys(partitions)...)
+	fmt.Println("------ MERGE ------")
+	// Sync up the nodes to the same point and check the consistency between them. TX1 is accepted this time.
+	{
+		// Let node1 catch up with commitment 1
+		ts.IssueBlocksAtSlots("after-merge", []iotago.SlotIndex{8, 9, 10}, 3, "more-", ts.Nodes("node1"), true, true)
+
+		ts.AssertNodeState(ts.Nodes("node1", "node2"),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(8),
+			testsuite.WithEqualStoredCommitmentAtIndex(8),
+			testsuite.WithEvictedSlot(8),
+		)
+		ts.AssertEqualStoredCommitmentAtIndex(8, ts.Nodes()...)
+
+		ts.AssertStorageCommitmentBlockAccepted(8, ts.BlockID("more-attachment-2-tx1"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1"), false, ts.Nodes()...)
+		ts.AssertTransactionsInCacheAccepted(wallet.Transactions("tx1"), true, ts.Nodes()...)
+
+		ts.AssertStorageCommitmentTransactionAccepted(8, wallet.TransactionID("tx1"), true, ts.Nodes()...)
+
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1"), false, node1)
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1"), false, node2)
+	}
+
+	// Commit further so that transaction is evicted after maxCommittableAge delay.
+	{
+		ts.IssueBlocksAtSlots("after-merge", []iotago.SlotIndex{11, 12, 13, 14, 15}, 3, "after-merge10.2", ts.Nodes("node1"), true, true)
+
+		ts.AssertNodeState(ts.Nodes("node1", "node2"),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(13),
+			testsuite.WithEqualStoredCommitmentAtIndex(13),
+			testsuite.WithEvictedSlot(13),
+		)
+		ts.AssertEqualStoredCommitmentAtIndex(13, ts.Nodes()...)
+		ts.AssertTransactionsExist(wallet.Transactions("tx1"), false, ts.Nodes()...)
+	}
+}
+
+// This test checks, similar to the previous one,
+// that a fresh attachment of an orphaned transaction before it's evicted, can mark it as unorphaned.
+// On the other node, the transaction is evicted before a fresh attachment arrives,
+// simulating a possible race that could cause a divergence if both cases weren't handled correctly.
+// In the end, both nodes orphaned the transaction again and evict it from cache.
+func Test_OrphanedTransactionRace_Scenario2(t *testing.T) {
+	ts := testsuite.NewTestSuite(t,
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				0,
+				testsuite.GenesisTimeWithOffsetBySlots(20, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				testsuite.DefaultSlotsPerEpochExponent,
+			),
+			iotago.WithLivenessOptions(
+				15,
+				15,
+				2,
+				5,
+				testsuite.DefaultEpochNearingThreshold,
+			),
+		),
+	)
+	defer ts.Shutdown()
+
+	node1 := ts.AddValidatorNode("node1")
+	node2 := ts.AddNode("node2")
+	wallet := ts.AddDefaultWallet(node1)
+
+	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
+
+	node2.Protocol.SetLogLevel(log.LevelTrace)
+
+	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
+		node1.Validator.AccountID,
+	}, ts.Nodes()...)
+
+	tx1 := wallet.CreateBasicOutputsEquallyFromInput("tx1", 1, "Genesis:0")
+
+	// Create a transaction to be orphaned.
+	{
+
+		ts.SetCurrentSlot(1)
+		ts.IssueBasicBlockWithOptions("attachment-1-tx1-orphaned", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
+
+		ts.AssertTransactionsExist(wallet.Transactions("tx1"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1"), true, node1, node2)
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("attachment-1-tx1-orphaned"): {"tx1"},
+		}, node1, node2)
+
+		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
+			wallet.Transaction("tx1"): {"tx1"},
+		}, node1, node2)
+	}
+
+	// Advance both nodes at the edge of slot 1 committability
+	{
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{2, 3, 4, 5, 6, 7, 8}, 1, "Genesis", ts.Nodes("node1"), false, false)
+
+		ts.AssertNodeState(ts.Nodes(),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(5),
+			testsuite.WithEqualStoredCommitmentAtIndex(5),
+			testsuite.WithEvictedSlot(5),
+		)
+
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1"), true, node1, node2)
+	}
+
+	partitions := map[string][]*mock.Node{
+		"node1": {node1},
+		"node2": {node2},
+	}
+
+	// Split the nodes into partitions and commit slot 1 only on node2
+	{
+		ts.SplitIntoPartitions(partitions)
+
+		// Issue validation blocks on the validator node so that it commits further and performs the delayed eviction of TX1 from the mempool.
+		ts.IssueBlocksAtSlots("more-", []iotago.SlotIndex{8}, 3, "8.0", ts.Nodes("node1"), true, true)
+
+		ts.AssertNodeState(ts.Nodes("node1"),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(6),
+			testsuite.WithEqualStoredCommitmentAtIndex(6),
+			testsuite.WithEvictedSlot(6),
+		)
+		ts.AssertTransactionsExist(wallet.Transactions("tx1"), false, node1)
+
+		//Node 2 didn't perform the delayed eviction of TX1.
+		ts.AssertNodeState(ts.Nodes("node2"),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(5),
+			testsuite.WithEqualStoredCommitmentAtIndex(5),
+			testsuite.WithEvictedSlot(5),
+		)
+
+		ts.AssertTransactionsExist(wallet.Transactions("tx1"), true, node2)
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1"), true, node2)
+
+	}
+
+	// Issue the block on two partitions, to simulate a situation in which one node already committed and evicted the transaction,
+	// while on the other node transaction is still present.
+	{
+		wallet.SetDefaultNode(node2)
+		ts.SetCurrentSlot(8)
+		ts.IssueBasicBlockWithOptions("attachment-2-tx1-orphaned", wallet, tx1, mock.WithStrongParents(ts.BlockIDsWithPrefix("8.0")...), mock.WithSlotCommitment(ts.CommitmentOfMainEngine(node1, 5).Commitment()))
+
+		wallet.SetDefaultNode(node1)
+		ts.IssueExistingBlock("attachment-2-tx1-orphaned", wallet)
+
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("attachment-2-tx1-orphaned"), false, ts.Nodes()...)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1"), false, ts.Nodes()...)
+	}
+
+	ts.MergePartitionsToMain(lo.Keys(partitions)...)
+	fmt.Println("------ MERGE ------")
+	// Sync up the nodes to the same point and check the consistency between them. TX1 is again orphaned and evicted on both nodes.
+	{
+		// Let node1 catch up with commitment 1
+		ts.IssueBlocksAtSlots("after-merge", []iotago.SlotIndex{8, 9, 10}, 3, "more-", ts.Nodes("node1"), true, true)
+
+		ts.AssertNodeState(ts.Nodes("node1", "node2"),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(8),
+			testsuite.WithEqualStoredCommitmentAtIndex(8),
+			testsuite.WithEvictedSlot(8),
+		)
+		ts.AssertEqualStoredCommitmentAtIndex(8, ts.Nodes()...)
+
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1"), false, ts.Nodes()...)
+	}
+
+	// Commit further so that transaction is evicted after maxCommittableAge delay.
+	{
+		ts.IssueBlocksAtSlots("after-merge", []iotago.SlotIndex{11, 12, 13, 14, 15}, 3, "after-merge10.2", ts.Nodes("node1"), true, true)
+
+		ts.AssertNodeState(ts.Nodes("node1", "node2"),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(13),
+			testsuite.WithEqualStoredCommitmentAtIndex(13),
+			testsuite.WithEvictedSlot(13),
+		)
+		ts.AssertEqualStoredCommitmentAtIndex(13, ts.Nodes()...)
+		ts.AssertTransactionsExist(wallet.Transactions("tx1"), false, ts.Nodes()...)
+	}
 }

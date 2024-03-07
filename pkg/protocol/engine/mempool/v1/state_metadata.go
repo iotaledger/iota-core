@@ -4,7 +4,6 @@ import (
 	"sync/atomic"
 
 	"github.com/iotaledger/hive.go/ds/reactive"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/promise"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -54,8 +53,9 @@ func (s *StateMetadata) setup(optSource ...*TransactionMetadata) *StateMetadata 
 	source.OnPending(func() { s.accepted.Set(false) })
 	source.OnAccepted(func() { s.accepted.Set(true) })
 	source.OnRejected(func() { s.rejected.Trigger() })
-	source.OnCommittedSlotUpdated(lo.Void(s.committedSlot.Set))
-	source.OnOrphanedSlotUpdated(lo.Void(s.orphanedSlot.Set))
+
+	s.committedSlot.InheritFrom(source.committedSlot)
+	s.orphanedSlot.InheritFrom(source.orphanedSlot)
 
 	return s
 }
@@ -151,5 +151,5 @@ func (s *StateMetadata) setupSpender(spender *TransactionMetadata) {
 		s.decreaseSpenderCount()
 	})
 
-	spender.OnOrphanedSlotUpdated(func(_ iotago.SlotIndex) { s.decreaseSpenderCount() })
+	spender.OnOrphanedSlotUpdated(func(_ iotago.SlotIndex, _ iotago.SlotIndex) { s.decreaseSpenderCount() })
 }

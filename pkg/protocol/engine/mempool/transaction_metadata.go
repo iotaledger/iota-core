@@ -69,5 +69,5 @@ type inclusionFlags interface {
 
 	OrphanedSlot() (slot iotago.SlotIndex, isOrphaned bool)
 
-	OnOrphanedSlotUpdated(callback func(slot iotago.SlotIndex))
+	OnOrphanedSlotUpdated(callback func(prevSlot iotago.SlotIndex, newSlot iotago.SlotIndex))
 }
