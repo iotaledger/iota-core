@@ -164,7 +164,10 @@ func NewProvider(opts ...options.Option[TransactionRetainer]) module.Provider[*e
 			e.Ledger.MemPool().OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {
 				e.LogTrace("TxRetainer.TransactionAttached", "tx", transactionMetadata.ID())
 
-				// store that we saw the transaction
+				// store that we saw the transaction.
+				// we don't know the validity of the signature yet, but it is not important at this point.
+				// if there is already an entry with a valid signature, it should not be overwritten,
+				// therefore we use false for the "validSignature" argument.
 				r.UpdateTransactionMetadata(transactionMetadata.ID(), false, transactionMetadata.EarliestIncludedAttachment().Slot(), api.TransactionStatePending, nil)
 
 				// the transaction was accepted
@@ -214,7 +217,9 @@ func NewProvider(opts ...options.Option[TransactionRetainer]) module.Provider[*e
 					// 	- attached to the wrong place in the tangle, was not accepted within minCommittableAge
 					// 	- one of the inputs is orphaned, so the other transaction that produced that input got orphaned as well
 					// 	- a conflicting tx was committed before this one, so this one gets orphaned
-					// TODO: unclear if signature is valid/invalid
+					// we can use false for the "validSignature" argument, because we don't know here if the signature is valid or not,
+					// and it was neither invalid nor accepted nor rejected before, so there was no entry with
+					// "validSignature" set to true anyway.
 					r.UpdateTransactionMetadata(transactionMetadata.ID(), false, transactionMetadata.EarliestIncludedAttachment().Slot(), api.TransactionStateFailed, ierrors.WithMessagef(iotago.ErrTxOrphaned, "transaction orphaned in slot %d", slot))
 				})
 			}, asyncOpt)

@@ -23,7 +23,7 @@ type transactionRetainerCache struct {
 // defaultTxMetadataUpdateFunc is the default update function for transaction metadata in the transaction retainer cache.
 // HINT: do not modify the contents of the old transaction metadata in the update function, as it is used as a reference
 // to the earliest attachment slot in the cache.
-func defaulTxMetadataUpdateFunc(oldTxMeta *TransactionMetadata, newTxMeta *TransactionMetadata) (*TransactionMetadata, bool, error) {
+func defaultTxMetadataUpdateFunc(oldTxMeta *TransactionMetadata, newTxMeta *TransactionMetadata) (*TransactionMetadata, bool, error) {
 	if oldTxMeta == nil {
 		// no former transaction metadata exists, return the new one
 		return newTxMeta, true, nil
@@ -35,7 +35,8 @@ func defaulTxMetadataUpdateFunc(oldTxMeta *TransactionMetadata, newTxMeta *Trans
 	}
 
 	if oldTxMeta.ValidSignature && !newTxMeta.ValidSignature {
-		// do not update the entry in the cache if the signature was valid before and is invalid now
+		// do not update the entry in the cache if the signature was valid before and is invalid now.
+		// this can for example happen if there is a new attachment with an invalid signature.
 		return oldTxMeta, false, nil
 	}
 
@@ -69,7 +70,7 @@ func NewTransactionRetainerCache(opts ...options.Option[transactionRetainerCache
 		uncommittedTxIDsBySlot:           shrinkingmap.New[iotago.SlotIndex, map[iotago.TransactionID]struct{}](),
 	}, opts, func(c *transactionRetainerCache) {
 		if c.txMetadataUpdateFunc == nil {
-			c.txMetadataUpdateFunc = defaulTxMetadataUpdateFunc
+			c.txMetadataUpdateFunc = defaultTxMetadataUpdateFunc
 		}
 	})
 }

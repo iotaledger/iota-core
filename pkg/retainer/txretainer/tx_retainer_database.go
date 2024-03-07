@@ -60,6 +60,7 @@ func (r *transactionRetainerDatabase) updateTransactionMetadata(dbTx *gorm.DB, n
 	if err := dbTx.First(txMeta, &TransactionMetadata{TransactionID: txID, ValidSignature: true}).Error; err == nil {
 		// a signed txMeta for the given txID already exists, we only store new txMetas with a valid signature as well.
 		if !newTxMeta.ValidSignature {
+			// this can for example happen if there is a new attachment with an invalid signature.
 			return nil
 		}
 		entryFound = true
