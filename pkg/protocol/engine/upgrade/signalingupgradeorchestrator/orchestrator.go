@@ -58,7 +58,7 @@ type Orchestrator struct {
 
 	latestSignals             *memstorage.IndexedStorage[iotago.SlotIndex, account.SeatIndex, *model.SignaledBlock]
 	upgradeSignalsPerSlotFunc func(slot iotago.SlotIndex) (*slotstore.Store[account.SeatIndex, *model.SignaledBlock], error)
-	decidedUpgradeSignals     *epochstore.Store[model.VersionAndHash]
+	decidedUpgradeSignals     epochstore.Store[model.VersionAndHash]
 
 	setProtocolParametersEpochMappingFunc func(iotago.Version, iotago.Identifier, iotago.EpochIndex) error
 	protocolParametersAndVersionsHashFunc func() (iotago.Identifier, error)
@@ -110,7 +110,7 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 }
 
 func NewOrchestrator(errorHandler func(error),
-	decidedUpgradeSignals *epochstore.Store[model.VersionAndHash],
+	decidedUpgradeSignals epochstore.Store[model.VersionAndHash],
 	upgradeSignalsFunc func(slot iotago.SlotIndex) (*slotstore.Store[account.SeatIndex, *model.SignaledBlock], error),
 	apiProvider iotago.APIProvider,
 	setProtocolParametersEpochMappingFunc func(iotago.Version, iotago.Identifier, iotago.EpochIndex) error,

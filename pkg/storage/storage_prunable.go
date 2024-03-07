@@ -18,15 +18,15 @@ func (s *Storage) Rewards() *epochstore.EpochKVStore {
 	return s.prunable.Rewards()
 }
 
-func (s *Storage) PoolStats() *epochstore.Store[*model.PoolsStats] {
+func (s *Storage) PoolStats() epochstore.Store[*model.PoolsStats] {
 	return s.prunable.PoolStats()
 }
 
-func (s *Storage) DecidedUpgradeSignals() *epochstore.Store[model.VersionAndHash] {
+func (s *Storage) DecidedUpgradeSignals() epochstore.Store[model.VersionAndHash] {
 	return s.prunable.DecidedUpgradeSignals()
 }
 
-func (s *Storage) Committee() *epochstore.Store[*account.SeatedAccounts] {
+func (s *Storage) Committee() epochstore.Store[*account.SeatedAccounts] {
 	return s.prunable.Committee()
 }
 

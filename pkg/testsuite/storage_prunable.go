@@ -103,7 +103,7 @@ func (t *TestSuite) assertPrunedUntil(storageInstance *storage.Storage,
 	return nil
 }
 
-func assertPrunableEpochStoragesPruned[V any](t *TestSuite, store *epochstore.Store[V], epoch iotago.EpochIndex) error {
+func assertPrunableEpochStoragesPruned[V any](t *TestSuite, store epochstore.Store[V], epoch iotago.EpochIndex) error {
 	// Check that all store returns the expected error when trying to access the data.
 	_, err := store.Load(epoch)
 	if !ierrors.Is(err, database.ErrEpochPruned) {
