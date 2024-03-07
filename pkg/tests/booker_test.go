@@ -1179,7 +1179,7 @@ func Test_OrphanedTransactionRace_Scenario2(t *testing.T) {
 
 		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1"), true, ts.Nodes()...)
 		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1"), true, ts.Nodes()...)
-		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1"), false, ts.Nodes()...)
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1"), true, ts.Nodes()...)
 	}
 
 	// Commit further so that transaction is evicted after maxCommittableAge delay.
