@@ -36,7 +36,7 @@ func Test_CoreAPI(t *testing.T) {
 
 	d.WaitUntilNetworkReady()
 
-	assetsPerSlot, lastSlot := d.prepareAssets(1)
+	assetsPerSlot, lastSlot := d.prepareAssets(5)
 
 	fmt.Println("AwaitCommitment for slot", lastSlot)
 	d.AwaitCommitment(lastSlot)
