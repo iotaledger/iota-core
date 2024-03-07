@@ -11,9 +11,7 @@ import (
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/components/metricstracker"
 	"github.com/iotaledger/iota-core/components/protocol"
-	"github.com/iotaledger/iota-core/components/restapi"
-	"github.com/iotaledger/iota-core/pkg/blockhandler"
-	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/requesthandler"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	"github.com/iotaledger/iota.go/v4/api"
 )
@@ -23,9 +21,6 @@ func init() {
 		Name:      "CoreAPIV3",
 		DepsFunc:  func(cDeps dependencies) { deps = cDeps },
 		Configure: configure,
-		IsEnabled: func(_ *dig.Container) bool {
-			return restapi.ParamsRestAPI.Enabled
-		},
 	}
 }
 
@@ -39,22 +34,22 @@ type dependencies struct {
 
 	AppInfo          *app.Info
 	RestRouteManager *restapipkg.RestRouteManager
-	Protocol         *protocolpkg.Protocol
-	BlockHandler     *blockhandler.BlockHandler
+	RequestHandler   *requesthandler.RequestHandler
 	MetricsTracker   *metricstracker.MetricsTracker
 	BaseToken        *protocol.BaseToken
 }
 
 func configure() error {
-	// check if RestAPI plugin is disabled
-	if !Component.App().IsComponentEnabled(restapi.Component.Identifier()) {
-		Component.LogPanicf("RestAPI plugin needs to be enabled to use the %s plugin", Component.Name)
-	}
-
 	routeGroup := deps.RestRouteManager.AddRoute(api.CorePluginName)
 
 	routeGroup.GET(api.CoreEndpointInfo, func(c echo.Context) error {
 		resp := info()
+
+		return responseByHeader(c, resp)
+	})
+
+	routeGroup.GET(api.CoreEndpointNetworkMetrics, func(c echo.Context) error {
+		resp := metrics()
 
 		return responseByHeader(c, resp)
 	})
@@ -97,7 +92,7 @@ func configure() error {
 	}, checkNodeSynced())
 
 	routeGroup.GET(api.CoreEndpointBlockIssuance, func(c echo.Context) error {
-		resp, err := blockIssuance()
+		resp, err := deps.RequestHandler.BlockIssuance()
 		if err != nil {
 			return err
 		}
@@ -111,7 +106,7 @@ func configure() error {
 			return err
 		}
 
-		commitment, err := getCommitmentByID(commitmentID)
+		commitment, err := deps.RequestHandler.GetCommitmentByID(commitmentID)
 		if err != nil {
 			return err
 		}
@@ -126,12 +121,12 @@ func configure() error {
 		}
 
 		// load the commitment to check if it matches the given commitmentID
-		commitment, err := getCommitmentByID(commitmentID)
+		commitment, err := deps.RequestHandler.GetCommitmentByID(commitmentID)
 		if err != nil {
 			return err
 		}
 
-		resp, err := getUTXOChanges(commitment.ID())
+		resp, err := deps.RequestHandler.GetUTXOChanges(commitment.ID())
 		if err != nil {
 			return err
 		}
@@ -146,12 +141,12 @@ func configure() error {
 		}
 
 		// load the commitment to check if it matches the given commitmentID
-		commitment, err := getCommitmentByID(commitmentID)
+		commitment, err := deps.RequestHandler.GetCommitmentByID(commitmentID)
 		if err != nil {
 			return err
 		}
 
-		resp, err := getUTXOChangesFull(commitment.ID())
+		resp, err := deps.RequestHandler.GetUTXOChangesFull(commitment.ID())
 		if err != nil {
 			return err
 		}
@@ -165,7 +160,7 @@ func configure() error {
 			return err
 		}
 
-		commitment, err := getCommitmentBySlot(index)
+		commitment, err := deps.RequestHandler.GetCommitmentBySlot(index)
 		if err != nil {
 			return err
 		}
@@ -179,12 +174,12 @@ func configure() error {
 			return err
 		}
 
-		commitment, err := getCommitmentBySlot(slot)
+		commitment, err := deps.RequestHandler.GetCommitmentBySlot(slot)
 		if err != nil {
 			return err
 		}
 
-		resp, err := getUTXOChanges(commitment.ID())
+		resp, err := deps.RequestHandler.GetUTXOChanges(commitment.ID())
 		if err != nil {
 			return err
 		}
@@ -198,12 +193,12 @@ func configure() error {
 			return err
 		}
 
-		commitment, err := getCommitmentBySlot(slot)
+		commitment, err := deps.RequestHandler.GetCommitmentBySlot(slot)
 		if err != nil {
 			return err
 		}
 
-		resp, err := getUTXOChangesFull(commitment.ID())
+		resp, err := deps.RequestHandler.GetUTXOChangesFull(commitment.ID())
 		if err != nil {
 			return err
 		}
@@ -212,7 +207,7 @@ func configure() error {
 	})
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointOutput), func(c echo.Context) error {
-		resp, err := outputByID(c)
+		resp, err := outputFromOutputID(c)
 		if err != nil {
 			return err
 		}
@@ -221,7 +216,7 @@ func configure() error {
 	})
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointOutputMetadata), func(c echo.Context) error {
-		resp, err := outputMetadataByID(c)
+		resp, err := outputMetadataFromOutputID(c)
 		if err != nil {
 			return err
 		}
@@ -230,7 +225,7 @@ func configure() error {
 	})
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointOutputWithMetadata), func(c echo.Context) error {
-		resp, err := outputWithMetadataByID(c)
+		resp, err := outputWithMetadataFromOutputID(c)
 		if err != nil {
 			return err
 		}
@@ -239,12 +234,12 @@ func configure() error {
 	})
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointTransactionsIncludedBlock), func(c echo.Context) error {
-		block, err := blockByTransactionID(c)
+		block, err := blockFromTransactionID(c)
 		if err != nil {
 			return err
 		}
 
-		return responseByHeader(c, block.ProtocolBlock())
+		return responseByHeader(c, block)
 	})
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointTransactionsIncludedBlockMetadata), func(c echo.Context) error {
@@ -316,7 +311,7 @@ func configure() error {
 func checkNodeSynced() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			if !deps.Protocol.Engines.Main.Get().SyncManager.IsNodeSynced() {
+			if !deps.RequestHandler.IsNodeSynced() {
 				return ierrors.Wrap(echo.ErrServiceUnavailable, "node is not synced")
 			}
 
@@ -327,5 +322,5 @@ func checkNodeSynced() echo.MiddlewareFunc {
 
 func responseByHeader(c echo.Context, obj any, httpStatusCode ...int) error {
 	// TODO: that should take the API that belongs to the object
-	return httpserver.SendResponseByHeader(c, deps.Protocol.CommittedAPI(), obj, httpStatusCode...)
+	return httpserver.SendResponseByHeader(c, deps.RequestHandler.CommittedAPI(), obj, httpStatusCode...)
 }

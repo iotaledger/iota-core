@@ -11,9 +11,9 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	inx "github.com/iotaledger/inx/go"
-	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/requesthandler"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
@@ -188,13 +188,13 @@ func (s *Server) attachBlock(ctx context.Context, block *iotago.Block) (*inx.Blo
 	mergedCtx, mergedCtxCancel := contextutils.MergeContexts(ctx, Component.Daemon().ContextStopped())
 	defer mergedCtxCancel()
 
-	blockID, err := deps.BlockHandler.AttachBlock(mergedCtx, block)
+	blockID, err := deps.RequestHandler.AttachBlock(mergedCtx, block)
 	if err != nil {
 		switch {
-		case ierrors.Is(err, blockhandler.ErrBlockAttacherInvalidBlock):
+		case ierrors.Is(err, requesthandler.ErrBlockAttacherInvalidBlock):
 			return nil, status.Errorf(codes.InvalidArgument, "failed to attach block: %s", err.Error())
 
-		case ierrors.Is(err, blockhandler.ErrBlockAttacherAttachingNotPossible):
+		case ierrors.Is(err, requesthandler.ErrBlockAttacherAttachingNotPossible):
 			return nil, status.Errorf(codes.Internal, "failed to attach block: %s", err.Error())
 
 		default:

@@ -58,7 +58,7 @@ type Orchestrator struct {
 
 	latestSignals             *memstorage.IndexedStorage[iotago.SlotIndex, account.SeatIndex, *model.SignaledBlock]
 	upgradeSignalsPerSlotFunc func(slot iotago.SlotIndex) (*slotstore.Store[account.SeatIndex, *model.SignaledBlock], error)
-	decidedUpgradeSignals     *epochstore.Store[model.VersionAndHash]
+	decidedUpgradeSignals     epochstore.Store[model.VersionAndHash]
 
 	setProtocolParametersEpochMappingFunc func(iotago.Version, iotago.Identifier, iotago.EpochIndex) error
 	protocolParametersAndVersionsHashFunc func() (iotago.Identifier, error)
@@ -110,7 +110,7 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 }
 
 func NewOrchestrator(errorHandler func(error),
-	decidedUpgradeSignals *epochstore.Store[model.VersionAndHash],
+	decidedUpgradeSignals epochstore.Store[model.VersionAndHash],
 	upgradeSignalsFunc func(slot iotago.SlotIndex) (*slotstore.Store[account.SeatIndex, *model.SignaledBlock], error),
 	apiProvider iotago.APIProvider,
 	setProtocolParametersEpochMappingFunc func(iotago.Version, iotago.Identifier, iotago.EpochIndex) error,
@@ -136,7 +136,9 @@ func NewOrchestrator(errorHandler func(error),
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (o *Orchestrator) Reset() {
-	// TODO: clean up latestSignals
+	// latestSignals are evicted upon commitment,
+	// so we can safely clear the whole structure as it only contains data from uncommitted slots.
+	o.latestSignals.Clear()
 }
 
 func (o *Orchestrator) Shutdown() {

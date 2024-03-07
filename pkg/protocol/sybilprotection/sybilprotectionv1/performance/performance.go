@@ -20,8 +20,8 @@ import (
 
 type Tracker struct {
 	rewardsStorePerEpochFunc       func(epoch iotago.EpochIndex) (kvstore.KVStore, error)
-	poolStatsStore                 *epochstore.Store[*model.PoolsStats]
-	committeeStore                 *epochstore.Store[*account.SeatedAccounts]
+	poolStatsStore                 epochstore.Store[*model.PoolsStats]
+	committeeStore                 epochstore.Store[*account.SeatedAccounts]
 	committeeCandidatesInEpochFunc func(epoch iotago.EpochIndex) (*kvstore.TypedStore[iotago.AccountID, iotago.SlotIndex], error)
 	nextEpochCommitteeCandidates   *shrinkingmap.ShrinkingMap[iotago.AccountID, iotago.SlotIndex]
 	validatorPerformancesFunc      func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error)
@@ -39,8 +39,8 @@ type Tracker struct {
 
 func NewTracker(
 	rewardsStorePerEpochFunc func(epoch iotago.EpochIndex) (kvstore.KVStore, error),
-	poolStatsStore *epochstore.Store[*model.PoolsStats],
-	committeeStore *epochstore.Store[*account.SeatedAccounts],
+	poolStatsStore epochstore.Store[*model.PoolsStats],
+	committeeStore epochstore.Store[*account.SeatedAccounts],
 	committeeCandidatesInEpochFunc func(epoch iotago.EpochIndex) (*kvstore.TypedStore[iotago.AccountID, iotago.SlotIndex], error),
 	validatorPerformancesFunc func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error),
 	latestAppliedEpoch iotago.EpochIndex,
@@ -65,6 +65,16 @@ func NewTracker(
 func (t *Tracker) ClearCandidates() {
 	// clean the candidate cache stored in memory to make room for candidates in the next epoch
 	t.nextEpochCommitteeCandidates.Clear()
+}
+func (t *Tracker) Reset(lastCommittedSlot iotago.SlotIndex) {
+	// Only remove candidates that announced their candidacy after the lastCommittedSlot.
+	t.nextEpochCommitteeCandidates.ForEach(func(id iotago.AccountID, index iotago.SlotIndex) bool {
+		if index > lastCommittedSlot {
+			t.nextEpochCommitteeCandidates.Delete(id)
+		}
+
+		return true
+	})
 }
 
 func (t *Tracker) TrackValidationBlock(block *blocks.Block) {

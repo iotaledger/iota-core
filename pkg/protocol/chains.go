@@ -96,6 +96,10 @@ func attachEngineLogs(instance *engine.Engine) func() {
 			instance.LogTrace("BlockDAG.BlockAttached", "block", block.ID())
 		}).Unhook,
 
+		events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
+			instance.LogTrace("BlockDAG.BlockSolid", "block", block.ID())
+		}).Unhook,
+
 		events.BlockDAG.BlockInvalid.Hook(func(block *blocks.Block, err error) {
 			instance.LogTrace("BlockDAG.BlockInvalid", "block", block.ID(), "err", err)
 		}).Unhook,
@@ -345,8 +349,14 @@ func (c *Chains) trackHeaviestCandidates(chain *Chain) (teardown func()) {
 
 		if evictionEvent := c.protocol.EvictionEvent(targetSlot); !evictionEvent.WasTriggered() {
 			c.HeaviestClaimedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
-			c.HeaviestAttestedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
-			c.HeaviestVerifiedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
+
+			latestCommitment.IsAttested.OnTrigger(func() {
+				c.HeaviestAttestedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
+			})
+
+			latestCommitment.IsVerified.OnTrigger(func() {
+				c.HeaviestVerifiedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
+			})
 		}
 	})
 }
@@ -435,50 +445,58 @@ func (c *ChainsCandidate) measureAt(slot iotago.SlotIndex) (teardown func()) {
 		return
 	}
 
-	// abort if no commitment exists for this slot
-	sortedCommitments, sortedCommitmentsExist := c.sortedCommitmentsBySlot.Get(slot)
-	if !sortedCommitmentsExist {
-		return
-	}
+	// get the sorted commitments for the given slot
+	sortedCommitments := c.sortedCommitments(slot, c.chains.protocol.EvictionEvent(slot))
 
 	// make sure the heaviest commitment was the heaviest for the last chainSwitchingThreshold slots before we update
 	return sortedCommitments.HeaviestElement().WithNonEmptyValue(func(heaviestCommitment *Commitment) (teardown func()) {
-		// abort if the heaviest commitment is the main chain
-		heaviestChain := heaviestCommitment.Chain.Get()
-		if heaviestChain == c.chains.Main.Get() {
-			return
-		}
+		return c.weightVariable(heaviestCommitment).WithValue(func(candidateWeight uint64) (teardown func()) {
+			heaviestChain := heaviestCommitment.Chain.Get()
 
-		// create counter for the number of slots with the same chain
-		slotsWithSameChain := reactive.NewCounter[*Commitment](func(commitment *Commitment) bool {
-			return commitment.Chain.Get() == heaviestChain
-		})
-
-		// reactively counts the number of slots with the same chain
-		var teardownMonitoringFunctions []func()
-		for i := uint8(1); i < chainSwitchingThreshold; i++ {
-			if earlierCommitments, earlierCommitmentsExist := c.sortedCommitmentsBySlot.Get(slot - iotago.SlotIndex(i)); earlierCommitmentsExist {
-				teardownMonitoringFunctions = append(teardownMonitoringFunctions, slotsWithSameChain.Monitor(earlierCommitments.HeaviestElement()))
+			// abort if the heaviest commitment is the main chain or main chain is heavier
+			if mainChain := c.chains.Main.Get(); heaviestChain == mainChain {
+				return
+			} else if mainChain.CumulativeVerifiedWeightAt(heaviestCommitment.Slot()) > candidateWeight {
+				return
 			}
-		}
 
-		// reactively update the value in respect to the reached threshold
-		teardownUpdates := slotsWithSameChain.OnUpdate(func(_ int, slotsWithSameChain int) {
-			if slotsWithSameChain >= int(chainSwitchingThreshold)-1 {
-				c.Set(heaviestChain)
-			} else {
-				c.Set(nil)
+			// create counter for the number of slots with the same chain
+			slotsWithSameChain := reactive.NewCounter[*Commitment](func(commitment *Commitment) bool {
+				return commitment.Chain.Get() == heaviestChain
+			})
+
+			// reactively counts the number of slots with the same chain
+			var teardownMonitoringFunctions []func()
+			for i := uint8(1); i < chainSwitchingThreshold; i++ {
+				if earlierCommitments, earlierCommitmentsExist := c.sortedCommitmentsBySlot.Get(slot - iotago.SlotIndex(i)); earlierCommitmentsExist {
+					teardownMonitoringFunctions = append(teardownMonitoringFunctions, slotsWithSameChain.Monitor(earlierCommitments.HeaviestElement()))
+				}
 			}
-		})
 
-		// return all teardown functions
-		return lo.Batch(append(teardownMonitoringFunctions, teardownUpdates)...)
+			// reactively update the value in respect to the reached threshold
+			teardownUpdates := slotsWithSameChain.OnUpdate(func(_ int, slotsWithSameChain int) {
+				if slotsWithSameChain >= int(chainSwitchingThreshold)-1 {
+					c.Set(heaviestChain)
+				} else {
+					c.Set(nil)
+				}
+			})
+
+			// return all teardown functions
+			return lo.Batch(append(teardownMonitoringFunctions, teardownUpdates)...)
+		})
 	})
 }
 
 // registerCommitment registers the given commitment for the given slot, which makes it become part of the weight
 // measurement process.
 func (c *ChainsCandidate) registerCommitment(slot iotago.SlotIndex, commitment *Commitment, evictionEvent reactive.Event) {
+	sortedCommitments := c.sortedCommitments(slot, evictionEvent)
+	sortedCommitments.Add(commitment)
+}
+
+// sortedCommitments returns the sorted commitments for the given slot and creates a new sorted set if it doesn't exist.
+func (c *ChainsCandidate) sortedCommitments(slot iotago.SlotIndex, evictionEvent reactive.Event) (sortedCommitments reactive.SortedSet[*Commitment]) {
 	sortedCommitments, slotCreated := c.sortedCommitmentsBySlot.GetOrCreate(slot, func() reactive.SortedSet[*Commitment] {
 		return reactive.NewSortedSet(c.weightVariable)
 	})
@@ -487,7 +505,7 @@ func (c *ChainsCandidate) registerCommitment(slot iotago.SlotIndex, commitment *
 		evictionEvent.OnTrigger(func() { c.sortedCommitmentsBySlot.Delete(slot) })
 	}
 
-	sortedCommitments.Add(commitment)
+	return sortedCommitments
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

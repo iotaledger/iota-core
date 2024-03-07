@@ -4,7 +4,6 @@ import (
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/serializer/v2"
@@ -55,13 +54,21 @@ func (s *State) LastEvictedSlot() iotago.SlotIndex {
 	return s.lastCommittedSlot
 }
 
-// InActiveRootBlockRange checks if the Block associated with the given id is within the active root block range with
-// respect to the latest committed slot.
-func (s *State) InActiveRootBlockRange(id iotago.BlockID) bool {
+// BelowOrInActiveRootBlockRange checks if the Block associated with the given id is within or below the active root block range
+// with respect to the latest committed slot.
+func (s *State) BelowOrInActiveRootBlockRange(id iotago.BlockID) (belowRange bool, inRange bool) {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	return s.withinActiveIndexRange(id.Slot())
+	slot := id.Slot()
+
+	startSlot, endSlot := s.activeIndexRange(s.lastCommittedSlot)
+
+	if slot >= startSlot && slot <= endSlot {
+		return false, true
+	}
+
+	return slot < startSlot, false
 }
 
 func (s *State) AllActiveRootBlocks() map[iotago.BlockID]iotago.CommitmentID {
@@ -134,10 +141,6 @@ func (s *State) AddRootBlock(id iotago.BlockID, commitmentID iotago.CommitmentID
 
 	if err := lo.PanicOnErr(s.rootBlockStorageFunc(id.Slot())).Store(id, commitmentID); err != nil {
 		panic(ierrors.Wrapf(err, "failed to store root block %s", id))
-	}
-
-	if err := s.settings.AdvanceLatestNonEmptySlot(id.Slot()); err != nil && !ierrors.Is(err, kvstore.ErrTypedValueNotChanged) {
-		panic(ierrors.Wrapf(err, "failed to advance latest non empty slot to %d", id.Slot()))
 	}
 }
 
