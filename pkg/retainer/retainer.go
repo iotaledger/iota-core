@@ -25,8 +25,5 @@ type TransactionRetainer interface {
 	// Reset resets the component to a clean state as if it was created at the last commitment.
 	Reset(targetSlot iotago.SlotIndex)
 
-	// Prune prunes the component state as if the last pruned slot was targetSlot.
-	Prune(targetSlot iotago.SlotIndex) error
-
 	module.Interface
 }

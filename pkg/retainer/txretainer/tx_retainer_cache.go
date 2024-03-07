@@ -21,7 +21,8 @@ type transactionRetainerCache struct {
 }
 
 // defaultTxMetadataUpdateFunc is the default update function for transaction metadata in the transaction retainer cache.
-// HINT: do not modify the contents of the old transaction metadata in the update function, as it is a reference to the cache.
+// HINT: do not modify the contents of the old transaction metadata in the update function, as it is used as a reference
+// to the earliest attachment slot in the cache.
 func defaulTxMetadataUpdateFunc(oldTxMeta *TransactionMetadata, newTxMeta *TransactionMetadata) (*TransactionMetadata, bool, error) {
 	if oldTxMeta == nil {
 		// no former transaction metadata exists, return the new one
@@ -34,16 +35,13 @@ func defaulTxMetadataUpdateFunc(oldTxMeta *TransactionMetadata, newTxMeta *Trans
 	}
 
 	if oldTxMeta.ValidSignature && !newTxMeta.ValidSignature {
-		// do not update the entry in the database if the signature was valid before and is invalid now
+		// do not update the entry in the cache if the signature was valid before and is invalid now
 		return oldTxMeta, false, nil
 	}
 
 	if !oldTxMeta.ValidSignature && newTxMeta.ValidSignature {
-		// if the signature was invalid before and is valid now, update the entry in the database
-		// but keep the ID of the old transaction metadata to overwrite the old entry.
+		// if the signature was invalid before and is valid now, update the entry in the cache.
 		// all former fields are overwritten by the new transaction metadata, including the earliest attachment slot.
-		newTxMeta.ID = oldTxMeta.ID
-
 		return newTxMeta, true, nil
 	}
 
@@ -51,9 +49,6 @@ func defaulTxMetadataUpdateFunc(oldTxMeta *TransactionMetadata, newTxMeta *Trans
 	if newTxMeta.EarliestAttachmentSlot == 0 || (oldTxMeta.EarliestAttachmentSlot != 0 && oldTxMeta.EarliestAttachmentSlot < newTxMeta.EarliestAttachmentSlot) {
 		newTxMeta.EarliestAttachmentSlot = oldTxMeta.EarliestAttachmentSlot
 	}
-
-	// keep the ID of the old transaction metadata to overwrite the old entry
-	newTxMeta.ID = oldTxMeta.ID
 
 	return newTxMeta, true, nil
 }

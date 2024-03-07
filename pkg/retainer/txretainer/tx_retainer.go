@@ -23,10 +23,15 @@ var (
 	// ErrEntryNotFound is returned when a transaction metadata entry is not found.
 	ErrEntryNotFound = ierrors.New("entry not found")
 
+	// code guard to ensure that the TransactionRetainer implements the retainer.TransactionRetainer interface.
 	_ retainer.TransactionRetainer = &TransactionRetainer{}
 )
 
 // TransactionMetadata represents the metadata of a transaction in the SQL database and the cache.
+// The ID is the primary key of the database table. We need this ID because we want to be able to store multiple
+// metadata entries for the same transaction ID, but with different earliest attachment slots.
+// This is necessary because we want to be able to rollback the transaction retainer to a specific slot by deleting
+// all entries with an earliest attachment slot greater than the target slot.
 type TransactionMetadata struct {
 	ID                     uint64           `gorm:"autoIncrement"`
 	TransactionID          []byte           `gorm:"notnull"`
@@ -236,13 +241,10 @@ func NewProvider(opts ...options.Option[TransactionRetainer]) module.Provider[*e
 
 			// this event is fired when the storage successfully pruned an epoch
 			e.Storage.Pruned.Hook(func(epoch iotago.EpochIndex) {
-				epochStartSlot := e.CommittedAPI().TimeProvider().EpochStart(epoch)
-				if epochStartSlot == 0 {
-					return
-				}
+				epochEndSlot := e.CommittedAPI().TimeProvider().EpochEnd(epoch)
 
-				// pruning should be done until and including the last slot of the previous epoch
-				if err := r.txRetainerDatabase.Prune(epochStartSlot - 1); err != nil {
+				// pruning should be done until and including the last slot of the pruned epoch
+				if err := r.txRetainerDatabase.Prune(epochEndSlot); err != nil {
 					r.errorHandler(err)
 				}
 			}, asyncOpt)

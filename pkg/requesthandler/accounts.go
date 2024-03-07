@@ -47,7 +47,7 @@ func (r *RequestHandler) Validators(slotRange, cursorIndex, pageSize uint32) (*a
 
 	registeredValidators, err := r.protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(latestEpoch)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get ordered registered validators list for epoch %d : %s", latestEpoch, err)
+		return nil, ierrors.Join(echo.ErrInternalServerError, ierrors.Wrapf(err, "failed to get ordered registered validators list for epoch %d", latestEpoch))
 	}
 
 	page := registeredValidators[cursorIndex:lo.Min(cursorIndex+pageSize, uint32(len(registeredValidators)))]

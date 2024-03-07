@@ -17,8 +17,8 @@ type txRetainerTestsuite struct {
 	database   *clonablesql.ClonableSQLiteDatabase
 	TxRetainer *txretainer.TransactionRetainer
 
-	latestCommitedSlot iotago.SlotIndex
-	finalizedSlot      iotago.SlotIndex
+	latestCommittedSlot iotago.SlotIndex
+	finalizedSlot       iotago.SlotIndex
 }
 
 func newClonableSQLiteDatabase(t *testing.T) *clonablesql.ClonableSQLiteDatabase {
@@ -40,7 +40,7 @@ func newTestSuite(t *testing.T) *txRetainerTestsuite {
 
 	testSuite.TxRetainer = txretainer.New(workers, testSuite.database.ExecDBFunc(),
 		func() iotago.SlotIndex {
-			return testSuite.latestCommitedSlot
+			return testSuite.latestCommittedSlot
 		}, func() iotago.SlotIndex {
 			return testSuite.finalizedSlot
 		}, func(err error) {
@@ -58,7 +58,7 @@ func (ts *txRetainerTestsuite) Close() {
 }
 
 func (ts *txRetainerTestsuite) SetLatestCommittedSlot(slot iotago.SlotIndex) {
-	ts.latestCommitedSlot = slot
+	ts.latestCommittedSlot = slot
 	if err := ts.TxRetainer.CommitSlot(slot); err != nil {
 		panic(err)
 	}

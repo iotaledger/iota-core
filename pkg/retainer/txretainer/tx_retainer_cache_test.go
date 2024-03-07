@@ -112,11 +112,6 @@ func TestTransactionRetainerCache(t *testing.T) {
 	txIDs = txRetainerCache.DeleteAndReturnTxMetadataChangesBySlot(20)
 	require.Len(t, txIDs, 0)
 
-	// check that the transaction metadata doesn't exist anymore
-	txMeta, exists = txRetainerCache.TransactionMetadataByID(txID1)
-	require.False(t, exists)
-	require.Nil(t, txMeta)
-
 	// add the transaction metadata again
 	err = txRetainerCache.UpdateTxMetadata(newTxMeta1)
 	require.NoError(t, err)
