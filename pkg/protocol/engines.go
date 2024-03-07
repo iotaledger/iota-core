@@ -208,6 +208,7 @@ func (e *Engines) loadEngineInstanceWithStorage(engineAlias string, storage *sto
 		e.protocol.Options.SlotGadgetProvider,
 		e.protocol.Options.SybilProtectionProvider,
 		e.protocol.Options.NotarizationProvider,
+		e.protocol.Options.SyncManagerProvider,
 		e.protocol.Options.AttestationProvider,
 		e.protocol.Options.LedgerProvider,
 		e.protocol.Options.SchedulerProvider,
@@ -216,7 +217,6 @@ func (e *Engines) loadEngineInstanceWithStorage(engineAlias string, storage *sto
 		e.protocol.Options.BlockRetainerProvider,
 		e.protocol.Options.TransactionRetainerProvider,
 		e.protocol.Options.UpgradeOrchestratorProvider,
-		e.protocol.Options.SyncManagerProvider,
 		append(e.protocol.Options.EngineOptions, engineOptions...)...,
 	)
 }

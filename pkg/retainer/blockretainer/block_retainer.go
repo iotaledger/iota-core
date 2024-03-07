@@ -48,19 +48,9 @@ func NewProvider() module.Provider[*engine.Engine, retainer.BlockRetainer] {
 		r := New(e.Workers.CreateGroup("Retainer"),
 			e.Storage.BlockMetadata,
 			func() iotago.SlotIndex {
-				// use settings in case SyncManager is not constructed yet.
-				if e.SyncManager == nil {
-					return e.Storage.Settings().LatestCommitment().Slot()
-				}
-
 				return e.SyncManager.LatestCommitment().Slot()
 			},
 			func() iotago.SlotIndex {
-				// use settings in case SyncManager is not constructed yet.
-				if e.SyncManager == nil {
-					return e.Storage.Settings().LatestFinalizedSlot()
-				}
-
 				return e.SyncManager.LatestFinalizedSlot()
 			},
 			e.ErrorHandler("retainer"))

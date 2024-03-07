@@ -108,6 +108,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		totalweightslotgadget.NewProvider(),
 		sybilprotectionv1.NewProvider(sybilprotectionv1.WithInitialCommittee(committeeAccountsData)),
 		slotnotarization.NewProvider(),
+		trivialsyncmanager.NewProvider(),
 		slotattestation.NewProvider(),
 		opt.LedgerProvider,
 		passthrough.NewProvider(),
@@ -116,7 +117,6 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		blockretainer.NewProvider(),
 		txretainer.NewProvider(),
 		signalingupgradeorchestrator.NewProvider(),
-		trivialsyncmanager.NewProvider(),
 		engine.WithSnapshotPath(""), // magic to disable loading snapshot
 	)
 	defer engineInstance.Shutdown.Trigger()

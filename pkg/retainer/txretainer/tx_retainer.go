@@ -130,19 +130,9 @@ func NewProvider(opts ...options.Option[TransactionRetainer]) module.Provider[*e
 		r := New(e.Workers.CreateGroup("TransactionRetainer"),
 			e.Storage.TransactionRetainerDatabaseExecFunc(),
 			func() iotago.SlotIndex {
-				// use settings in case SyncManager is not constructed yet.
-				if e.SyncManager == nil {
-					return e.Storage.Settings().LatestCommitment().Slot()
-				}
-
 				return e.SyncManager.LatestCommitment().Slot()
 			},
 			func() iotago.SlotIndex {
-				// use settings in case SyncManager is not constructed yet.
-				if e.SyncManager == nil {
-					return e.Storage.Settings().LatestFinalizedSlot()
-				}
-
 				return e.SyncManager.LatestFinalizedSlot()
 			},
 			e.ErrorHandler("txRetainer"),

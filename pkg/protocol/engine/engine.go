@@ -59,6 +59,7 @@ type Engine struct {
 	SlotGadget          slotgadget.Gadget
 	SybilProtection     sybilprotection.SybilProtection
 	Notarization        notarization.Notarization
+	SyncManager         syncmanager.SyncManager
 	Attestations        attestation.Attestations
 	Ledger              ledger.Ledger
 	Scheduler           scheduler.Scheduler
@@ -66,7 +67,6 @@ type Engine struct {
 	TipSelection        tipselection.TipSelection
 	BlockRetainer       retainer.BlockRetainer
 	TxRetainer          retainer.TransactionRetainer
-	SyncManager         syncmanager.SyncManager
 	UpgradeOrchestrator upgrade.Orchestrator
 
 	// RootCommitment contains the earliest commitment that that blocks we are solidifying will refer to, and is mainly
@@ -105,6 +105,7 @@ func New(
 	slotGadgetProvider module.Provider[*Engine, slotgadget.Gadget],
 	sybilProtectionProvider module.Provider[*Engine, sybilprotection.SybilProtection],
 	notarizationProvider module.Provider[*Engine, notarization.Notarization],
+	syncManagerProvider module.Provider[*Engine, syncmanager.SyncManager],
 	attestationProvider module.Provider[*Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*Engine, ledger.Ledger],
 	schedulerProvider module.Provider[*Engine, scheduler.Scheduler],
@@ -113,7 +114,6 @@ func New(
 	blockRetainerProvider module.Provider[*Engine, retainer.BlockRetainer],
 	txRetainerProvider module.Provider[*Engine, retainer.TransactionRetainer],
 	upgradeOrchestratorProvider module.Provider[*Engine, upgrade.Orchestrator],
-	syncManagerProvider module.Provider[*Engine, syncmanager.SyncManager],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
 	var importSnapshot bool
@@ -167,6 +167,7 @@ func New(
 			e.BlockGadget = blockGadgetProvider(e)
 			e.SlotGadget = slotGadgetProvider(e)
 			e.Notarization = notarizationProvider(e)
+			e.SyncManager = syncManagerProvider(e)
 			e.Attestations = attestationProvider(e)
 			e.Ledger = ledgerProvider(e)
 			e.TipManager = tipManagerProvider(e)
@@ -175,7 +176,6 @@ func New(
 			e.BlockRetainer = blockRetainerProvider(e)
 			e.TxRetainer = txRetainerProvider(e)
 			e.UpgradeOrchestrator = upgradeOrchestratorProvider(e)
-			e.SyncManager = syncManagerProvider(e)
 		},
 		(*Engine).setupBlockStorage,
 		(*Engine).setupEvictionState,

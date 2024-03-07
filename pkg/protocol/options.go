@@ -95,11 +95,11 @@ type Options struct {
 	// NotarizationProvider contains the provider for the Notarization engine modules.
 	NotarizationProvider module.Provider[*engine.Engine, notarization.Notarization]
 
-	// AttestationProvider contains the provider for the Attestation engine modules.
-	AttestationProvider module.Provider[*engine.Engine, attestation.Attestations]
-
 	// SyncManagerProvider contains the provider for the SyncManager engine modules.
 	SyncManagerProvider module.Provider[*engine.Engine, syncmanager.SyncManager]
+
+	// AttestationProvider contains the provider for the Attestation engine modules.
+	AttestationProvider module.Provider[*engine.Engine, attestation.Attestations]
 
 	// LedgerProvider contains the provider for the Ledger engine modules.
 	LedgerProvider module.Provider[*engine.Engine, ledger.Ledger]
@@ -133,8 +133,8 @@ func NewDefaultOptions() *Options {
 		SlotGadgetProvider:          totalweightslotgadget.NewProvider(),
 		SybilProtectionProvider:     sybilprotectionv1.NewProvider(),
 		NotarizationProvider:        slotnotarization.NewProvider(),
-		AttestationProvider:         slotattestation.NewProvider(),
 		SyncManagerProvider:         trivialsyncmanager.NewProvider(),
+		AttestationProvider:         slotattestation.NewProvider(),
 		LedgerProvider:              ledger1.NewProvider(),
 		BlockRetainerProvider:       blockretainer.NewProvider(),
 		TransactionRetainerProvider: txretainer.NewProvider(),
@@ -234,17 +234,17 @@ func WithNotarizationProvider(optsNotarizationProvider module.Provider[*engine.E
 	}
 }
 
-// WithAttestationProvider is an option for the Protocol that allows to set the AttestationProvider.
-func WithAttestationProvider(optsAttestationProvider module.Provider[*engine.Engine, attestation.Attestations]) options.Option[Protocol] {
-	return func(p *Protocol) {
-		p.Options.AttestationProvider = optsAttestationProvider
-	}
-}
-
 // WithSyncManagerProvider is an option for the Protocol that allows to set the SyncManagerProvider.
 func WithSyncManagerProvider(optsSyncManagerProvider module.Provider[*engine.Engine, syncmanager.SyncManager]) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.Options.SyncManagerProvider = optsSyncManagerProvider
+	}
+}
+
+// WithAttestationProvider is an option for the Protocol that allows to set the AttestationProvider.
+func WithAttestationProvider(optsAttestationProvider module.Provider[*engine.Engine, attestation.Attestations]) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.Options.AttestationProvider = optsAttestationProvider
 	}
 }
 
