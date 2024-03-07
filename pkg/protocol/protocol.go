@@ -71,7 +71,7 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 		shutdownSubComponents := p.initSubcomponents(networkEndpoint)
 
 		p.Initialized.OnTrigger(func() {
-			shutdown := lo.Batch(
+			shutdown := lo.BatchReverse(
 				p.initEviction(),
 				p.initGlobalEventsRedirection(),
 				p.initNetwork(),
@@ -188,7 +188,7 @@ func (p *Protocol) initGlobalEventsRedirection() (shutdown func()) {
 
 // initNetwork initializes the network of the protocol and returns a function that shuts it down.
 func (p *Protocol) initNetwork() (shutdown func()) {
-	return lo.Batch(
+	return lo.BatchReverse(
 		p.Network.OnError(func(err error, peer peer.ID) { p.LogError("network error", "peer", peer, "error", err) }),
 		p.Network.OnBlockReceived(p.Blocks.ProcessResponse),
 		p.Network.OnBlockRequestReceived(p.Blocks.ProcessRequest),

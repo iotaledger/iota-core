@@ -53,7 +53,7 @@ func newCommitments(protocol *Protocol) *Commitments {
 		requester:      eventticker.New[iotago.SlotIndex, iotago.CommitmentID](protocol.Options.CommitmentRequesterOptions...),
 	}
 
-	shutdown := lo.Batch(
+	shutdown := lo.BatchReverse(
 		c.initLogger(),
 		c.initEngineCommitmentSynchronization(),
 		c.initRequester(),
@@ -101,7 +101,7 @@ func (c *Commitments) API(commitmentID iotago.CommitmentID) (commitmentAPI *engi
 func (c *Commitments) initLogger() (shutdown func()) {
 	c.Logger = c.protocol.NewChildLogger("Commitments")
 
-	return lo.Batch(
+	return lo.BatchReverse(
 		c.Root.LogUpdates(c, log.LevelTrace, "Root", (*Commitment).LogName),
 
 		c.Logger.UnsubscribeFromParentLogger,
@@ -111,7 +111,7 @@ func (c *Commitments) initLogger() (shutdown func()) {
 // initEngineCommitmentSynchronization initializes the synchronization of commitments that are published by the engines.
 func (c *Commitments) initEngineCommitmentSynchronization() func() {
 	return c.protocol.Constructed.WithNonEmptyValue(func(_ bool) (shutdown func()) {
-		return lo.Batch(
+		return lo.BatchReverse(
 			// advance the root commitment of the main chain
 			c.protocol.Chains.Main.WithNonEmptyValue(func(mainChain *Chain) (shutdown func()) {
 				return mainChain.WithInitializedEngine(func(mainEngine *engine.Engine) (shutdown func()) {

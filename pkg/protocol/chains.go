@@ -74,7 +74,7 @@ func newChains(protocol *Protocol) *Chains {
 		})
 	})
 
-	shutdown := lo.Batch(
+	shutdown := lo.BatchReverse(
 		c.initLogger(protocol.NewChildLogger("Chains")),
 		c.initChainSwitching(),
 
@@ -91,7 +91,7 @@ func newChains(protocol *Protocol) *Chains {
 func attachEngineLogs(instance *engine.Engine) func() {
 	events := instance.Events
 
-	return lo.Batch(
+	return lo.BatchReverse(
 		events.BlockDAG.BlockAppended.Hook(func(block *blocks.Block) {
 			instance.LogTrace("BlockDAG.BlockAppended", "block", block.ID())
 		}).Unhook,
@@ -304,7 +304,7 @@ func (c *Chains) WithInitializedEngines(callback func(chain *Chain, engine *engi
 func (c *Chains) initLogger(logger log.Logger) (shutdown func()) {
 	c.Logger = logger
 
-	return lo.Batch(
+	return lo.BatchReverse(
 		c.Main.LogUpdates(c, log.LevelTrace, "Main", (*Chain).LogName),
 		c.HeaviestClaimedCandidate.LogUpdates(c, log.LevelTrace, "HeaviestClaimedCandidate", (*Chain).LogName),
 		c.HeaviestAttestedCandidate.LogUpdates(c, log.LevelTrace, "HeaviestAttestedCandidate", (*Chain).LogName),
@@ -321,7 +321,7 @@ func (c *Chains) initChainSwitching() (shutdown func()) {
 
 	c.Main.Set(mainChain)
 
-	return lo.Batch(
+	return lo.BatchReverse(
 		c.HeaviestClaimedCandidate.WithNonEmptyValue(func(heaviestClaimedCandidate *Chain) (shutdown func()) {
 			return heaviestClaimedCandidate.RequestAttestations.ToggleValue(true)
 		}),
@@ -364,7 +364,7 @@ func (c *Chains) trackHeaviestCandidates(chain *Chain) (teardown func()) {
 func (c *Chains) updateMeasuredSlot(latestSeenSlot iotago.SlotIndex) (teardown func()) {
 	measuredSlot := latestSeenSlot - chainSwitchingMeasurementOffset
 
-	return lo.Batch(
+	return lo.BatchReverse(
 		c.HeaviestClaimedCandidate.measureAt(measuredSlot),
 		c.HeaviestAttestedCandidate.measureAt(measuredSlot),
 		c.HeaviestVerifiedCandidate.measureAt(measuredSlot),
@@ -375,7 +375,7 @@ func (c *Chains) updateMeasuredSlot(latestSeenSlot iotago.SlotIndex) (teardown f
 func (c *Chains) deriveLatestSeenSlot(protocol *Protocol) func() {
 	//nolint:revive
 	return protocol.Engines.Main.WithNonEmptyValue(func(mainEngine *engine.Engine) (shutdown func()) {
-		return lo.Batch(
+		return lo.BatchReverse(
 			c.WithInitializedEngines(func(_ *Chain, engine *engine.Engine) (shutdown func()) {
 				return engine.LatestCommitment.OnUpdate(func(_ *model.Commitment, latestCommitment *model.Commitment) {
 					c.LatestSeenSlot.Set(latestCommitment.Slot())
@@ -483,7 +483,7 @@ func (c *ChainsCandidate) measureAt(slot iotago.SlotIndex) (teardown func()) {
 			})
 
 			// return all teardown functions
-			return lo.Batch(append(teardownMonitoringFunctions, teardownUpdates)...)
+			return lo.BatchReverse(append(teardownMonitoringFunctions, teardownUpdates)...)
 		})
 	})
 }

@@ -52,7 +52,7 @@ func newEngines(protocol *Protocol) *Engines {
 	}
 
 	protocol.Constructed.OnTrigger(func() {
-		shutdown := lo.Batch(
+		shutdown := lo.BatchReverse(
 			e.initLogger(protocol.NewChildLogger("Engines")),
 
 			e.syncMainEngineFromMainChain(),
@@ -78,7 +78,7 @@ func newEngines(protocol *Protocol) *Engines {
 func (e *Engines) initLogger(logger log.Logger) (shutdown func()) {
 	e.Logger = logger
 
-	return lo.Batch(
+	return lo.BatchReverse(
 		e.Main.LogUpdates(e, log.LevelTrace, "Main", (*engine.Engine).LogName),
 
 		logger.UnsubscribeFromParentLogger,
