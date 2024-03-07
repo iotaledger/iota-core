@@ -26,11 +26,8 @@ func NewCachedStore[V any](store *BaseStore[V], maxCacheSize int) *CachedStore[V
 }
 
 func (c *CachedStore[V]) addToCache(epoch iotago.EpochIndex, value V) {
-	if !c.addedQueue.Offer(epoch) {
-		removedEpoch, _ := c.addedQueue.Poll()
+	if removedEpoch, wasRemoved := c.addedQueue.ForceOffer(epoch); wasRemoved {
 		c.cache.Delete(removedEpoch)
-
-		c.addedQueue.Offer(epoch)
 	}
 
 	c.cache.Set(epoch, value)
