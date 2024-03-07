@@ -21,10 +21,16 @@ type transactionRetainerCache struct {
 }
 
 // defaultTxMetadataUpdateFunc is the default update function for transaction metadata in the transaction retainer cache.
+// HINT: do not modify the contents of the old transaction metadata in the update function, as it is a reference to the cache.
 func defaulTxMetadataUpdateFunc(oldTxMeta *TransactionMetadata, newTxMeta *TransactionMetadata) (*TransactionMetadata, bool, error) {
 	if oldTxMeta == nil {
 		// no former transaction metadata exists, return the new one
 		return newTxMeta, true, nil
+	}
+
+	if oldTxMeta.Equal(newTxMeta) {
+		// the transaction metadata has not changed, return the old one
+		return oldTxMeta, false, nil
 	}
 
 	if oldTxMeta.ValidSignature && !newTxMeta.ValidSignature {
@@ -32,26 +38,24 @@ func defaulTxMetadataUpdateFunc(oldTxMeta *TransactionMetadata, newTxMeta *Trans
 		return oldTxMeta, false, nil
 	}
 
-	// reset former information if the new signature is valid and the former one was invalid
 	if !oldTxMeta.ValidSignature && newTxMeta.ValidSignature {
-		oldTxMeta.ValidSignature = true
-		oldTxMeta.EarliestAttachmentSlot = 0
-		oldTxMeta.State = 0
-		oldTxMeta.FailureReason = 0
-		oldTxMeta.ErrorMsg = nil
+		// if the signature was invalid before and is valid now, update the entry in the database
+		// but keep the ID of the old transaction metadata to overwrite the old entry.
+		// all former fields are overwritten by the new transaction metadata, including the earliest attachment slot.
+		newTxMeta.ID = oldTxMeta.ID
+
+		return newTxMeta, true, nil
 	}
 
-	// if the new earliest attachment slot is set, update the field if it wasn't set before or it is smaller now
-	if (newTxMeta.EarliestAttachmentSlot != 0) && ((oldTxMeta.EarliestAttachmentSlot == 0) || (newTxMeta.EarliestAttachmentSlot < oldTxMeta.EarliestAttachmentSlot)) {
-		oldTxMeta.EarliestAttachmentSlot = newTxMeta.EarliestAttachmentSlot
+	// update the new earliest attachment slot if it is not set in the new transaction metadata, but was set in the old one or it was smaller in the old one.
+	if newTxMeta.EarliestAttachmentSlot == 0 || (oldTxMeta.EarliestAttachmentSlot != 0 && oldTxMeta.EarliestAttachmentSlot < newTxMeta.EarliestAttachmentSlot) {
+		newTxMeta.EarliestAttachmentSlot = oldTxMeta.EarliestAttachmentSlot
 	}
 
-	// update the state and failure reason and error message
-	oldTxMeta.State = newTxMeta.State
-	oldTxMeta.FailureReason = newTxMeta.FailureReason
-	oldTxMeta.ErrorMsg = newTxMeta.ErrorMsg
+	// keep the ID of the old transaction metadata to overwrite the old entry
+	newTxMeta.ID = oldTxMeta.ID
 
-	return oldTxMeta, true, nil
+	return newTxMeta, true, nil
 }
 
 // WithTxRetainerCacheTxMetadataUpdateFunc is an option for the transaction retainer cache that allows to set a custom update function for transaction metadata.
@@ -91,45 +95,46 @@ func (c *transactionRetainerCache) UpdateTxMetadata(newTxMeta *TransactionMetada
 
 	txID := iotago.TransactionID(newTxMeta.TransactionID)
 
-	// check if the transaction metadata already exists
-	oldTxMeta, exists := c.uncommittedTxMetadataChangesByID.Get(txID)
-
-	// update the transaction metadata using the update function
-	updatedTxMeta, updated, err := c.txMetadataUpdateFunc(oldTxMeta, newTxMeta)
-	if err != nil {
-		return err
-	}
-
-	// if the transaction metadata has not changed, return
-	if !updated {
-		return nil
-	}
-
-	// we need to keep the list of earliest attachment slots in sync with the transaction metadata changes
-	if exists {
-		// update the earliest attachment slot of the transaction if it has changed
-		if oldTxMeta.EarliestAttachmentSlot != updatedTxMeta.EarliestAttachmentSlot {
-			c.updateEarliestAttachmentSlotWithoutLocking(txID, oldTxMeta.EarliestAttachmentSlot, updatedTxMeta.EarliestAttachmentSlot)
-		}
-	} else {
-		// add the earliest attachment slot of the new transaction
-		c.addEarliestAttachmentSlotWithoutLocking(txID, updatedTxMeta.EarliestAttachmentSlot)
-	}
+	var innerErr error
 
 	// update the transaction metadata
-	c.uncommittedTxMetadataChangesByID.Set(txID, updatedTxMeta)
+	c.uncommittedTxMetadataChangesByID.Compute(txID, func(oldTxMeta *TransactionMetadata, exists bool) *TransactionMetadata {
+		// update the transaction metadata using the update function
+		updatedTxMeta, updated, err := c.txMetadataUpdateFunc(oldTxMeta, newTxMeta)
+		if err != nil {
+			innerErr = err
+			return oldTxMeta
+		}
 
-	return nil
+		// if the transaction metadata has not changed, return
+		if !updated {
+			return updatedTxMeta
+		}
+
+		// we need to keep the list of earliest attachment slots in sync with the transaction metadata changes
+		if exists {
+			// update the earliest attachment slot of the transaction if it has changed
+			if oldTxMeta.EarliestAttachmentSlot != updatedTxMeta.EarliestAttachmentSlot {
+				c.updateEarliestAttachmentSlotWithoutLocking(txID, oldTxMeta.EarliestAttachmentSlot, updatedTxMeta.EarliestAttachmentSlot)
+			}
+		} else {
+			// add the earliest attachment slot of the new transaction
+			c.addEarliestAttachmentSlotWithoutLocking(txID, updatedTxMeta.EarliestAttachmentSlot)
+		}
+
+		return updatedTxMeta
+	})
+
+	return innerErr
 }
 
 func (c *transactionRetainerCache) addEarliestAttachmentSlotWithoutLocking(txID iotago.TransactionID, slot iotago.SlotIndex) {
-	// add the slot to the uncommittedTxMetadataChangesBySlot map if it does not exist yet
-	if _, exists := c.uncommittedTxIDsBySlot.Get(slot); !exists {
-		c.uncommittedTxIDsBySlot.Set(slot, make(map[iotago.TransactionID]struct{}))
-	}
+	uncommittedSlot, _ := c.uncommittedTxIDsBySlot.GetOrCreate(slot, func() map[iotago.TransactionID]struct{} {
+		return make(map[iotago.TransactionID]struct{})
+	})
 
 	// add the transaction to the slot
-	lo.Return1(c.uncommittedTxIDsBySlot.Get(slot))[txID] = struct{}{}
+	uncommittedSlot[txID] = struct{}{}
 }
 
 // updateEarliestAttachmentSlotWithoutLocking updates the earliest attachment slot of a transaction without locking the cache.

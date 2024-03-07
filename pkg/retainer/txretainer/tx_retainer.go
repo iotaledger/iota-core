@@ -1,6 +1,7 @@
 package txretainer
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 
@@ -34,6 +35,43 @@ type TransactionMetadata struct {
 	State                  byte             `gorm:"notnull"`
 	FailureReason          byte             `gorm:"notnull"`
 	ErrorMsg               *string
+}
+
+// Equal compares everything except the Database ID.
+func (m *TransactionMetadata) Equal(other *TransactionMetadata) bool {
+	if m == nil || other == nil {
+		return m == other
+	}
+
+	if !bytes.Equal(m.TransactionID, other.TransactionID) {
+		return false
+	}
+
+	if m.ValidSignature != other.ValidSignature {
+		return false
+	}
+
+	if m.EarliestAttachmentSlot != other.EarliestAttachmentSlot {
+		return false
+	}
+
+	if m.State != other.State {
+		return false
+	}
+
+	if m.FailureReason != other.FailureReason {
+		return false
+	}
+
+	if (m.ErrorMsg == nil || other.ErrorMsg == nil) && m.ErrorMsg != other.ErrorMsg {
+		return false
+	}
+
+	if (m.ErrorMsg != nil && other.ErrorMsg != nil) && *m.ErrorMsg != *other.ErrorMsg {
+		return false
+	}
+
+	return true
 }
 
 func (m *TransactionMetadata) String() string {
@@ -245,7 +283,7 @@ func (r *TransactionRetainer) Prune(targetSlot iotago.SlotIndex) error {
 	return nil
 }
 
-// CommitSlot applies all uncommited changes of a slot from the cache to the database and deletes them from the cache.
+// CommitSlot applies all uncommitted changes of a slot from the cache to the database and deletes them from the cache.
 func (r *TransactionRetainer) CommitSlot(slot iotago.SlotIndex) error {
 	uncommitedChanges := r.txRetainerCache.DeleteAndReturnTxMetadataChangesBySlot(slot)
 	if len(uncommitedChanges) == 0 {
