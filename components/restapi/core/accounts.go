@@ -66,7 +66,7 @@ func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 		return nil, ierrors.Wrapf(echo.ErrBadRequest, "epoch %d is larger than current epoch %d", requestedEpoch, currentEpoch)
 	}
 
-	return deps.RequestHandler.Validators(requestedEpoch, pageSize, cursorIndex)
+	return deps.RequestHandler.Validators(requestedEpoch, cursorIndex, pageSize)
 }
 
 func validatorByAccountAddress(c echo.Context) (*api.ValidatorResponse, error) {
