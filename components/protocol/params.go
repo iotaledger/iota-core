@@ -60,15 +60,25 @@ type ParametersDatabase struct {
 	}
 }
 
+// ParametersRetainer contains the definition of configuration parameters used by the Retainer.
+type ParametersRetainer struct {
+	// DebugStoreErrorMessages defines whether to store debug error messages in the database.
+	DebugStoreErrorMessages bool `default:"false" usage:"whether to store debug error messages in the database"`
+}
+
 // ParamsProtocol contains the configuration parameters used by the Protocol.
 var ParamsProtocol = &ParametersProtocol{}
 
 // ParamsDatabase contains configuration parameters used by Database.
 var ParamsDatabase = &ParametersDatabase{}
 
+// ParamsRetainer contains configuration parameters used by Retainer.
+var ParamsRetainer = &ParametersRetainer{}
+
 var params = &app.ComponentParams{
 	Params: map[string]any{
 		"protocol": ParamsProtocol,
 		"db":       ParamsDatabase,
+		"retainer": ParamsRetainer,
 	},
 }

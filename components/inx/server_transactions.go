@@ -6,23 +6,22 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	inx "github.com/iotaledger/inx/go"
-	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
+	"github.com/iotaledger/iota-core/pkg/retainer/txretainer"
 )
 
 func (s *Server) ReadTransactionMetadata(_ context.Context, transactionID *inx.TransactionId) (*inx.TransactionMetadata, error) {
-	return getINXTransactionMetadata(transactionID.Unwrap())
-}
+	txID := transactionID.Unwrap()
 
-func getINXTransactionMetadata(transactionID iotago.TransactionID) (*inx.TransactionMetadata, error) {
-	// TODO: wire this up with the tx retainer
-	//nolint:staticcheck // TODO: remove this once we have the transaction retainer
-	transactionMetadata := &api.TransactionMetadataResponse{TransactionID: transactionID}
-	//nolint:staticcheck // TODO: remove this once we have the transaction retainer
-	if transactionMetadata == nil {
-		return nil, status.Errorf(codes.NotFound, "transaction not found")
+	txMetadata, err := deps.Protocol.Engines.Main.Get().TxRetainer.TransactionMetadata(txID)
+	if err != nil {
+		if ierrors.Is(err, txretainer.ErrEntryNotFound) {
+			return nil, status.Errorf(codes.NotFound, "transaction metadata not found: %s", txID.ToHex())
+		}
+
+		return nil, ierrors.WithMessagef(err, "error when retrieving transaction metadata: %s", txID.ToHex())
 	}
 
-	return inx.WrapTransactionMetadata(transactionMetadata), nil
+	return inx.WrapTransactionMetadata(txMetadata), nil
 }

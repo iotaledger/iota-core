@@ -6,22 +6,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
-// TODO Remove old general interface after TransactionRetainer and ValidatorsCache is done
-// Retainer keeps and resolves all the information needed in the API and INX.
-type Retainer interface {
-	RegisteredValidatorsCache(uint32) ([]*api.ValidatorResponse, bool)
-	RetainRegisteredValidatorsCache(uint32, []*api.ValidatorResponse)
-
-	RetainTransactionFailure(iotago.TransactionID, error)
-
-	// Reset resets the component to a clean state as if it was created at the last commitment.
-	Reset()
-
-	// Interface embeds the required methods of the module.Interface.
-	module.Interface
-}
-
-// BlockRetainer keeps and resolves all the information needed in the API and INX.
+// BlockRetainer keeps and resolves all the block related information needed in the API and INX.
 type BlockRetainer interface {
 	BlockMetadata(blockID iotago.BlockID) (*api.BlockMetadataResponse, error)
 
@@ -32,13 +17,13 @@ type BlockRetainer interface {
 	module.Interface
 }
 
-// TransactionRetainer keeps and resolves all the information needed in the API and INX.
+// TransactionRetainer keeps and resolves all the transaction-related metadata needed in the API and INX.
 type TransactionRetainer interface {
+	// TransactionMetadata returns the metadata of a transaction.
 	TransactionMetadata(txID iotago.TransactionID) (*api.TransactionMetadataResponse, error)
-	RetainTransactionFailure(iotago.TransactionID, error)
 
 	// Reset resets the component to a clean state as if it was created at the last commitment.
-	Reset()
+	Reset(targetSlot iotago.SlotIndex)
 
 	module.Interface
 }

@@ -224,7 +224,7 @@ func TestStorage_CopyFromForkedStorageEmpty(t *testing.T) {
 	}
 	tf1.GeneratePermanentData(1 * MB)
 
-	clonedStorage, err := storage.Clone(tf1.Instance, t.TempDir(), 0, func(err error) {
+	clonedStorage, err := storage.Clone(tf1.logger, tf1.Instance, t.TempDir(), 0, func(err error) {
 		t.Log(err)
 	})
 	require.NoError(t, err)

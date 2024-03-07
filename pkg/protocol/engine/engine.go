@@ -59,14 +59,14 @@ type Engine struct {
 	SlotGadget          slotgadget.Gadget
 	SybilProtection     sybilprotection.SybilProtection
 	Notarization        notarization.Notarization
+	SyncManager         syncmanager.SyncManager
 	Attestations        attestation.Attestations
 	Ledger              ledger.Ledger
 	Scheduler           scheduler.Scheduler
 	TipManager          tipmanager.TipManager
 	TipSelection        tipselection.TipSelection
 	BlockRetainer       retainer.BlockRetainer
-	Retainer            retainer.Retainer
-	SyncManager         syncmanager.SyncManager
+	TxRetainer          retainer.TransactionRetainer
 	UpgradeOrchestrator upgrade.Orchestrator
 
 	// RootCommitment contains the earliest commitment that that blocks we are solidifying will refer to, and is mainly
@@ -105,15 +105,15 @@ func New(
 	slotGadgetProvider module.Provider[*Engine, slotgadget.Gadget],
 	sybilProtectionProvider module.Provider[*Engine, sybilprotection.SybilProtection],
 	notarizationProvider module.Provider[*Engine, notarization.Notarization],
+	syncManagerProvider module.Provider[*Engine, syncmanager.SyncManager],
 	attestationProvider module.Provider[*Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*Engine, ledger.Ledger],
 	schedulerProvider module.Provider[*Engine, scheduler.Scheduler],
 	tipManagerProvider module.Provider[*Engine, tipmanager.TipManager],
 	tipSelectionProvider module.Provider[*Engine, tipselection.TipSelection],
-	retainerProvider module.Provider[*Engine, retainer.Retainer],
 	blockRetainerProvider module.Provider[*Engine, retainer.BlockRetainer],
+	txRetainerProvider module.Provider[*Engine, retainer.TransactionRetainer],
 	upgradeOrchestratorProvider module.Provider[*Engine, upgrade.Orchestrator],
-	syncManagerProvider module.Provider[*Engine, syncmanager.SyncManager],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
 	var importSnapshot bool
@@ -167,15 +167,15 @@ func New(
 			e.BlockGadget = blockGadgetProvider(e)
 			e.SlotGadget = slotGadgetProvider(e)
 			e.Notarization = notarizationProvider(e)
+			e.SyncManager = syncManagerProvider(e)
 			e.Attestations = attestationProvider(e)
 			e.Ledger = ledgerProvider(e)
 			e.TipManager = tipManagerProvider(e)
 			e.Scheduler = schedulerProvider(e)
 			e.TipSelection = tipSelectionProvider(e)
-			e.Retainer = retainerProvider(e)
 			e.BlockRetainer = blockRetainerProvider(e)
+			e.TxRetainer = txRetainerProvider(e)
 			e.UpgradeOrchestrator = upgradeOrchestratorProvider(e)
-			e.SyncManager = syncManagerProvider(e)
 		},
 		(*Engine).setupBlockStorage,
 		(*Engine).setupEvictionState,
@@ -265,8 +265,8 @@ func (e *Engine) Reset() {
 	e.PostSolidFilter.Reset()
 	e.BlockDAG.Reset()
 	e.PreSolidFilter.Reset()
-	e.Retainer.Reset()
 	e.BlockRetainer.Reset()
+	e.TxRetainer.Reset(latestCommittedSlot)
 	e.EvictionState.Reset()
 	e.BlockCache.Reset()
 	e.Storage.Reset()
@@ -599,8 +599,8 @@ func (e *Engine) initReactiveModule(parentLogger log.Logger) (reactiveModule *mo
 		e.PostSolidFilter.Shutdown()
 		e.BlockDAG.Shutdown()
 		e.PreSolidFilter.Shutdown()
-		e.Retainer.Shutdown()
 		e.BlockRetainer.Shutdown()
+		e.TxRetainer.Shutdown()
 		e.Workers.Shutdown()
 		e.Storage.Shutdown()
 

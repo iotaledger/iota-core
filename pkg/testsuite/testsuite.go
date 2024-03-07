@@ -515,7 +515,7 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 		baseOpts := []options.Option[protocol.Protocol]{
 			protocol.WithSnapshotPath(t.snapshotPath),
 			protocol.WithBaseDirectory(t.Directory.PathWithCreate(node.Name)),
-			protocol.WithEpochGadgetProvider(
+			protocol.WithSybilProtectionProvider(
 				sybilprotectionv1.NewProvider(),
 			),
 		}

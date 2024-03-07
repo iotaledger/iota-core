@@ -193,9 +193,9 @@ func (t *TestSuite) assertPrunableSlotStoragesPruned(storageInstance *storage.St
 		return ierrors.Errorf("expected epoch %d to be pruned when calling Roots", epoch)
 	}
 
-	_, err = storageInstance.Retainer(endSlot)
+	_, err = storageInstance.BlockMetadata(endSlot)
 	if !ierrors.Is(err, database.ErrEpochPruned) {
-		return ierrors.Errorf("expected epoch %d to be pruned when calling Retainer", epoch)
+		return ierrors.Errorf("expected epoch %d to be pruned when calling BlockMetadata", epoch)
 	}
 
 	return nil

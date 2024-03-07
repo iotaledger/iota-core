@@ -22,9 +22,9 @@ type Booker struct {
 
 	blockCache *blocks.Blocks
 
-	spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
-
 	ledger ledger.Ledger
+
+	spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
 
 	loadBlockFromStorage func(id iotago.BlockID) (*model.Block, bool)
 

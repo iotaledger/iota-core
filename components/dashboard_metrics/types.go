@@ -36,10 +36,11 @@ type NodeInfoExtended struct {
 
 // DatabaseSizesMetric represents database size metrics.
 type DatabaseSizesMetric struct {
-	Prunable  int64 `json:"prunable"`
-	Permanent int64 `json:"permanent"`
-	Total     int64 `json:"total"`
-	Time      int64 `json:"ts"`
+	Permanent  int64 `json:"permanent"`
+	Prunable   int64 `json:"prunable"`
+	TxRetainer int64 `json:"txRetainer"`
+	Total      int64 `json:"total"`
+	Time       int64 `json:"ts"`
 }
 
 // String returns the stringified component type.
