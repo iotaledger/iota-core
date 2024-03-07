@@ -5,6 +5,7 @@ package tests
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 func Test_CoreAPI(t *testing.T) {
@@ -314,4 +316,204 @@ func Test_CoreAPI(t *testing.T) {
 	// check if the same values were returned by all nodes for the same slot
 	assetsPerSlot.assertCommitments(t)
 	assetsPerSlot.assertBICs(t)
+}
+
+func TestCoreAPI_BadRequests(t *testing.T) {
+	d := NewDockerTestFramework(t,
+		WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 4),
+			iotago.WithLivenessOptions(10, 10, 2, 4, 8),
+			iotago.WithRewardsOptions(8, 10, 2, 384),
+			iotago.WithTargetCommitteeSize(4),
+		))
+	defer d.Stop()
+
+	d.AddValidatorNode("V1", "docker-network-inx-validator-1-1", "http://localhost:8050", "rms1pzg8cqhfxqhq7pt37y8cs4v5u4kcc48lquy2k73ehsdhf5ukhya3y5rx2w6")
+	d.AddValidatorNode("V2", "docker-network-inx-validator-2-1", "http://localhost:8060", "rms1pqm4xk8e9ny5w5rxjkvtp249tfhlwvcshyr3pc0665jvp7g3hc875k538hl")
+	d.AddValidatorNode("V3", "docker-network-inx-validator-3-1", "http://localhost:8070", "rms1pp4wuuz0y42caz48vv876qfpmffswsvg40zz8v79sy8cp0jfxm4kunflcgt")
+	d.AddValidatorNode("V4", "docker-network-inx-validator-4-1", "http://localhost:8040", "rms1pr8cxs3dzu9xh4cduff4dd4cxdthpjkpwmz2244f75m0urslrsvtsshrrjw")
+	d.AddNode("node5", "docker-network-node-5-1", "http://localhost:8090")
+
+	runErr := d.Run()
+	require.NoError(t, runErr)
+
+	d.WaitUntilNetworkReady()
+
+	tests := []struct {
+		name     string
+		testFunc func(t *testing.T, nodeAlias string)
+	}{
+		{
+			name: "Test_BlockByBlockID_Failure",
+			testFunc: func(t *testing.T, nodeAlias string) {
+				blockID := tpkg.RandBlockID()
+				respBlock, err := d.wallet.Clients[nodeAlias].BlockByBlockID(context.Background(), blockID)
+				require.Error(t, err)
+				require.True(t, isStatusCode(err, http.StatusNotFound))
+				require.Nil(t, respBlock)
+			},
+		},
+		{
+			name: "Test_BlockMetadataByBlockID_Failure",
+			testFunc: func(t *testing.T, nodeAlias string) {
+				blockID := tpkg.RandBlockID()
+				resp, err := d.wallet.Clients[nodeAlias].BlockMetadataByBlockID(context.Background(), blockID)
+				require.Error(t, err)
+				require.True(t, isStatusCode(err, http.StatusNotFound))
+				require.Nil(t, resp)
+			},
+		},
+		{
+			name: "Test_BlockWithMetadata_Failure",
+			testFunc: func(t *testing.T, nodeAlias string) {
+				blockID := tpkg.RandBlockID()
+				resp, err := d.wallet.Clients[nodeAlias].BlockWithMetadataByID(context.Background(), blockID)
+				require.Error(t, err)
+				require.True(t, isStatusCode(err, http.StatusNotFound))
+				require.Nil(t, resp)
+			},
+		},
+		{
+			name: "Test_CommitmentBySlot_Failure",
+			testFunc: func(t *testing.T, nodeAlias string) {
+				slot := iotago.SlotIndex(1000_000_000)
+				resp, err := d.wallet.Clients[nodeAlias].CommitmentByIndex(context.Background(), slot)
+				require.Error(t, err)
+				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.Nil(t, resp)
+			},
+		},
+		{
+			name: "Test_CommitmentByID_Failure",
+			testFunc: func(t *testing.T, nodeAlias string) {
+				committmentID := tpkg.RandCommitmentID()
+				resp, err := d.wallet.Clients[nodeAlias].CommitmentByID(context.Background(), committmentID)
+				require.Error(t, err)
+				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.Nil(t, resp)
+			},
+		},
+		{
+			name: "Test_CommitmentUTXOChangesByID_Failure",
+			testFunc: func(t *testing.T, nodeAlias string) {
+				committmentID := tpkg.RandCommitmentID()
+				resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesByID(context.Background(), committmentID)
+				require.Error(t, err)
+				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.Nil(t, resp)
+			},
+		},
+		{
+			"Test_CommitmentUTXOChangesFullByID_Failure",
+			func(t *testing.T, nodeAlias string) {
+				committmentID := tpkg.RandCommitmentID()
+
+				resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesFullByID(context.Background(), committmentID)
+				require.Error(t, err)
+				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.Nil(t, resp)
+			},
+		},
+		{
+			name: "Test_CommitmentUTXOChangesBySlot_Failure",
+			testFunc: func(t *testing.T, nodeAlias string) {
+				slot := iotago.SlotIndex(1000_000_000)
+				resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesByIndex(context.Background(), slot)
+				require.Error(t, err)
+				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.Nil(t, resp)
+			},
+		},
+		{
+			name: "Test_CommitmentUTXOChangesFullBySlot_Failure",
+			testFunc: func(t *testing.T, nodeAlias string) {
+				slot := iotago.SlotIndex(1000_000_000)
+
+				resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesFullByIndex(context.Background(), slot)
+				require.Error(t, err)
+				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.Nil(t, resp)
+			},
+		},
+		{
+			name: "Test_OutputByID_Failure",
+			testFunc: func(t *testing.T, nodeAlias string) {
+				outputID := tpkg.RandOutputID(0)
+				resp, err := d.wallet.Clients[nodeAlias].OutputByID(context.Background(), outputID)
+				require.Error(t, err)
+				require.True(t, isStatusCode(err, http.StatusNotFound))
+				require.Nil(t, resp)
+			},
+		},
+		{
+			name: "Test_OutputMetadata_Failure",
+			testFunc: func(t *testing.T, nodeAlias string) {
+				outputID := tpkg.RandOutputID(0)
+
+				resp, err := d.wallet.Clients[nodeAlias].OutputMetadataByID(context.Background(), outputID)
+				require.Error(t, err)
+				require.True(t, isStatusCode(err, http.StatusNotFound))
+				require.Nil(t, resp)
+			},
+		},
+		{
+			name: "Test_TransactionsIncludedBlock_Failure",
+			testFunc: func(t *testing.T, nodeAlias string) {
+				txID := tpkg.RandTransactionID()
+				resp, err := d.wallet.Clients[nodeAlias].TransactionIncludedBlock(context.Background(), txID)
+				require.Error(t, err)
+				require.True(t, isStatusCode(err, http.StatusNotFound))
+				require.Nil(t, resp)
+			},
+		},
+		{
+			name: "Test_TransactionsIncludedBlockMetadata_Failure",
+			testFunc: func(t *testing.T, nodeAlias string) {
+				txID := tpkg.RandTransactionID()
+
+				resp, err := d.wallet.Clients[nodeAlias].TransactionIncludedBlockMetadata(context.Background(), txID)
+				require.Error(t, err)
+				require.True(t, isStatusCode(err, http.StatusNotFound))
+				require.Nil(t, resp)
+			},
+		},
+		{
+			name: "Test_TransactionsMetadata_Failure",
+			testFunc: func(t *testing.T, nodeAlias string) {
+				txID := tpkg.RandTransactionID()
+
+				resp, err := d.wallet.Clients[nodeAlias].TransactionMetadata(context.Background(), txID)
+				require.Error(t, err)
+				require.True(t, isStatusCode(err, http.StatusNotFound))
+				require.Nil(t, resp)
+			},
+		},
+		{
+			name: "Test_Congestion_Failure",
+			testFunc: func(t *testing.T, nodeAlias string) {
+				accountAddress := tpkg.RandAccountAddress()
+				commitmentID := tpkg.RandCommitmentID()
+				resp, err := d.wallet.Clients[nodeAlias].Congestion(context.Background(), accountAddress, 0, commitmentID)
+				require.Error(t, err)
+				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.Nil(t, resp)
+			},
+		},
+		{
+			name: "Test_Rewards_Failure",
+			testFunc: func(t *testing.T, nodeAlias string) {
+				outputID := tpkg.RandOutputID(0)
+				resp, err := d.wallet.Clients[nodeAlias].Rewards(context.Background(), outputID)
+				require.Error(t, err)
+				require.True(t, isStatusCode(err, http.StatusNotFound))
+				require.Nil(t, resp)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			d.requestFromClients(test.testFunc)
+		})
+	}
 }

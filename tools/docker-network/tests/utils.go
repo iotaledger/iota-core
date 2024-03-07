@@ -10,7 +10,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -339,4 +341,31 @@ func getDelegationStartEpoch(api iotago.API, commitmentSlot iotago.SlotIndex) io
 	}
 
 	return pastBoundedEpoch + 2
+}
+
+func isStatusCode(err error, status int) bool {
+	if err == nil {
+		return false
+	}
+	code, err := extractStatusCode(err.Error())
+	if err != nil {
+		return false
+	}
+
+	return code == status
+}
+
+func extractStatusCode(errorMessage string) (int, error) {
+	re := regexp.MustCompile(`code=(\d+)`)
+	matches := re.FindStringSubmatch(errorMessage)
+	if len(matches) != 2 {
+		return 0, ierrors.Errorf("unable to extract status code from error message")
+	}
+
+	statusCode, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return 0, err
+	}
+
+	return statusCode, nil
 }
