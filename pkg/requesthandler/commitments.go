@@ -19,7 +19,7 @@ func (r *RequestHandler) GetCommitmentBySlot(slot iotago.SlotIndex) (*model.Comm
 
 	commitment, err := r.protocol.Engines.Main.Get().Storage.Commitments().Load(slot)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment, slot: %d, error: %v", slot, err)
+		return nil, ierrors.Join(echo.ErrInternalServerError, ierrors.Wrapf(err, "failed to load commitment, slot: %d", slot))
 	}
 
 	return commitment, nil
@@ -38,11 +38,11 @@ func (r *RequestHandler) GetCommitmentByID(commitmentID iotago.CommitmentID) (*m
 
 	commitment, err := r.protocol.Engines.Main.Get().Storage.Commitments().Load(commitmentID.Slot())
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment, commitmentID: %s, slot: %d, error: %v", commitmentID, commitmentID.Slot(), err)
+		return nil, ierrors.Join(echo.ErrInternalServerError, ierrors.Wrapf(err, "failed to load commitment, commitmentID: %s, slot: %d", commitmentID, commitmentID.Slot()))
 	}
 
 	if commitment.ID() != commitmentID {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "commitment in the store for slot %d does not match the given commitmentID (%s != %s)", commitmentID.Slot(), commitment.ID(), commitmentID)
+		return nil, ierrors.Join(echo.ErrBadRequest, ierrors.Wrapf(err, "commitment in the store for slot %d does not match the given commitmentID (%s != %s)", commitmentID.Slot(), commitment.ID(), commitmentID))
 	}
 
 	return commitment, nil
@@ -55,7 +55,7 @@ func (r *RequestHandler) GetLatestCommitment() *model.Commitment {
 func (r *RequestHandler) GetUTXOChanges(commitmentID iotago.CommitmentID) (*api.UTXOChangesResponse, error) {
 	diffs, err := r.protocol.Engines.Main.Get().Ledger.SlotDiffs(commitmentID.Slot())
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get slot diffs, commitmentID: %s, slot: %d, error: %v", commitmentID, commitmentID.Slot(), err)
+		return nil, ierrors.Join(echo.ErrInternalServerError, ierrors.Wrapf(err, "failed to get slot diffs, commitmentID: %s, slot: %d", commitmentID, commitmentID.Slot()))
 	}
 
 	createdOutputs := make(iotago.OutputIDs, len(diffs.Outputs))
@@ -79,7 +79,7 @@ func (r *RequestHandler) GetUTXOChanges(commitmentID iotago.CommitmentID) (*api.
 func (r *RequestHandler) GetUTXOChangesFull(commitmentID iotago.CommitmentID) (*api.UTXOChangesFullResponse, error) {
 	diffs, err := r.protocol.Engines.Main.Get().Ledger.SlotDiffs(commitmentID.Slot())
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get slot diffs, commitmentID: %s, slot: %d, error: %v", commitmentID, commitmentID.Slot(), err)
+		return nil, ierrors.Join(echo.ErrInternalServerError, ierrors.Wrapf(err, "failed to get slot diffs, commitmentID: %s, slot: %d", commitmentID, commitmentID.Slot()))
 	}
 
 	createdOutputs := make([]*api.OutputWithID, len(diffs.Outputs))
