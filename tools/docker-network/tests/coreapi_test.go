@@ -36,7 +36,7 @@ func Test_CoreAPI(t *testing.T) {
 
 	d.WaitUntilNetworkReady()
 
-	assetsPerSlot, lastSlot := d.prepareAssets(3)
+	assetsPerSlot, lastSlot := d.prepareAssets(5)
 
 	fmt.Println("AwaitCommitment for slot", lastSlot)
 	d.AwaitCommitment(lastSlot)
@@ -61,7 +61,6 @@ func Test_CoreAPI(t *testing.T) {
 					require.NoError(t, err)
 					require.NotNil(t, respBlock)
 					require.Equal(t, block.MustID(), respBlock.MustID(), "BlockID of retrieved block does not match: %s != %s", block.MustID(), respBlock.MustID())
-					//require.EqualValues(t, block, respBlock)
 				})
 			},
 		},
@@ -72,7 +71,7 @@ func Test_CoreAPI(t *testing.T) {
 					resp, err := d.wallet.Clients[nodeAlias].BlockMetadataByBlockID(context.Background(), block.MustID())
 					require.NoError(t, err)
 					require.NotNil(t, resp)
-					//require.Equal(t, block.MustID(), resp.BlockID)
+					require.Equal(t, block.MustID(), resp.BlockID, "BlockID of retrieved block does not match: %s != %s", block.MustID(), resp.BlockID)
 					require.Equal(t, api.BlockStateFinalized, resp.BlockState)
 				})
 			},
@@ -80,13 +79,12 @@ func Test_CoreAPI(t *testing.T) {
 		{
 			name: "Test_BlockWithMetadata",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				// TODO missing client side implementation for BlockWithMetadata
 				assetsPerSlot.forEachBlock(t, func(t *testing.T, block *iotago.Block) {
-					resp, err := d.wallet.Clients[nodeAlias].BlockMetadataByBlockID(context.Background(), block.MustID())
+					resp, err := d.wallet.Clients[nodeAlias].BlockWithMetadataByID(context.Background(), block.MustID())
 					require.NoError(t, err)
 					require.NotNil(t, resp)
-					require.Equal(t, block.MustID(), resp.BlockID)
-					require.Equal(t, api.BlockStateFinalized, resp.BlockState)
+					require.Equal(t, block.MustID(), resp.Block.MustID(), "BlockID of retrieved block does not match: %s != %s", block.MustID(), resp.Block.MustID())
+					require.Equal(t, api.BlockStateFinalized, resp.Metadata.BlockState)
 				})
 			},
 		},
@@ -97,7 +95,7 @@ func Test_CoreAPI(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, resp)
 
-				require.GreaterOrEqual(t, len(resp.StrongParents), 1)
+				require.GreaterOrEqual(t, len(resp.StrongParents), 1, "There should be at least 1 strong parent provided")
 			},
 		},
 		{
@@ -118,7 +116,7 @@ func Test_CoreAPI(t *testing.T) {
 					resp, err := d.wallet.Clients[nodeAlias].CommitmentByID(context.Background(), commitmentsPerNode[nodeAlias])
 					require.NoError(t, err)
 					require.NotNil(t, resp)
-					require.Equal(t, commitmentsPerNode[nodeAlias], resp.MustID())
+					require.Equal(t, commitmentsPerNode[nodeAlias], resp.MustID(), "Commitment does not match commitment got for the same slot from the same node: %s != %s", commitmentsPerNode[nodeAlias], resp.MustID())
 				})
 			},
 		},
@@ -130,7 +128,7 @@ func Test_CoreAPI(t *testing.T) {
 					require.NoError(t, err)
 					require.NotNil(t, resp)
 					assetsPerSlot.assertUTXOOutputIDsInSlot(t, commitmentsPerNode[nodeAlias].Slot(), resp.CreatedOutputs, resp.ConsumedOutputs)
-					require.Equal(t, commitmentsPerNode[nodeAlias], resp.CommitmentID)
+					require.Equal(t, commitmentsPerNode[nodeAlias], resp.CommitmentID, "CommitmentID of retrieved UTXO changes does not match: %s != %s", commitmentsPerNode[nodeAlias], resp.CommitmentID)
 				})
 			},
 		},
@@ -142,7 +140,7 @@ func Test_CoreAPI(t *testing.T) {
 					require.NoError(t, err)
 					require.NotNil(t, resp)
 					assetsPerSlot.assertUTXOOutputsInSlot(t, commitmentsPerNode[nodeAlias].Slot(), resp.CreatedOutputs, resp.ConsumedOutputs)
-					require.Equal(t, commitmentsPerNode[nodeAlias], resp.CommitmentID)
+					require.Equal(t, commitmentsPerNode[nodeAlias], resp.CommitmentID, "CommitmentID of retrieved UTXO changes does not match: %s != %s", commitmentsPerNode[nodeAlias], resp.CommitmentID)
 				})
 			},
 		},
@@ -154,7 +152,7 @@ func Test_CoreAPI(t *testing.T) {
 					require.NoError(t, err)
 					require.NotNil(t, resp)
 					assetsPerSlot.assertUTXOOutputIDsInSlot(t, commitmentsPerNode[nodeAlias].Slot(), resp.CreatedOutputs, resp.ConsumedOutputs)
-					require.Equal(t, commitmentsPerNode[nodeAlias], resp.CommitmentID)
+					require.Equal(t, commitmentsPerNode[nodeAlias], resp.CommitmentID, "CommitmentID of retrieved UTXO changes does not match: %s != %s", commitmentsPerNode[nodeAlias], resp.CommitmentID)
 				})
 			},
 		},
@@ -166,7 +164,7 @@ func Test_CoreAPI(t *testing.T) {
 					require.NoError(t, err)
 					require.NotNil(t, resp)
 					assetsPerSlot.assertUTXOOutputsInSlot(t, commitmentsPerNode[nodeAlias].Slot(), resp.CreatedOutputs, resp.ConsumedOutputs)
-					require.Equal(t, commitmentsPerNode[nodeAlias], resp.CommitmentID)
+					require.Equal(t, commitmentsPerNode[nodeAlias], resp.CommitmentID, "CommitmentID of retrieved UTXO changes does not match: %s != %s", commitmentsPerNode[nodeAlias], resp.CommitmentID)
 				})
 			},
 		},
@@ -177,7 +175,7 @@ func Test_CoreAPI(t *testing.T) {
 					resp, err := d.wallet.Clients[nodeAlias].OutputByID(context.Background(), outputID)
 					require.NoError(t, err)
 					require.NotNil(t, resp)
-					require.EqualValues(t, output, resp)
+					require.EqualValues(t, output, resp, "Output created is different than retrieved from the API: %s != %s", output, resp)
 				})
 			},
 		},
@@ -188,9 +186,8 @@ func Test_CoreAPI(t *testing.T) {
 					resp, err := d.wallet.Clients[nodeAlias].OutputMetadataByID(context.Background(), outputID)
 					require.NoError(t, err)
 					require.NotNil(t, resp)
-					require.EqualValues(t, outputID, resp.OutputID)
-					require.EqualValues(t, outputID.Slot(), resp.Included.Slot)
-					require.EqualValues(t, outputID.TransactionID(), resp.Included.TransactionID)
+					require.EqualValues(t, outputID, resp.OutputID, "OutputID of retrieved output does not match: %s != %s", outputID, resp.OutputID)
+					require.EqualValues(t, outputID.TransactionID(), resp.Included.TransactionID, "TransactionID of retrieved output does not match: %s != %s", outputID.TransactionID(), resp.Included.TransactionID)
 				})
 			},
 		},
@@ -213,6 +210,7 @@ func Test_CoreAPI(t *testing.T) {
 					resp, err := d.wallet.Clients[nodeAlias].TransactionIncludedBlockMetadata(context.Background(), lo.PanicOnErr(transaction.Transaction.ID()))
 					require.NoError(t, err)
 					require.NotNil(t, resp)
+					require.EqualValues(t, api.BlockStateFinalized, resp.BlockState)
 				})
 			},
 		},
@@ -231,12 +229,17 @@ func Test_CoreAPI(t *testing.T) {
 			name: "Test_Congestion",
 			testFunc: func(t *testing.T, nodeAlias string) {
 				assetsPerSlot.forEachAccountAddress(t, func(t *testing.T, accountAddress *iotago.AccountAddress, commitmentPerNode map[string]iotago.CommitmentID) {
-
 					resp, err := d.wallet.Clients[nodeAlias].Congestion(context.Background(), accountAddress, 0)
 					require.NoError(t, err)
 					require.NotNil(t, resp)
 
-					resp, err = d.wallet.Clients[nodeAlias].Congestion(context.Background(), accountAddress, 0, commitmentPerNode[nodeAlias])
+					// node allows to get account only for the slot newer than lastCommittedSlot - MCA, we need fresh commitment
+					infoRes, err := d.wallet.Clients[nodeAlias].Info(context.Background())
+					require.NoError(t, err)
+					commitment, err := d.wallet.Clients[nodeAlias].CommitmentByIndex(context.Background(), infoRes.Status.LatestCommitmentID.Slot())
+					require.NoError(t, err)
+
+					resp, err = d.wallet.Clients[nodeAlias].Congestion(context.Background(), accountAddress, 0, commitment.MustID())
 					require.NoError(t, err)
 					require.NotNil(t, resp)
 				})
@@ -278,6 +281,7 @@ func Test_CoreAPI(t *testing.T) {
 				resp, err := d.wallet.Clients[nodeAlias].Committee(context.Background())
 				require.NoError(t, err)
 				require.NotNil(t, resp)
+				require.EqualValues(t, 4, len(resp.Committee))
 			},
 		},
 	}

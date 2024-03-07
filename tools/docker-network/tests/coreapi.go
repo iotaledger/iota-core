@@ -4,9 +4,7 @@ package tests
 
 import (
 	"context"
-	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -18,15 +16,11 @@ import (
 
 type coreAPIAssets map[iotago.SlotIndex]*coreAPISlotAssets
 
-func (a coreAPIAssets) assetForSlot(slot iotago.SlotIndex, account *AccountData) *coreAPISlotAssets {
+func (a coreAPIAssets) setupAssetsForSlot(slot iotago.SlotIndex) {
 	_, ok := a[slot]
 	if !ok {
 		a[slot] = newAssetsPerSlot()
 	}
-	a[slot].accountSlot = account.OutputID.Slot()
-	a[slot].accountAddress = account.Address
-
-	return a[slot]
 }
 
 func (a coreAPIAssets) assertCommitments(t *testing.T) {
@@ -76,6 +70,10 @@ func (a coreAPIAssets) forEachCommitment(t *testing.T, f func(*testing.T, map[st
 
 func (a coreAPIAssets) forEachAccountAddress(t *testing.T, f func(*testing.T, *iotago.AccountAddress, map[string]iotago.CommitmentID)) {
 	for _, asset := range a {
+		if asset.accountAddress == nil {
+			// no account created in this slot
+			continue
+		}
 		f(t, asset.accountAddress, asset.commitmentPerNode)
 	}
 }
@@ -84,7 +82,6 @@ func (a coreAPIAssets) assertUTXOOutputIDsInSlot(t *testing.T, slot iotago.SlotI
 	created := make(map[iotago.OutputID]types.Empty)
 	spent := make(map[iotago.OutputID]types.Empty)
 	for _, outputID := range createdOutputs {
-
 		created[outputID] = types.Void
 	}
 
@@ -127,10 +124,7 @@ func (a coreAPIAssets) assertUTXOOutputsInSlot(t *testing.T, slot iotago.SlotInd
 }
 
 type coreAPISlotAssets struct {
-	//slot           iotago.SlotIndex
-	//epoch          iotago.EpochIndex
 	accountAddress *iotago.AccountAddress
-	accountSlot    iotago.SlotIndex
 	dataBlocks     []*iotago.Block
 	valueBlocks    []*iotago.Block
 	transactions   []*iotago.SignedTransaction
@@ -165,33 +159,35 @@ func newAssetsPerSlot() *coreAPISlotAssets {
 func (d *DockerTestFramework) prepareAssets(totalAssetsNum int) (coreAPIAssets, iotago.SlotIndex) {
 	assets := make(coreAPIAssets)
 	ctx := context.Background()
-	account := d.CreateAccount()
-	accountSlot := account.OutputID.Slot()
+
 	latestSlot := iotago.SlotIndex(0)
-	assets.assetForSlot(accountSlot, account)
 
 	for i := 0; i < totalAssetsNum; i++ {
-		fmt.Println("Creating asset: ", i)
+		// account
+		account := d.CreateAccount()
+		assets.setupAssetsForSlot(account.OutputID.Slot())
+		assets[account.OutputID.Slot()].accountAddress = account.Address
+
+		// data block
 		block := d.CreateTaggedDataBlock(account.ID, []byte("tag"))
 		blockSlot := lo.PanicOnErr(block.ID()).Slot()
-		latestSlot = lo.Max[iotago.SlotIndex](latestSlot, blockSlot)
-		assets.assetForSlot(blockSlot, account).dataBlocks = append(assets[blockSlot].dataBlocks, block)
+		assets.setupAssetsForSlot(blockSlot)
+		assets[blockSlot].dataBlocks = append(assets[blockSlot].dataBlocks, block)
 		d.SubmitBlock(ctx, block)
 
-		block, signedTx, faucetOutput, basicOut := d.CreateValueBlock(account.ID)
-		valueBlockSlot := block.MustID().Slot()
-		latestSlot = lo.Max[iotago.SlotIndex](latestSlot, valueBlockSlot)
-		d.SubmitBlock(ctx, block)
+		// transaction
+		valueBlock, signedTx, faucetOutput, basicOut := d.CreateValueBlock(account.ID)
+		valueBlockSlot := valueBlock.MustID().Slot()
+		assets.setupAssetsForSlot(valueBlockSlot)
 
-		assets.assetForSlot(valueBlockSlot, account).valueBlocks = append(assets[valueBlockSlot].valueBlocks, block)
-		txSlot := lo.PanicOnErr(signedTx.ID()).Slot()
-		latestSlot = lo.Max[iotago.SlotIndex](latestSlot, txSlot)
+		assets[valueBlockSlot].valueBlocks = append(assets[valueBlockSlot].valueBlocks, valueBlock)
+		assets[valueBlockSlot].transactions = append(assets[valueBlockSlot].transactions, signedTx)
+		assets[valueBlockSlot].basicOutputs[iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)] = basicOut
+		assets[valueBlockSlot].faucetOutputs[faucetOutput.ID] = faucetOutput.Output
+		d.SubmitBlock(ctx, valueBlock)
+		d.AwaitTransactionPayloadAccepted(ctx, valueBlock.MustID())
 
-		assets.assetForSlot(txSlot, account).transactions = append(assets[txSlot].transactions, signedTx)
-		basicOutpID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
-		assets[txSlot].basicOutputs[basicOutpID] = basicOut
-		assets[txSlot].faucetOutputs[faucetOutput.ID] = faucetOutput.Output
-		time.Sleep(1 * time.Second)
+		latestSlot = lo.Max[iotago.SlotIndex](latestSlot, blockSlot, valueBlockSlot)
 	}
 
 	return assets, latestSlot
