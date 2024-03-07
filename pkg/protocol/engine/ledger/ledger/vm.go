@@ -22,12 +22,12 @@ func NewVM(ledger *Ledger) *VM {
 }
 
 func (v *VM) Inputs(transaction mempool.Transaction) (inputReferences []mempool.StateReference, err error) {
-	stardustTransaction, ok := transaction.(*iotago.Transaction)
+	iotagoTransaction, ok := transaction.(*iotago.Transaction)
 	if !ok {
 		return nil, iotago.ErrTxTypeInvalid
 	}
 
-	for _, input := range stardustTransaction.TransactionEssence.Inputs {
+	for _, input := range iotagoTransaction.TransactionEssence.Inputs {
 		switch input.Type() {
 		case iotago.InputUTXO:
 			//nolint:forcetypeassert // we can safely assume that this is a UTXOInput
@@ -39,7 +39,7 @@ func (v *VM) Inputs(transaction mempool.Transaction) (inputReferences []mempool.
 		}
 	}
 
-	for _, contextInput := range stardustTransaction.TransactionEssence.ContextInputs {
+	for _, contextInput := range iotagoTransaction.TransactionEssence.ContextInputs {
 		switch contextInput.Type() {
 		case iotago.ContextInputCommitment:
 			//nolint:forcetypeassert // we can safely assume that this is a CommitmentInput
@@ -60,12 +60,12 @@ func (v *VM) Inputs(transaction mempool.Transaction) (inputReferences []mempool.
 }
 
 func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, resolvedInputStates []mempool.State) (executionContext context.Context, err error) {
-	signedStardustTransaction, ok := signedTransaction.(*iotago.SignedTransaction)
+	iotagoSignedTransaction, ok := signedTransaction.(*iotago.SignedTransaction)
 	if !ok {
 		return nil, iotago.ErrTxTypeInvalid
 	}
 
-	contextInputs, err := signedStardustTransaction.Transaction.ContextInputs()
+	contextInputs, err := iotagoSignedTransaction.Transaction.ContextInputs()
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "unable to retrieve context inputs from transaction")
 	}
@@ -174,7 +174,7 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 		RewardsInputSet:             rewardInputSet,
 	}
 
-	unlockedAddresses, err := nova.NewVirtualMachine().ValidateUnlocks(signedStardustTransaction, resolvedInputs)
+	unlockedAddresses, err := nova.NewVirtualMachine().ValidateUnlocks(iotagoSignedTransaction, resolvedInputs)
 	if err != nil {
 		return nil, err
 	}
@@ -187,12 +187,12 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 }
 
 func (v *VM) Execute(executionContext context.Context, transaction mempool.Transaction) (outputs []mempool.State, err error) {
-	stardustTransaction, ok := transaction.(*iotago.Transaction)
+	iotagoTransaction, ok := transaction.(*iotago.Transaction)
 	if !ok {
 		return nil, iotago.ErrTxTypeInvalid
 	}
 
-	transactionID, err := stardustTransaction.ID()
+	transactionID, err := iotagoTransaction.ID()
 	if err != nil {
 		return nil, err
 	}
@@ -207,13 +207,13 @@ func (v *VM) Execute(executionContext context.Context, transaction mempool.Trans
 		return nil, ierrors.Errorf("resolvedInputs not found in execution context")
 	}
 
-	createdOutputs, err := nova.NewVirtualMachine().Execute(stardustTransaction, resolvedInputs, unlockedAddresses)
+	createdOutputs, err := nova.NewVirtualMachine().Execute(iotagoTransaction, resolvedInputs, unlockedAddresses)
 	if err != nil {
 		return nil, err
 	}
 
 	for index, output := range createdOutputs {
-		proof, err := iotago.OutputIDProofFromTransaction(stardustTransaction, uint16(index))
+		proof, err := iotago.OutputIDProofFromTransaction(iotagoTransaction, uint16(index))
 		if err != nil {
 			return nil, err
 		}

@@ -157,10 +157,10 @@ func (s *Server) ListenToCommitments(req *inx.SlotRangeRequest, srv inx.INX_List
 	return innerErr
 }
 
-func (s *Server) ForceCommitUntil(_ context.Context, slot *inx.SlotIndex) (*inx.NoParams, error) {
+func (s *Server) ForceCommitUntil(_ context.Context, slot *inx.SlotRequest) (*inx.NoParams, error) {
 	err := deps.Protocol.Engines.Main.Get().Notarization.ForceCommitUntil(slot.Unwrap())
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "error while performing force commit until %d", slot.Index)
+		return nil, ierrors.Wrapf(err, "error while performing force commit until %d", slot.Slot)
 	}
 
 	return &inx.NoParams{}, nil

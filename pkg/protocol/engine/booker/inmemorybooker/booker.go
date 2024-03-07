@@ -5,7 +5,6 @@ import (
 
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -16,7 +15,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Booker struct {
@@ -24,12 +22,11 @@ type Booker struct {
 
 	blockCache *blocks.Blocks
 
-	spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
-
 	ledger ledger.Ledger
 
+	spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
+
 	loadBlockFromStorage func(id iotago.BlockID) (*model.Block, bool)
-	retainBlockFailure   func(id iotago.BlockID, reason api.BlockFailureReason)
 
 	errorHandler func(error)
 	apiProvider  iotago.APIProvider
@@ -60,8 +57,6 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 					b.errorHandler(err)
 				}
 			})
-
-			b.setRetainBlockFailureFunc(e.Retainer.RetainBlockFailure)
 
 			e.Events.Booker.LinkTo(b.events)
 
@@ -94,8 +89,6 @@ func (b *Booker) Queue(block *blocks.Block) error {
 	}
 
 	if signedTransactionMetadata == nil {
-		b.retainBlockFailure(block.ID(), api.BlockFailurePayloadInvalid)
-
 		return ierrors.Errorf("transaction in %s was not attached", block.ID())
 	}
 
@@ -163,10 +156,6 @@ func (b *Booker) setupBlock(block *blocks.Block) {
 	})
 }
 
-func (b *Booker) setRetainBlockFailureFunc(retainBlockFailure func(iotago.BlockID, api.BlockFailureReason)) {
-	b.retainBlockFailure = retainBlockFailure
-}
-
 func (b *Booker) book(block *blocks.Block) error {
 	spendersToInherit, err := b.inheritSpenders(block)
 	if err != nil {
@@ -202,8 +191,6 @@ func (b *Booker) inheritSpenders(block *blocks.Block) (spenderIDs ds.Set[iotago.
 	for _, parent := range block.ParentsWithType() {
 		parentBlock, exists := b.blockCache.Block(parent.ID)
 		if !exists {
-			b.retainBlockFailure(block.ID(), api.BlockFailureParentNotFound)
-
 			return nil, ierrors.Errorf("parent %s does not exist", parent.ID)
 		}
 
@@ -230,7 +217,7 @@ func (b *Booker) inheritSpenders(block *blocks.Block) (spenderIDs ds.Set[iotago.
 
 			// Check whether the parent contains a conflicting TX,
 			// otherwise reference is invalid and the block should be marked as invalid as well.
-			if signedTransaction, hasTx := parentBlock.SignedTransaction(); !hasTx || !parentBlock.PayloadSpenderIDs().Has(lo.PanicOnErr(signedTransaction.Transaction.ID())) {
+			if signedTransaction, hasTx := parentBlock.SignedTransaction(); !hasTx || !parentBlock.PayloadSpenderIDs().Has(signedTransaction.Transaction.MustID()) {
 				return nil, ierrors.Wrapf(err, "shallow like parent %s does not contain a conflicting transaction", parent.ID.String())
 			}
 

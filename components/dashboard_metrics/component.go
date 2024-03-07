@@ -102,8 +102,8 @@ func configureComponentCountersEvents() {
 		incComponentCounter(Received)
 	})
 
-	deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(_ *blocks.Block) {
-		incComponentCounter(Attached)
+	deps.Protocol.Events.Engine.PostSolidFilter.BlockAllowed.Hook(func(_ *blocks.Block) {
+		incComponentCounter(Allowed)
 	})
 
 	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(b *blocks.Block) {

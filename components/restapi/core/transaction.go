@@ -47,17 +47,5 @@ func transactionMetadataFromTransactionID(c echo.Context) (*api.TransactionMetad
 		return nil, ierrors.Wrapf(err, "failed to parse transaction ID %s", c.Param(api.ParameterTransactionID))
 	}
 
-	blockID, err := deps.RequestHandler.BlockIDFromTransactionID(txID)
-	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrNotFound, "failed to get block ID from transaction ID: %v", err)
-	}
-
-	metadata, err := deps.RequestHandler.TransactionMetadataByBlockID(blockID)
-	if err != nil {
-		return nil, err
-	}
-
-	metadata.TransactionID = txID
-
-	return metadata, nil
+	return deps.RequestHandler.TransactionMetadataByID(txID)
 }

@@ -83,14 +83,14 @@ func NewProvider(opts ...options.Option[SyncManager]) module.Provider[*engine.En
 			}
 		}, asyncOpt)
 
-		e.Events.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-			if s.updateFinalizedSlot(index) {
+		e.Events.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
+			if s.updateFinalizedSlot(slot) {
 				s.triggerUpdate()
 			}
 		}, asyncOpt)
 
-		e.Storage.Pruned.Hook(func(index iotago.EpochIndex) {
-			if s.updatePrunedEpoch(index, true) {
+		e.Storage.Pruned.Hook(func(epoch iotago.EpochIndex) {
+			if s.updatePrunedEpoch(epoch, true) {
 				s.triggerUpdate()
 			}
 		}, asyncOpt)
