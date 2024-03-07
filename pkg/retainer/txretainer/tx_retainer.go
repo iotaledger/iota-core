@@ -34,9 +34,9 @@ var (
 // all entries with an earliest attachment slot greater than the target slot.
 type TransactionMetadata struct {
 	ID                     uint64           `gorm:"autoIncrement"`
-	TransactionID          []byte           `gorm:"notnull"`
+	TransactionID          []byte           `gorm:"notnull;index:transaction_ids"`
 	ValidSignature         bool             `gorm:"notnull"`
-	EarliestAttachmentSlot iotago.SlotIndex `gorm:"notnull;index:earliest_attachment_slots"`
+	EarliestAttachmentSlot iotago.SlotIndex `gorm:"notnull"`
 	State                  byte             `gorm:"notnull"`
 	FailureReason          byte             `gorm:"notnull"`
 	ErrorMsg               *string
