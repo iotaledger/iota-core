@@ -186,6 +186,7 @@ func referencesFromBlockIssuanceResponse(response *api.IssuanceBlockHeaderRespon
 	references[iotago.StrongParentType] = response.StrongParents
 	references[iotago.WeakParentType] = response.WeakParents
 	references[iotago.ShallowLikeParentType] = response.ShallowLikeParents
+
 	return references
 }
 

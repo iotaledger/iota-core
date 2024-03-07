@@ -69,6 +69,9 @@ func (r *RequestHandler) BlockIssuance() (*api.IssuanceBlockHeaderResponse, erro
 	var latestParentBlockIssuingTime time.Time
 	for _, parentType := range []iotago.ParentsType{iotago.StrongParentType, iotago.WeakParentType, iotago.ShallowLikeParentType} {
 		for _, blockID := range references[parentType] {
+			if blockID == r.CommittedAPI().ProtocolParameters().GenesisBlockID() {
+				continue
+			}
 			block, exists := r.protocol.Engines.Main.Get().Block(blockID)
 			if !exists {
 				return nil, ierrors.Wrapf(echo.ErrNotFound, "no block found for parent, block ID: %s", blockID.ToHex())

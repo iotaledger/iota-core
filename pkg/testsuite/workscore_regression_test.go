@@ -1,6 +1,7 @@
 package testsuite
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"testing"
@@ -116,13 +117,14 @@ func getStandardBlock(t *testing.T) *iotago.Block {
 	node := ts.AddValidatorNode("node1")
 	ts.AddDefaultWallet(node)
 	ts.Run(true)
+	blockIssuanceResp := ts.DefaultWallet().GetNewBlockIssuanceResponse()
 	tx := ts.DefaultWallet().CreateAccountFromInput(
 		"tx",
 		"Genesis:0",
 		ts.DefaultWallet(),
 		mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{tpkg.RandBlockIssuerKey()}, iotago.MaxSlotIndex),
 	)
-	commitment := node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
+	commitment := blockIssuanceResp.LatestCommitment
 	block := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block", ts.DefaultWallet(), tx, mock.WithSlotCommitment(commitment)))
 
 	return block.ProtocolBlock()
@@ -148,7 +150,7 @@ func initializeTestSuite(b *testing.B, t *testing.T, blockScheduled chan *blocks
 // issueBlockAndTimeProcessing runs the issueBlockAndTimeProcessing issues the block and measures the time it takes to schedule the block.
 func issueBlockAndTimeProcessing(b *testing.B, ts *TestSuite, modelBlock *model.Block, blockScheduled chan *blocks.Block) {
 	b.StartTimer()
-	ts.DefaultWallet().Node.Protocol.IssueBlock(modelBlock)
+	ts.DefaultWallet().Client.SubmitBlock(context.Background(), modelBlock.ProtocolBlock())
 	<-blockScheduled
 	b.StopTimer()
 	ts.Shutdown()
@@ -225,20 +227,21 @@ func basicInAccountOut(t *testing.T, numAccounts int, staking bool) (float64, []
 	// basic block with one input, one account output with staking and a remainder
 	fn := func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			ts, node := initializeTestSuite(b, t, blockScheduled)
+			ts, _ := initializeTestSuite(b, t, blockScheduled)
 			opts := []options.Option[builder.AccountOutputBuilder]{
 				mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{tpkg.RandBlockIssuerKey()}, iotago.MaxSlotIndex),
 			}
 			if staking {
 				opts = append(opts, mock.WithStakingFeature(10000, 421, 0, 10))
 			}
+			blockIssuanceResp := ts.DefaultWallet().GetNewBlockIssuanceResponse()
 			tx1 := ts.DefaultWallet().CreateAccountsFromInput(
 				"tx1",
 				"Genesis:0",
 				numAccounts,
 				opts...,
 			)
-			commitment := node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
+			commitment := blockIssuanceResp.LatestCommitment
 			block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(commitment)))
 			block = block1.ProtocolBlock()
 			modelBlock := lo.PanicOnErr(model.BlockFromBlock(block))

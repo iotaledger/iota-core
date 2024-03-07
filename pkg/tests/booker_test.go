@@ -863,9 +863,9 @@ func Test_BlockWithInvalidTransactionGetsBooked(t *testing.T) {
 	)
 	block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1))
 
-	vblock1 := lo.PanicOnErr(ts.IssueValidationBlockWithHeaderOptions("vblock1", ts.DefaultWallet().Node, mock.WithWeakParents(block1.ID()), mock.WithStrongParents(ts.Block("Genesis").ID())))
-	vblock2 := lo.PanicOnErr(ts.IssueValidationBlockWithHeaderOptions("vblock2", ts.DefaultWallet().Node, mock.WithStrongParents(vblock1.ID())))
-	vblock3 := lo.PanicOnErr(ts.IssueValidationBlockWithHeaderOptions("vblock3", ts.DefaultWallet().Node, mock.WithStrongParents(vblock2.ID())))
+	vblock1 := lo.PanicOnErr(ts.IssueValidationBlockWithHeaderOptions("vblock1", node1, mock.WithWeakParents(block1.ID()), mock.WithStrongParents(ts.Block("Genesis").ID())))
+	vblock2 := lo.PanicOnErr(ts.IssueValidationBlockWithHeaderOptions("vblock2", node1, mock.WithStrongParents(vblock1.ID())))
+	vblock3 := lo.PanicOnErr(ts.IssueValidationBlockWithHeaderOptions("vblock3", node1, mock.WithStrongParents(vblock2.ID())))
 
 	ts.AssertBlocksInCacheAccepted(ts.Blocks("block1"), true, ts.Nodes()...)
 	ts.AssertBlocksInCacheConfirmed(ts.Blocks("block1"), true, ts.Nodes()...)

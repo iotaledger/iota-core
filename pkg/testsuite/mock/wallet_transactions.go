@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 
@@ -44,7 +45,7 @@ func (w *Wallet) CreateAccountFromInput(transactionName string, inputName string
 		transactionName,
 		[]uint32{0},
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithInputs(input),
 		WithOutputs(outputStates...),
@@ -77,7 +78,7 @@ func (w *Wallet) CreateAccountsFromInput(transactionName string, inputName strin
 		transactionName,
 		[]uint32{0},
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithInputs(input),
 		WithOutputs(outputStates...),
@@ -124,7 +125,7 @@ func (w *Wallet) CreateDelegationFromInput(transactionName string, inputName str
 		transactionName,
 		[]uint32{0},
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithInputs(input),
 		WithOutputs(outputStates...),
@@ -134,11 +135,10 @@ func (w *Wallet) CreateDelegationFromInput(transactionName string, inputName str
 	return signedTransaction
 }
 
-func (w *Wallet) DelegationStartFromSlot(slot iotago.SlotIndex) iotago.EpochIndex {
-	latestCommitment := w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment()
-	apiForSlot := w.Node.Protocol.APIForSlot(slot)
+func (w *Wallet) DelegationStartFromSlot(slot, latestCommitmentSlot iotago.SlotIndex) iotago.EpochIndex {
+	apiForSlot := w.Client.APIForSlot(slot)
 
-	pastBoundedSlotIndex := latestCommitment.Slot() + apiForSlot.ProtocolParameters().MaxCommittableAge()
+	pastBoundedSlotIndex := latestCommitmentSlot + apiForSlot.ProtocolParameters().MaxCommittableAge()
 	pastBoundedEpochIndex := apiForSlot.TimeProvider().EpochFromSlot(pastBoundedSlotIndex)
 
 	registrationSlot := w.registrationSlot(slot)
@@ -150,11 +150,10 @@ func (w *Wallet) DelegationStartFromSlot(slot iotago.SlotIndex) iotago.EpochInde
 	return pastBoundedEpochIndex + 2
 }
 
-func (w *Wallet) DelegationEndFromSlot(slot iotago.SlotIndex) iotago.EpochIndex {
-	latestCommitment := w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment()
-	apiForSlot := w.Node.Protocol.APIForSlot(slot)
+func (w *Wallet) DelegationEndFromSlot(slot, latestCommitmentSlot iotago.SlotIndex) iotago.EpochIndex {
+	apiForSlot := w.Client.APIForSlot(slot)
 
-	futureBoundedSlotIndex := latestCommitment.Slot() + apiForSlot.ProtocolParameters().MinCommittableAge()
+	futureBoundedSlotIndex := latestCommitmentSlot + apiForSlot.ProtocolParameters().MinCommittableAge()
 	futureBoundedEpochIndex := apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex)
 
 	registrationSlot := w.registrationSlot(slot)
@@ -169,7 +168,7 @@ func (w *Wallet) DelegationEndFromSlot(slot iotago.SlotIndex) iotago.EpochIndex 
 // Returns the registration slot in the epoch X corresponding to the given slot.
 // This is the registration slot for epoch X+1.
 func (w *Wallet) registrationSlot(slot iotago.SlotIndex) iotago.SlotIndex {
-	apiForSlot := w.Node.Protocol.APIForSlot(slot)
+	apiForSlot := w.Client.APIForSlot(slot)
 
 	return apiForSlot.TimeProvider().EpochEnd(apiForSlot.TimeProvider().EpochFromSlot(slot)) - apiForSlot.ProtocolParameters().EpochNearingThreshold()
 }
@@ -197,7 +196,7 @@ func (w *Wallet) DelayedClaimingTransition(transactionName string, inputName str
 		transactionName,
 		[]uint32{0},
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.latestBlockIssuanceResp.LatestCommitment.MustID(),
 		}),
 		WithInputs(input),
 		WithOutputs(delegationOutput),
@@ -228,7 +227,7 @@ func (w *Wallet) TransitionAccount(transactionName string, inputName string, opt
 			AccountID: accountOutput.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.latestBlockIssuanceResp.LatestCommitment.MustID(),
 		}),
 		WithOutputs(accountOutput),
 	)
@@ -261,7 +260,7 @@ func (w *Wallet) TransitionAccounts(transactionName string, inputNames []string,
 		WithInputs(inputs...),
 		WithOutputs(outputs...),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.latestBlockIssuanceResp.LatestCommitment.MustID(),
 		}),
 	)
 
@@ -297,7 +296,7 @@ func (w *Wallet) DestroyAccount(transactionName string, inputName string) *iotag
 			AccountID: inputAccount.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.latestBlockIssuanceResp.LatestCommitment.MustID(),
 		}),
 		WithAccountInput(input),
 		WithOutputs(destructionOutputs...),
@@ -311,8 +310,8 @@ func (w *Wallet) CreateImplicitAccountFromInput(transactionName string, inputNam
 	input := w.OutputData(inputName)
 
 	implicitAccountOutput := &iotago.BasicOutput{
-		Amount: MinIssuerAccountAmount(w.Node.Protocol.CommittedAPI().ProtocolParameters()),
-		Mana:   AccountConversionManaCost(w.Node.Protocol.CommittedAPI().ProtocolParameters()),
+		Amount: MinIssuerAccountAmount(w.Client.CommittedAPI().ProtocolParameters()),
+		Mana:   AccountConversionManaCost(w.Client.CommittedAPI().ProtocolParameters()),
 		UnlockConditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: recipientWallet.ImplicitAccountCreationAddress()},
 		},
@@ -320,8 +319,8 @@ func (w *Wallet) CreateImplicitAccountFromInput(transactionName string, inputNam
 	}
 
 	remainderBasicOutput := &iotago.BasicOutput{
-		Amount: input.Output.BaseTokenAmount() - MinIssuerAccountAmount(w.Node.Protocol.CommittedAPI().ProtocolParameters()),
-		Mana:   input.Output.StoredMana() - AccountConversionManaCost(w.Node.Protocol.CommittedAPI().ProtocolParameters()),
+		Amount: input.Output.BaseTokenAmount() - MinIssuerAccountAmount(w.Client.CommittedAPI().ProtocolParameters()),
+		Mana:   input.Output.StoredMana() - AccountConversionManaCost(w.Client.CommittedAPI().ProtocolParameters()),
 		UnlockConditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: input.Output.UnlockConditionSet().Address().Address},
 		},
@@ -350,8 +349,8 @@ func (w *Wallet) CreateImplicitAccountAndBasicOutputFromInput(transactionName st
 	input := w.OutputData(inputName)
 
 	implicitAccountOutput := &iotago.BasicOutput{
-		Amount: MinIssuerAccountAmount(w.Node.Protocol.CommittedAPI().ProtocolParameters()),
-		Mana:   AccountConversionManaCost(w.Node.Protocol.CommittedAPI().ProtocolParameters()),
+		Amount: MinIssuerAccountAmount(w.Client.CommittedAPI().ProtocolParameters()),
+		Mana:   AccountConversionManaCost(w.Client.CommittedAPI().ProtocolParameters()),
 		UnlockConditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: recipientWallet.ImplicitAccountCreationAddress()},
 		},
@@ -419,7 +418,7 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string
 			AccountID: implicitAccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.latestBlockIssuanceResp.LatestCommitment.MustID(),
 		}),
 		WithInputs(inputs...),
 		WithOutputs(accountOutput),
@@ -492,7 +491,7 @@ func (w *Wallet) CreateFoundryAndNativeTokensFromInput(transactionName string, i
 			AccountID: accountOutput.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 	)
 
@@ -546,7 +545,7 @@ func (w *Wallet) TransitionFoundry(transactionName string, inputName string, acc
 			AccountID: outputAccount.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 	)
 
@@ -567,7 +566,7 @@ func (w *Wallet) AllotManaFromBasicOutput(transactionName string, inputName stri
 		Features: iotago.BasicOutputFeatures{},
 	}
 
-	apiForSlot := w.Node.Protocol.Engines.Main.Get().APIForSlot(w.currentSlot)
+	apiForSlot := w.Client.APIForSlot(w.currentSlot)
 	manaDecayProvider := apiForSlot.ManaDecayProvider()
 	storageScoreStructure := apiForSlot.StorageScoreStructure()
 
@@ -598,7 +597,7 @@ func (w *Wallet) AllotManaFromBasicOutput(transactionName string, inputName stri
 }
 
 func (w *Wallet) CreateBasicOutputsEquallyFromInput(transactionName string, outputCount int, inputName string) *iotago.SignedTransaction {
-	apiForSlot := w.Node.Protocol.Engines.Main.Get().APIForSlot(w.currentSlot)
+	apiForSlot := w.Client.APIForSlot(w.currentSlot)
 	manaDecayProvider := apiForSlot.ManaDecayProvider()
 	storageScoreStructure := apiForSlot.StorageScoreStructure()
 
@@ -642,7 +641,7 @@ func (w *Wallet) CreateBasicOutputsEquallyFromInput(transactionName string, outp
 
 func (w *Wallet) CreateBasicOutputsAtAddressesFromInput(transactionName string, addressIndexes []uint32, inputName string) *iotago.SignedTransaction {
 	outputCount := len(addressIndexes)
-	apiForSlot := w.Node.Protocol.Engines.Main.Get().APIForSlot(w.currentSlot)
+	apiForSlot := w.Client.APIForSlot(w.currentSlot)
 	manaDecayProvider := apiForSlot.ManaDecayProvider()
 	storageScoreStructure := apiForSlot.StorageScoreStructure()
 
@@ -685,7 +684,7 @@ func (w *Wallet) CreateBasicOutputsAtAddressesFromInput(transactionName string, 
 }
 
 func (w *Wallet) CreateBasicOutputsEquallyFromInputs(transactionName string, inputNames []string, inputAddressIndexes []uint32, outputsCount int) *iotago.SignedTransaction {
-	apiForSlot := w.Node.Protocol.Engines.Main.Get().APIForSlot(w.currentSlot)
+	apiForSlot := w.Client.APIForSlot(w.currentSlot)
 	manaDecayProvider := apiForSlot.ManaDecayProvider()
 	storageScoreStructure := apiForSlot.StorageScoreStructure()
 
@@ -750,7 +749,7 @@ func (w *Wallet) RemoveFeatureFromAccount(featureType iotago.FeatureType, transa
 			AccountID: accountOutput.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithOutputs(accountOutput),
 	)
@@ -877,26 +876,16 @@ func (w *Wallet) ClaimValidatorRewards(transactionName string, inputName string)
 		panic(fmt.Sprintf("output with alias %s is not *iotago.AccountOutput", inputName))
 	}
 
-	apiForSlot := w.Node.Protocol.APIForSlot(w.currentSlot)
-	latestCommittedSlot := w.Node.Protocol.Chains.Main.Get().LatestCommitment.Get().Slot()
-	futureBoundedSlotIndex := latestCommittedSlot + apiForSlot.ProtocolParameters().MinCommittableAge()
-	claimingEpoch := apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex)
+	apiForSlot := w.Client.APIForSlot(w.currentSlot)
 
-	rewardMana, _, _, err := w.Node.Protocol.Engines.Main.Get().SybilProtection.ValidatorReward(
-		inputAccount.AccountID,
-		inputAccount.FeatureSet().Staking(),
-		claimingEpoch,
-	)
-	if err != nil {
-		panic(fmt.Sprintf("failed to calculate reward for output %s: %s", inputName, err))
-	}
+	rewardResp := w.Client.Rewards(context.Background(), input.ID)
 
 	potentialMana := w.PotentialMana(apiForSlot, input)
 	storedMana := w.StoredMana(apiForSlot, input)
 
 	accountOutput := builder.NewAccountOutputBuilderFromPrevious(inputAccount).
 		RemoveFeature(iotago.FeatureStaking).
-		Mana(potentialMana + storedMana + rewardMana).
+		Mana(potentialMana + storedMana + rewardResp.Rewards).
 		MustBuild()
 
 	signedTransaction := w.createSignedTransactionWithOptions(
@@ -905,13 +894,13 @@ func (w *Wallet) ClaimValidatorRewards(transactionName string, inputName string)
 		WithAccountInput(input),
 		WithRewardInput(
 			&iotago.RewardInput{Index: 0},
-			rewardMana,
+			rewardResp.Rewards,
 		),
 		WithBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{
 			AccountID: accountOutput.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithOutputs(accountOutput),
 	)
@@ -964,40 +953,16 @@ func (w *Wallet) AllotManaFromInputs(transactionName string, allotments iotago.A
 
 func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string) *iotago.SignedTransaction {
 	input := w.OutputData(inputName)
-	inputDelegation, ok := input.Output.(*iotago.DelegationOutput)
-	if !ok {
-		panic(fmt.Sprintf("output with alias %s is not *iotago.AccountOutput", inputName))
-	}
 
-	apiForSlot := w.Node.Protocol.APIForSlot(w.currentSlot)
-	futureBoundedSlotIndex := w.currentSlot + apiForSlot.ProtocolParameters().MinCommittableAge()
-	claimingEpoch := apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex)
-
-	delegationEnd := inputDelegation.EndEpoch
-	// If Delegation ID is zeroed, the output is in delegating state, which means its End Epoch is not set and we must use the
-	// "last epoch" for the rewards calculation.
-	if inputDelegation.DelegationID.Empty() {
-		delegationEnd = claimingEpoch - iotago.EpochIndex(1)
-	}
-
-	rewardMana, _, _, err := w.Node.Protocol.Engines.Main.Get().SybilProtection.DelegatorReward(
-		inputDelegation.ValidatorAddress.AccountID(),
-		inputDelegation.DelegatedAmount,
-		inputDelegation.StartEpoch,
-		delegationEnd,
-		claimingEpoch,
-	)
-
-	if err != nil {
-		panic(fmt.Sprintf("failed to calculate reward for output %s: %s", inputName, err))
-	}
-
+	apiForSlot := w.Client.APIForSlot(w.currentSlot)
 	potentialMana := w.PotentialMana(apiForSlot, input)
+
+	rewardsResp := w.Client.Rewards(context.Background(), input.ID)
 
 	// Create Basic Output where the reward will be put.
 	outputStates := iotago.Outputs[iotago.Output]{&iotago.BasicOutput{
 		Amount: input.Output.BaseTokenAmount(),
-		Mana:   rewardMana + potentialMana,
+		Mana:   rewardsResp.Rewards + potentialMana,
 		UnlockConditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: w.Address()},
 		},
@@ -1010,10 +975,10 @@ func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string)
 		WithInputs(input),
 		WithRewardInput(
 			&iotago.RewardInput{Index: 0},
-			rewardMana,
+			rewardsResp.Rewards,
 		),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithOutputs(outputStates...),
 	)
@@ -1098,7 +1063,7 @@ func (w *Wallet) CreateNativeTokenFromInput(transactionName string, inputName st
 			AccountID: accID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithAllotAllManaToAccount(w.currentSlot, accID),
 	)
@@ -1128,7 +1093,7 @@ func (w *Wallet) TransitionNFTWithTransactionOpts(transactionName string, inputN
 }
 
 func (w *Wallet) createSignedTransactionWithOptions(transactionName string, addressIndexes []uint32, opts ...options.Option[builder.TransactionBuilder]) *iotago.SignedTransaction {
-	currentAPI := w.Node.Protocol.CommittedAPI()
+	currentAPI := w.Client.CommittedAPI()
 
 	addressSigner := w.AddressSigner(addressIndexes...)
 

@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"context"
 	"crypto/ed25519"
 	"testing"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/wallet"
 )
 
@@ -54,6 +56,8 @@ type Wallet struct {
 	Name string
 
 	Client Client
+	// LatestBlockIssuanceResp is the cached response from the latest query to the block issuance endpoint.
+	latestBlockIssuanceResp *api.IssuanceBlockHeaderResponse
 
 	Node *Node
 
@@ -74,7 +78,7 @@ func NewWallet(t *testing.T, name string, node *Node, keyManager ...*wallet.KeyM
 	} else {
 		km = keyManager[0]
 	}
-	client := &TestClient{node}
+	client := &TestSuiteClient{node}
 	issuerAccountData := &AccountData{
 		ID:           iotago.EmptyAccountID,
 		AddressIndex: 0,
@@ -98,7 +102,7 @@ func (w *Wallet) SetBlockIssuer(accountData *AccountData) {
 }
 
 func (w *Wallet) SetDefaultNode(node *Node) {
-	w.Client = &TestClient{node}
+	w.Client = &TestSuiteClient{node}
 	w.BlockIssuer.client = w.Client
 	w.Node = node
 }
@@ -177,4 +181,18 @@ func (w *Wallet) KeyPair() (ed25519.PrivateKey, ed25519.PublicKey) {
 
 func (w *Wallet) AddressSigner(indexes ...uint32) iotago.AddressSigner {
 	return w.keyManager.AddressSigner(indexes...)
+}
+
+func (w *Wallet) LatestBlockIssuanceResponse() *api.IssuanceBlockHeaderResponse {
+	if w.latestBlockIssuanceResp == nil {
+		panic(ierrors.Errorf("latest block issuance response not set for wallet %s", w.Name))
+	}
+
+	return w.latestBlockIssuanceResp
+}
+
+func (w *Wallet) GetNewBlockIssuanceResponse() *api.IssuanceBlockHeaderResponse {
+	w.latestBlockIssuanceResp = w.Client.BlockIssuance(context.Background())
+
+	return w.latestBlockIssuanceResp
 }

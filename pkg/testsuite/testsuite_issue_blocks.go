@@ -81,7 +81,7 @@ func (t *TestSuite) IssueValidationBlockWithHeaderOptions(blockName string, node
 	return block, err
 }
 
-func (t *TestSuite) IssueExistingBlock(blockName string, wallet *mock.Wallet) {
+func (t *TestSuite) IssueExistingBlock(blockName string, wallet *mock.Wallet) error {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -89,7 +89,7 @@ func (t *TestSuite) IssueExistingBlock(blockName string, wallet *mock.Wallet) {
 	require.True(t.Testing, exists)
 	require.NotNil(t.Testing, block)
 
-	require.NoError(t.Testing, wallet.BlockIssuer.SubmitBlockWithoutAwaitingBooking(block.ModelBlock(), wallet.Node))
+	return wallet.BlockIssuer.SubmitBlock(context.Background(), block.ModelBlock())
 }
 
 func (t *TestSuite) IssueValidationBlockWithOptions(blockName string, node *mock.Node, blockOpts ...options.Option[mock.ValidationBlockParams]) (*blocks.Block, error) {

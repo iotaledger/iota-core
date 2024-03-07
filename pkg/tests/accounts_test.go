@@ -218,6 +218,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	require.NoError(t, err)
 
 	var block1Slot iotago.SlotIndex = 1
+	ts.DefaultWallet().GetNewBlockIssuanceResponse()
 	tx1 := ts.DefaultWallet().CreateAccountFromInput(
 		"TX1",
 		"Genesis:0",

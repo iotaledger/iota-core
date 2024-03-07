@@ -61,7 +61,7 @@ func TestProtocol_Eviction(t *testing.T) {
 	node := ts.AddValidatorNode("node0")
 
 	ts.Run(false, map[string][]options.Option[protocol.Protocol]{
-		"node0": []options.Option[protocol.Protocol]{
+		"node0": {
 			protocol.WithSybilProtectionProvider(
 				sybilprotectionv1.NewProvider(
 					sybilprotectionv1.WithSeatManagerProvider(module.Provide(func(e *engine.Engine) seatmanager.SeatManager {

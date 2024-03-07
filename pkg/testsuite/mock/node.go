@@ -140,7 +140,7 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 	_, pub := n.KeyManager.KeyPair()
 	accountID := iotago.AccountID(blake2b.Sum256(pub))
 
-	client := &TestClient{n}
+	client := &TestSuiteClient{n}
 	if n.isValidator {
 		n.Validator = NewBlockIssuer(n.Testing, n.Name, n.KeyManager, client, 0, accountID, n.isValidator)
 	}
