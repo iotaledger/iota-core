@@ -10,18 +10,20 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/ioutils"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/sql"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 )
 
-// ClonableSQLiteDatabase is a wrapper around a LockableGormDB database (SQLite) that allows to clone it.
+// ClonableSQLiteDatabase is a wrapper around a gorm database (SQLite) that allows to clone it.
 type ClonableSQLiteDatabase struct {
 	logger       log.Logger
 	directory    string
 	filename     string
 	errorHandler func(error)
 
-	database *LockableGormDB
+	accessMutex *syncutils.StarvingMutex
+	database    *gorm.DB
 }
 
 // NewClonableSQLiteDatabase creates a new ClonableSQLDatabase instance.
@@ -31,20 +33,22 @@ func NewClonableSQLiteDatabase(logger log.Logger, directory string, filename str
 		directory:    directory,
 		filename:     filename,
 		errorHandler: errorHandler,
+		accessMutex:  syncutils.NewStarvingMutex(),
 	}
 
-	if err := db.openDatabase(); err != nil {
+	// we don't need to lock the database here, as the ClonableSQLiteDatabase is not used by anyone else yet.
+	if err := db.openDatabaseWithoutLocking(); err != nil {
 		panic(err)
 	}
 
 	return db
 }
 
-// openDatabase opens the SQLite database.
-func (p *ClonableSQLiteDatabase) openDatabase() error {
+// openDatabaseWithoutLocking opens the SQLite database.
+func (p *ClonableSQLiteDatabase) openDatabaseWithoutLocking() error {
 	baseDir := utils.NewDirectory(p.directory, true)
 
-	sqliteDatabase, _, err := sql.New(
+	gormDB, _, err := sql.New(
 		p.logger,
 		sql.DatabaseParameters{
 			Engine:   db.EngineSQLite,
@@ -58,20 +62,31 @@ func (p *ClonableSQLiteDatabase) openDatabase() error {
 		return ierrors.Wrapf(err, "failed to create/open SQLite database: %s", filepath.Join(baseDir.Path(), p.filename))
 	}
 
-	p.database = NewLockableGormDB(sqliteDatabase)
+	p.database = gormDB
 
 	return nil
 }
 
-// Clone creates a new ClonableSQLDatabase instance by copying the storage on disk to a new location.
+// closeWithoutLocking closes the SQLite database without locking access to it.
+func (p *ClonableSQLiteDatabase) closeDatabaseWithoutLocking() error {
+	gormDB, err := p.database.DB()
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to get SQLite database: %s", filepath.Join(p.directory, p.filename))
+	}
+
+	return gormDB.Close()
+}
+
+// Clone creates a new ClonableSQLDatabase instance by copying the SQLite database to a new location.
 func Clone(logger log.Logger, source *ClonableSQLiteDatabase, directory string, filename string, errorHandler func(error)) (*ClonableSQLiteDatabase, error) {
 	// Lock database so that nobody can try to use or open it while cloning.
-	source.database.LockAccess()
-	defer source.database.UnlockAccess()
+	// After the lock is acquired, all ongoing database operations are paused.
+	source.accessMutex.Lock()
+	defer source.accessMutex.Unlock()
 
 	// Close forked database before copying its contents. All necessary locks are already acquired.
-	if err := source.database.CloseWithoutLocking(); err != nil {
-		return nil, ierrors.Wrap(err, "failed to close source database before cloning")
+	if err := source.closeDatabaseWithoutLocking(); err != nil {
+		return nil, ierrors.Wrap(err, "failed to close source SQLite database before cloning")
 	}
 
 	// Copy the database on disk to new location.
@@ -79,18 +94,31 @@ func Clone(logger log.Logger, source *ClonableSQLiteDatabase, directory string, 
 		return nil, ierrors.Wrapf(err, "failed to copy SQLite database directory to new path: %s", directory)
 	}
 
-	// Reopen the source database.
-	if err := source.openDatabase(); err != nil {
-		return nil, ierrors.Wrap(err, "failed to reopen source database after cloning")
+	// Reopen the source database, the lock is already acquired above.
+	if err := source.openDatabaseWithoutLocking(); err != nil {
+		return nil, ierrors.Wrap(err, "failed to reopen source SQLite database after cloning")
 	}
 
+	// Create a new ClonableSQLiteDatabase instance for the clone.
 	return NewClonableSQLiteDatabase(logger, directory, filename, errorHandler), nil
 }
 
 // ExecDBFunc executes a function with the DB as argument.
 // The DB is locked during the execution of the function.
 func (p *ClonableSQLiteDatabase) ExecDBFunc() func(func(*gorm.DB) error) error {
-	return p.database.ExecDBFunc
+	// we need to return a function pointer that resolves the database exec call to the latest
+	// instance of the database with every call to the inner exec func.
+	return func(dbFunc func(*gorm.DB) error) error {
+		resolveDatabaseExecFunc := func(dbFuncInner func(*gorm.DB) error) error {
+			// Lock the database so that nobody uses it while cloning or closing.
+			p.accessMutex.RLock()
+			defer p.accessMutex.RUnlock()
+
+			return dbFuncInner(p.database)
+		}
+
+		return resolveDatabaseExecFunc(dbFunc)
+	}
 }
 
 // Size returns the size of the underlying database.
@@ -105,7 +133,10 @@ func (p *ClonableSQLiteDatabase) Size() int64 {
 
 // Shutdown closes the database.
 func (p *ClonableSQLiteDatabase) Shutdown() {
-	if err := p.database.Close(); err != nil {
-		p.errorHandler(ierrors.Wrapf(err, "failed to close clonable SQL database: %s", filepath.Join(p.directory, p.filename)))
+	p.accessMutex.Lock()
+	defer p.accessMutex.Unlock()
+
+	if err := p.closeDatabaseWithoutLocking(); err != nil {
+		p.errorHandler(ierrors.Wrap(err, "failed to close SQLite database"))
 	}
 }
