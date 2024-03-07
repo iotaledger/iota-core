@@ -16,7 +16,7 @@ func (r *RequestHandler) BlockIDFromTransactionID(transactionID iotago.Transacti
 
 	output, spent, err := r.protocol.Engines.Main.Get().Ledger.OutputOrSpent(outputID)
 	if err != nil {
-		return iotago.EmptyBlockID, ierrors.Wrapf(echo.ErrNotFound, "output %s of transaction %s not found: %s", transactionID.ToHex(), outputID.ToHex(), err)
+		return iotago.EmptyBlockID, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s: %s", outputID.ToHex(), err)
 	}
 
 	if output != nil {

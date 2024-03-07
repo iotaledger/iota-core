@@ -359,7 +359,7 @@ func TestCoreAPI_BadRequests(t *testing.T) {
 				blockID := tpkg.RandBlockID()
 				resp, err := d.wallet.Clients[nodeAlias].BlockMetadataByBlockID(context.Background(), blockID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusNotFound))
+				require.True(t, isStatusCode(err, http.StatusInternalServerError))
 				require.Nil(t, resp)
 			},
 		},
@@ -441,7 +441,7 @@ func TestCoreAPI_BadRequests(t *testing.T) {
 				outputID := tpkg.RandOutputID(0)
 				resp, err := d.wallet.Clients[nodeAlias].OutputByID(context.Background(), outputID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusNotFound))
+				require.True(t, isStatusCode(err, http.StatusInternalServerError))
 				require.Nil(t, resp)
 			},
 		},
@@ -452,7 +452,7 @@ func TestCoreAPI_BadRequests(t *testing.T) {
 
 				resp, err := d.wallet.Clients[nodeAlias].OutputMetadataByID(context.Background(), outputID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusNotFound))
+				require.True(t, isStatusCode(err, http.StatusInternalServerError))
 				require.Nil(t, resp)
 			},
 		},
@@ -462,7 +462,7 @@ func TestCoreAPI_BadRequests(t *testing.T) {
 				txID := tpkg.RandTransactionID()
 				resp, err := d.wallet.Clients[nodeAlias].TransactionIncludedBlock(context.Background(), txID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusNotFound))
+				require.True(t, isStatusCode(err, http.StatusInternalServerError))
 				require.Nil(t, resp)
 			},
 		},
@@ -473,7 +473,7 @@ func TestCoreAPI_BadRequests(t *testing.T) {
 
 				resp, err := d.wallet.Clients[nodeAlias].TransactionIncludedBlockMetadata(context.Background(), txID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusNotFound))
+				require.True(t, isStatusCode(err, http.StatusInternalServerError))
 				require.Nil(t, resp)
 			},
 		},
@@ -505,7 +505,7 @@ func TestCoreAPI_BadRequests(t *testing.T) {
 				outputID := tpkg.RandOutputID(0)
 				resp, err := d.wallet.Clients[nodeAlias].Rewards(context.Background(), outputID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusNotFound))
+				require.True(t, isStatusCode(err, http.StatusInternalServerError))
 				require.Nil(t, resp)
 			},
 		},
