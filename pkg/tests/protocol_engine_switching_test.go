@@ -224,6 +224,9 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 		ts.AssertStrongTips(ts.BlocksWithPrefix("P2:11.3"), nodesP2...)
 	}
 
+	oldestNonEvictedCommitment := 5 - maxCommittableAge
+	commitmentsMainChainP2 := ts.CommitmentsOfMainEngine(nodesP2[0], oldestNonEvictedCommitment, 9)
+
 	// Merge the partitions
 	{
 		ts.MergePartitionsToMain()
@@ -247,8 +250,6 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 			),
 		)
 
-		// TODO: assert attested and verified chains
-
 		ts.IssueBlocksAtSlots("P0-merged:", []iotago.SlotIndex{22, 23, 24}, 3, "revive", ts.Nodes("node0"), true, false)
 	}
 
@@ -268,7 +269,6 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 		ts.AssertAttestationsForSlot(22, ts.Blocks("P0-merged:22.2-node0"), nodes...)
 	}
 
-	oldestNonEvictedCommitment := 5 - maxCommittableAge
 	commitmentsMainChain := ts.CommitmentsOfMainEngine(nodesP1[0], oldestNonEvictedCommitment, expectedCommittedSlotAfterPartitionMerge)
 
 	ts.AssertMainChain(commitmentsMainChain[8].ID(), nodesP2...)
@@ -276,6 +276,10 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 
 	ts.AssertCommitmentsOnChainAndChainHasCommitments(commitmentsMainChain, commitmentsMainChain[0].ID(), nodesP1...)
 	ts.AssertCommitmentsOnChainAndChainHasCommitments(commitmentsMainChain[8:], commitmentsMainChain[8].ID(), nodesP2...)
+
+	// Check that the losing chain has an expected state on P2.
+	// P1 is not even aware of this chain because it hasn't received any blocks.
+	ts.AssertCommitmentsOnChainAndChainHasCommitments(commitmentsMainChainP2, commitmentsMainChainP2[0].ID(), nodesP2...)
 
 	ts.AssertUniqueCommitmentChain(ts.Nodes()...)
 	ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
