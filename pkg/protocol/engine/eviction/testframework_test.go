@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
+	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -17,6 +18,7 @@ import (
 type TestFramework struct {
 	Testing         *testing.T
 	Instance        *eviction.State
+	Settings        *permanent.Settings
 	prunableStorage *prunable.Prunable
 
 	rootBlockIDs  *shrinkingmap.ShrinkingMap[string, iotago.BlockID]
@@ -26,13 +28,21 @@ type TestFramework struct {
 	mutex     syncutils.RWMutex
 }
 
-func NewTestFramework(testing *testing.T, prunableStorage *prunable.Prunable, instance *eviction.State) *TestFramework {
+func NewTestFramework(testing *testing.T, prunableStorage *prunable.Prunable, settings *permanent.Settings) *TestFramework {
 	return &TestFramework{
 		Testing:         testing,
 		prunableStorage: prunableStorage,
-		Instance:        instance,
+		Instance:        eviction.NewState(settings, prunableStorage.RootBlocks),
+		Settings:        settings,
 		rootBlockIDs:    shrinkingmap.New[string, iotago.BlockID](),
 		commitmentIDs:   shrinkingmap.New[iotago.BlockID, iotago.CommitmentID](),
+	}
+}
+
+func (t *TestFramework) AdvanceActiveWindowToIndex(slot iotago.SlotIndex, isEmpty bool) {
+	t.Instance.AdvanceActiveWindowToIndex(slot)
+	if !isEmpty {
+		require.NoError(t.Testing, t.Settings.AdvanceLatestNonEmptySlot(slot))
 	}
 }
 
@@ -82,7 +92,7 @@ func (t *TestFramework) RootBlocks(aliases ...string) map[iotago.BlockID]iotago.
 func (t *TestFramework) RequireActiveRootBlocks(expected ...string) {
 	expectedRootBlocks := t.RootBlocks(expected...)
 	gotActiveRootBlocks := t.Instance.AllActiveRootBlocks()
-	require.Equalf(t.Testing, expectedRootBlocks, gotActiveRootBlocks, "active root blocks do not match, expected: %v, got: %v", expectedRootBlocks, gotActiveRootBlocks)
+	require.Equalf(t.Testing, expectedRootBlocks, gotActiveRootBlocks, "active root blocks do not match, expected: %s, got: %s", expectedRootBlocks, gotActiveRootBlocks)
 }
 
 func (t *TestFramework) RequireLastEvictedSlot(expectedSlot iotago.SlotIndex) {
