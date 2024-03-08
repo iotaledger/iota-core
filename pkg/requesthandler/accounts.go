@@ -2,6 +2,7 @@ package requesthandler
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/labstack/echo/v4"
 
@@ -200,6 +201,14 @@ func (r *RequestHandler) SelectedCommittee(epoch iotago.EpochIndex) (*api.Commit
 		})
 
 		return true
+	})
+
+	// sort committee by pool stake, then by address
+	sort.Slice(committee, func(i, j int) bool {
+		if committee[i].PoolStake == committee[j].PoolStake {
+			return committee[i].AddressBech32 < committee[j].AddressBech32
+		}
+		return committee[i].PoolStake > committee[j].PoolStake
 	})
 
 	return &api.CommitteeResponse{
