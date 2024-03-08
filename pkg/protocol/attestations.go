@@ -43,7 +43,7 @@ func newAttestations(protocol *Protocol) *Attestations {
 	}
 
 	protocol.Constructed.OnTrigger(func() {
-		shutdown := lo.Batch(
+		shutdown := lo.BatchReverse(
 			a.initCommitmentVerifiers(),
 			a.initRequester(),
 		)
@@ -76,7 +76,7 @@ func (a *Attestations) initCommitmentVerifiers() func() {
 
 // initRequester initializes the ticker that is used to send commitment requests.
 func (a *Attestations) initRequester() (shutdown func()) {
-	unsubscribeFromTicker := lo.Batch(
+	unsubscribeFromTicker := lo.BatchReverse(
 		a.protocol.Commitments.WithElements(func(commitment *Commitment) (shutdown func()) {
 			return commitment.RequestAttestations.WithNonEmptyValue(func(_ bool) (teardown func()) {
 				if commitment.CumulativeWeight.Get() == 0 {
