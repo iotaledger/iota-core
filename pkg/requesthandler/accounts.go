@@ -208,6 +208,7 @@ func (r *RequestHandler) SelectedCommittee(epoch iotago.EpochIndex) (*api.Commit
 		if committee[i].PoolStake == committee[j].PoolStake {
 			return committee[i].AddressBech32 < committee[j].AddressBech32
 		}
+
 		return committee[i].PoolStake > committee[j].PoolStake
 	})
 
