@@ -65,7 +65,7 @@ func runWebSocketStreams(component *app.Component) {
 		unhook := lo.Batch(
 			dashboardmetrics.Events.ComponentCounterUpdated.Hook(func(event *dashboardmetrics.ComponentCounterUpdatedEvent) {
 				process(&componentsmetric{
-					Store:      event.ComponentStatus[dashboardmetrics.Attached],
+					Store:      event.ComponentStatus[dashboardmetrics.Allowed],
 					Solidifier: event.ComponentStatus[dashboardmetrics.Solidified],
 					Scheduler:  event.ComponentStatus[dashboardmetrics.Scheduled],
 					Booker:     event.ComponentStatus[dashboardmetrics.Booked],

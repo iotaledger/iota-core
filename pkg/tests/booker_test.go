@@ -879,7 +879,7 @@ func Test_BlockWithInvalidTransactionGetsBooked(t *testing.T) {
 	ts.CommitUntilSlot(block1Slot, vblock3.ID())
 
 	ts.AssertStorageCommitmentBlockAccepted(block1Slot, block1.ID(), true, ts.Nodes()...)
-	ts.AssertStorageCommitmentTransactionAccepted(block1Slot, lo.PanicOnErr(tx1.Transaction.ID()), false, ts.Nodes()...)
+	ts.AssertStorageCommitmentTransactionAccepted(block1Slot, tx1.Transaction.MustID(), false, ts.Nodes()...)
 }
 
 // This test checks that a fresh attachment of an orphaned transaction before it's evicted, can mark it as unorphaned.

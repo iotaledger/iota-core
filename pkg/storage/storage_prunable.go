@@ -18,15 +18,15 @@ func (s *Storage) Rewards() *epochstore.EpochKVStore {
 	return s.prunable.Rewards()
 }
 
-func (s *Storage) PoolStats() *epochstore.Store[*model.PoolsStats] {
+func (s *Storage) PoolStats() epochstore.Store[*model.PoolsStats] {
 	return s.prunable.PoolStats()
 }
 
-func (s *Storage) DecidedUpgradeSignals() *epochstore.Store[model.VersionAndHash] {
+func (s *Storage) DecidedUpgradeSignals() epochstore.Store[model.VersionAndHash] {
 	return s.prunable.DecidedUpgradeSignals()
 }
 
-func (s *Storage) Committee() *epochstore.Store[*account.SeatedAccounts] {
+func (s *Storage) Committee() epochstore.Store[*account.SeatedAccounts] {
 	return s.prunable.Committee()
 }
 
@@ -109,29 +109,12 @@ func (s *Storage) Roots(slot iotago.SlotIndex) (*slotstore.Store[iotago.Commitme
 	return s.prunable.Roots(slot)
 }
 
-func (s *Storage) Retainer(slot iotago.SlotIndex) (*slotstore.Retainer, error) {
+func (s *Storage) BlockMetadata(slot iotago.SlotIndex) (*slotstore.BlockMetadataStore, error) {
 	if err := s.permanent.Settings().AdvanceLatestStoredSlot(slot); err != nil {
-		return nil, ierrors.Wrap(err, "failed to advance latest stored slot when accessing retainer")
+		return nil, ierrors.Wrap(err, "failed to advance latest stored slot when accessing block metadata")
 	}
 
-	return s.prunable.Retainer(slot)
-}
-
-func (s *Storage) RestoreFromDisk() {
-	s.pruningLock.Lock()
-	defer s.pruningLock.Unlock()
-
-	lastPrunedEpoch := s.prunable.RestoreFromDisk()
-	// Return if it's epoch 0, leave the lastPrunedEpoch at the default value, indicating epoch 0 is not pruned yet.
-	if lastPrunedEpoch == 0 {
-		return
-	}
-
-	s.lastPrunedEpoch.MarkEvicted(lastPrunedEpoch)
-}
-
-func (s *Storage) Rollback(targetSlot iotago.SlotIndex) error {
-	return s.prunable.Rollback(s.pruningRange(targetSlot))
+	return s.prunable.BlockMetadata(slot)
 }
 
 func (s *Storage) pruningRange(targetSlot iotago.SlotIndex) (targetEpoch iotago.EpochIndex, startSlot iotago.SlotIndex, endSlot iotago.SlotIndex) {

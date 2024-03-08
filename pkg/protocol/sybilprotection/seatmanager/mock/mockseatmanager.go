@@ -21,7 +21,7 @@ import (
 type ManualPOA struct {
 	events         *seatmanager.Events
 	apiProvider    iotago.APIProvider
-	committeeStore *epochstore.Store[*account.SeatedAccounts]
+	committeeStore epochstore.Store[*account.SeatedAccounts]
 
 	accounts  *account.Accounts
 	committee *account.SeatedAccounts
@@ -31,7 +31,7 @@ type ManualPOA struct {
 	module.Module
 }
 
-func NewManualPOA(e iotago.APIProvider, committeeStore *epochstore.Store[*account.SeatedAccounts]) *ManualPOA {
+func NewManualPOA(e iotago.APIProvider, committeeStore epochstore.Store[*account.SeatedAccounts]) *ManualPOA {
 	m := &ManualPOA{
 		events:         seatmanager.NewEvents(),
 		apiProvider:    e,

@@ -7,6 +7,10 @@ import (
 	"github.com/iotaledger/hive.go/runtime/ioutils"
 )
 
+const (
+	defaultPermissions = 0o755
+)
+
 // Directory represents a directory on the disk.
 type Directory struct {
 	path string
@@ -60,5 +64,3 @@ func (d *Directory) SubDirs() ([]string, error) {
 
 	return dirs, err
 }
-
-const defaultPermissions = 0o755

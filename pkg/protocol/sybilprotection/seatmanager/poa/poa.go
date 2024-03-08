@@ -25,7 +25,7 @@ type SeatManager struct {
 	apiProvider iotago.APIProvider
 
 	committee       *account.SeatedAccounts
-	committeeStore  *epochstore.Store[*account.SeatedAccounts]
+	committeeStore  epochstore.Store[*account.SeatedAccounts]
 	activityTracker activitytracker.ActivityTracker
 
 	committeeMutex syncutils.RWMutex
