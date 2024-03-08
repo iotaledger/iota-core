@@ -68,7 +68,7 @@ func (r *RequestHandler) registeredValidatorsFromCache(index iotago.EpochIndex) 
 func (r *RequestHandler) Validators(epochIndex iotago.EpochIndex, cursorIndex, pageSize uint32) (*api.ValidatorsResponse, error) {
 	apiForEpoch := r.APIProvider().APIForEpoch(epochIndex)
 	currentEpoch := apiForEpoch.TimeProvider().EpochFromSlot(r.protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot())
-	registeredValidators := make([]*api.ValidatorResponse, 0)
+	var registeredValidators []*api.ValidatorResponse
 	var err error
 
 	// return registered validators of current epoch from node, because they are not yet finalized.
@@ -77,7 +77,6 @@ func (r *RequestHandler) Validators(epochIndex iotago.EpochIndex, cursorIndex, p
 	} else {
 		registeredValidators, err = r.registeredValidatorsFromCache(epochIndex)
 	}
-
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get registered validators for epoch %d", epochIndex)
 	}
