@@ -92,7 +92,7 @@ func newChain(chains *Chains) *Chain {
 		commitments: shrinkingmap.New[iotago.SlotIndex, *Commitment](),
 	}
 
-	shutdown := lo.Batch(
+	shutdown := lo.BatchReverse(
 		c.initLogger(),
 		c.initDerivedProperties(),
 	)
@@ -191,7 +191,7 @@ func (c *Chain) LatestEngine() *engine.Engine {
 func (c *Chain) initLogger() (shutdown func()) {
 	c.Logger = c.chains.NewChildLogger("", true)
 
-	return lo.Batch(
+	return lo.BatchReverse(
 		c.WarpSyncMode.LogUpdates(c, log.LevelTrace, "WarpSyncMode"),
 		c.LatestSyncedSlot.LogUpdates(c, log.LevelTrace, "LatestSyncedSlot"),
 		c.OutOfSyncThreshold.LogUpdates(c, log.LevelTrace, "OutOfSyncThreshold"),
@@ -318,7 +318,7 @@ func (c *Chain) addCommitment(newCommitment *Commitment) (shutdown func()) {
 
 	c.LatestCommitment.Set(newCommitment)
 
-	return lo.Batch(
+	return lo.BatchReverse(
 		newCommitment.IsAttested.OnTrigger(func() { c.LatestAttestedCommitment.Set(newCommitment) }),
 		newCommitment.IsVerified.OnTrigger(func() { c.LatestProducedCommitment.Set(newCommitment) }),
 		newCommitment.IsSynced.OnTrigger(func() { c.LatestSyncedSlot.Set(newCommitment.Slot()) }),
