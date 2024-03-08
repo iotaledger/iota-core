@@ -188,6 +188,8 @@ func (s *Storage) Flush() {
 	s.prunable.Flush()
 }
 
+// Checks the correctness of the latest commitment
+// Additionally, for non-genesis slots it checks whether the ledger state corresponds to the state root
 func (s *Storage) CheckCorrectnessCommitmentLedgerState() error {
 
 	// Get the latest commitment

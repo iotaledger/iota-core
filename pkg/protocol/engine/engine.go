@@ -232,8 +232,7 @@ func New(
 				e.Reset()
 			}
 
-			// Check consistency of commitment and ledger state in the storage;
-			// In addition, check the correctness of computing commitment
+			// Check consistency of commitment and ledger state in the storage
 			if e.optsCheckCommitment {
 				if err := e.Storage.CheckCorrectnessCommitmentLedgerState(); err != nil {
 					panic(ierrors.Wrap(err, "commitment or ledger state are incorrect"))
