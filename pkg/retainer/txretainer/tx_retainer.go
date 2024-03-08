@@ -200,7 +200,7 @@ func NewProvider(opts ...options.Option[TransactionRetainer]) module.Provider[*e
 				})
 
 				// the transaction was marked as orphaned
-				transactionMetadata.OnOrphanedSlotUpdated(func(slot iotago.SlotIndex) {
+				transactionMetadata.OnOrphanedSlotUpdated(func(_ iotago.SlotIndex, slot iotago.SlotIndex) {
 					e.LogTrace("TxRetainer.TransactionOrphanedSlotUpdated", "tx", transactionMetadata.ID(), "slot", slot)
 
 					// transaction was orphaned for one of the following reasons:
