@@ -157,7 +157,7 @@ func (s *Storage) CheckCorrectnessCommitmentLedgerState() error {
 	latestCommitmentID := latestCommitment.ID()
 	latestCommittedSlotIndex := latestCommitment.Slot()
 
-	// Do all the following checks only for non-genesis slots
+	// Do the ledger state check only for non-genesis slots
 	// TODO: once the genesis slot provides the roots, change this
 	if latestCommittedSlotIndex > s.Settings().APIProvider().CommittedAPI().ProtocolParameters().GenesisSlot() {
 		// Get the state root in the permanent storage (that corresponds to the last commitment)
@@ -186,22 +186,21 @@ func (s *Storage) CheckCorrectnessCommitmentLedgerState() error {
 			return ierrors.Wrap(err, "root from prunable storage does not correspond to root from commitment")
 		}
 
-		// Recompute the commitment using roots.ID() from prunable storage and other information from permanent storage
-		computeCurrentCommitment := iotago.NewCommitment(
-			latestCommitment.Commitment().ProtocolVersion,
-			latestCommittedSlotIndex,
-			latestCommitment.PreviousCommitmentID(),
-			latestCommitment.RootsID(),
-			latestCommitment.CumulativeWeight(),
-			latestCommitment.ReferenceManaCost(),
-		)
-		computeCurrentCommitmentID := computeCurrentCommitment.MustID()
+	}
 
-		// Check if the computed commitment ID matches the stored one
-		if computeCurrentCommitmentID != latestCommitmentID {
-			return ierrors.Wrap(err, "Computed commitment ID is different from the stored one")
-		}
+	// Verify the correctness of the slot commitment
+	computeCurrentCommitment := iotago.NewCommitment(
+		latestCommitment.Commitment().ProtocolVersion,
+		latestCommittedSlotIndex,
+		latestCommitment.PreviousCommitmentID(),
+		latestCommitment.RootsID(),
+		latestCommitment.CumulativeWeight(),
+		latestCommitment.ReferenceManaCost(),
+	)
+	computeCurrentCommitmentID := computeCurrentCommitment.MustID()
 
+	if computeCurrentCommitmentID != latestCommitmentID {
+		return ierrors.New("Computed commitment ID is different from the stored one")
 	}
 
 	return nil
