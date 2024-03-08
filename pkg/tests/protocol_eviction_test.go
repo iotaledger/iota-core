@@ -61,7 +61,7 @@ func TestProtocol_Eviction(t *testing.T) {
 	node := ts.AddValidatorNode("node0")
 
 	ts.Run(false, map[string][]options.Option[protocol.Protocol]{
-		"node0": []options.Option[protocol.Protocol]{
+		"node0": {
 			protocol.WithSybilProtectionProvider(
 				sybilprotectionv1.NewProvider(
 					sybilprotectionv1.WithSeatManagerProvider(module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
@@ -71,7 +71,7 @@ func TestProtocol_Eviction(t *testing.T) {
 						onlineValidators := ds.NewSet[string]()
 
 						e.Constructed.OnTrigger(func() {
-							e.Events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
+							e.Events.BlockDAG.BlockAppended.Hook(func(block *blocks.Block) {
 								if block.ModelBlock().ProtocolBlock().Header.IssuerID == node.Validator.AccountID && onlineValidators.Add(node.Name) {
 									e.LogError("node online", "name", node.Name)
 									poa.SetOnline(onlineValidators.ToSlice()...)

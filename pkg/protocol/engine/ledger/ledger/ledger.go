@@ -35,16 +35,15 @@ type Ledger struct {
 
 	apiProvider iotago.APIProvider
 
-	utxoLedger               *utxoledger.Manager
-	accountsLedger           *accountsledger.Manager
-	manaManager              *mana.Manager
-	rmcManager               *rmc.Manager
-	sybilProtection          sybilprotection.SybilProtection
-	commitmentLoader         func(iotago.SlotIndex) (*model.Commitment, error)
-	memPool                  mempool.MemPool[ledger.BlockVoteRank]
-	spendDAG                 spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
-	retainTransactionFailure func(iotago.BlockID, error)
-	errorHandler             func(error)
+	utxoLedger       *utxoledger.Manager
+	accountsLedger   *accountsledger.Manager
+	manaManager      *mana.Manager
+	rmcManager       *rmc.Manager
+	sybilProtection  sybilprotection.SybilProtection
+	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)
+	memPool          mempool.MemPool[ledger.BlockVoteRank]
+	spendDAG         spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
+	errorHandler     func(error)
 
 	module.Module
 }
@@ -68,8 +67,6 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 				return l.sybilProtection.SeatManager().OnlineCommittee().Size()
 			})
 			e.Events.SpendDAG.LinkTo(l.spendDAG.Events())
-
-			l.setRetainTransactionFailureFunc(e.Retainer.RetainTransactionFailure)
 
 			l.memPool = mempoolv1.New(NewVM(l), l.resolveState, e.Storage.Mutations, e.Workers.CreateGroup("MemPool"), l.spendDAG, l.apiProvider, l.errorHandler)
 
@@ -118,10 +115,6 @@ func New(
 	}
 }
 
-func (l *Ledger) setRetainTransactionFailureFunc(retainTransactionFailure func(iotago.BlockID, error)) {
-	l.retainTransactionFailure = retainTransactionFailure
-}
-
 func (l *Ledger) OnTransactionAttached(handler func(transaction mempool.TransactionMetadata), opts ...event.Option) *event.Hook[func(metadata mempool.TransactionMetadata)] {
 	return l.memPool.OnTransactionAttached(handler, opts...)
 }
@@ -130,8 +123,7 @@ func (l *Ledger) AttachTransaction(block *blocks.Block) (attachedTransaction mem
 	if signedTransaction, hasTransaction := block.SignedTransaction(); hasTransaction {
 		signedTransactionMetadata, err := l.memPool.AttachSignedTransaction(signedTransaction, signedTransaction.Transaction, block.ID())
 		if err != nil {
-			l.retainTransactionFailure(block.ID(), err)
-			l.errorHandler(err)
+			l.errorHandler(ierrors.Wrapf(err, "failed to attach transaction %s to block %s", signedTransaction.Transaction.MustID(), block.ID()))
 
 			return nil, true
 		}
@@ -363,8 +355,10 @@ func (l *Ledger) RMCManager() *rmc.Manager {
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (l *Ledger) Reset() {
+	// ConflictDAG is evicted automatically when transaction are marked as evicted in the mempool.
 	l.memPool.Reset()
 	l.accountsLedger.Reset()
+	l.rmcManager.Reset()
 }
 
 func (l *Ledger) Shutdown() {

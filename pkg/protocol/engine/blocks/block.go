@@ -75,21 +75,21 @@ func (r *rootBlock) String() string {
 }
 
 // NewBlock creates a new Block with the given options.
-func NewBlock(data *model.Block) *Block {
+func NewBlock(modelBlock *model.Block) *Block {
 	return &Block{
 		witnesses:             ds.NewSet[account.SeatIndex](),
 		spenderIDs:            ds.NewSet[iotago.TransactionID](),
 		payloadSpenderIDs:     ds.NewSet[iotago.TransactionID](),
 		acceptanceRatifiers:   ds.NewSet[account.SeatIndex](),
 		confirmationRatifiers: ds.NewSet[account.SeatIndex](),
-		modelBlock:            data,
+		modelBlock:            modelBlock,
 		solid:                 reactive.NewVariable[bool](),
 		invalid:               reactive.NewVariable[bool](),
 		booked:                reactive.NewVariable[bool](),
 		accepted:              reactive.NewVariable[bool](),
 		weightPropagated:      reactive.NewVariable[bool](),
 		notarized:             reactive.NewEvent(),
-		workScore:             data.WorkScore(),
+		workScore:             modelBlock.WorkScore(),
 	}
 }
 
@@ -351,7 +351,7 @@ func (b *Block) AppendChild(child *Block, childType iotago.ParentsType) {
 }
 
 // Update publishes the given Block data to the underlying Block and marks it as no longer missing.
-func (b *Block) Update(data *model.Block) (wasPublished bool) {
+func (b *Block) Update(modelBlock *model.Block) (wasPublished bool) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
@@ -359,8 +359,8 @@ func (b *Block) Update(data *model.Block) (wasPublished bool) {
 		return
 	}
 
-	b.modelBlock = data
-	b.workScore = data.WorkScore()
+	b.modelBlock = modelBlock
+	b.workScore = modelBlock.WorkScore()
 	b.missing = false
 
 	return true

@@ -118,7 +118,7 @@ func (w *Wallet) Transactions(transactionNames ...string) []*iotago.Transaction 
 }
 
 func (w *Wallet) TransactionID(alias string) iotago.TransactionID {
-	return lo.PanicOnErr(w.Transaction(alias).ID())
+	return w.Transaction(alias).MustID()
 }
 
 func (w *Wallet) Address(index ...uint32) iotago.DirectUnlockableAddress {

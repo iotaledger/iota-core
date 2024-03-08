@@ -11,11 +11,9 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	inx "github.com/iotaledger/inx/go"
-	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 func (s *Server) ReadActiveRootBlocks(_ context.Context, _ *inx.NoParams) (*inx.RootBlocksResponse, error) {
@@ -148,7 +146,7 @@ func (s *Server) ListenToConfirmedBlocks(_ *inx.NoParams, srv inx.INX_ListenToCo
 	return ctx.Err()
 }
 
-func (s *Server) ReadAcceptedBlocks(slot *inx.SlotIndex, srv inx.INX_ReadAcceptedBlocksServer) error {
+func (s *Server) ReadAcceptedBlocks(slot *inx.SlotRequest, srv inx.INX_ReadAcceptedBlocksServer) error {
 	blocksStore, err := deps.Protocol.Engines.Main.Get().Storage.Blocks(slot.Unwrap())
 	if err != nil {
 		return status.Errorf(codes.InvalidArgument, "failed to get blocks: %s", err.Error())
@@ -188,39 +186,18 @@ func (s *Server) attachBlock(ctx context.Context, block *iotago.Block) (*inx.Blo
 	mergedCtx, mergedCtxCancel := contextutils.MergeContexts(ctx, Component.Daemon().ContextStopped())
 	defer mergedCtxCancel()
 
-	blockID, err := deps.BlockHandler.AttachBlock(mergedCtx, block)
+	blockID, err := deps.RequestHandler.AttachBlock(mergedCtx, block)
 	if err != nil {
-		switch {
-		case ierrors.Is(err, blockhandler.ErrBlockAttacherInvalidBlock):
-			return nil, status.Errorf(codes.InvalidArgument, "failed to attach block: %s", err.Error())
-
-		case ierrors.Is(err, blockhandler.ErrBlockAttacherAttachingNotPossible):
-			return nil, status.Errorf(codes.Internal, "failed to attach block: %s", err.Error())
-
-		default:
-			return nil, status.Errorf(codes.Internal, "failed to attach block: %s", err.Error())
-		}
+		return nil, status.Errorf(codes.Internal, "failed to attach block: %s", err.Error())
 	}
 
 	return inx.NewBlockId(blockID), nil
 }
 
 func getINXBlockMetadata(blockID iotago.BlockID) (*inx.BlockMetadata, error) {
-	retainerBlockMetadata, err := deps.Protocol.Engines.Main.Get().Retainer.BlockMetadata(blockID)
+	blockMetadata, err := deps.Protocol.Engines.Main.Get().BlockRetainer.BlockMetadata(blockID)
 	if err != nil {
 		return nil, ierrors.Errorf("failed to get BlockMetadata: %v", err)
-	}
-
-	// TODO: the retainer should store the blockMetadataResponse directly
-	blockMetadata := &api.BlockMetadataResponse{
-		BlockID:            retainerBlockMetadata.BlockID,
-		BlockState:         retainerBlockMetadata.BlockState,
-		BlockFailureReason: retainerBlockMetadata.BlockFailureReason,
-		TransactionMetadata: &api.TransactionMetadataResponse{
-			TransactionID:            iotago.EmptyTransactionID, // TODO: change the retainer to store the transaction ID
-			TransactionState:         retainerBlockMetadata.TransactionState,
-			TransactionFailureReason: retainerBlockMetadata.TransactionFailureReason,
-		},
 	}
 
 	return inx.WrapBlockMetadata(blockMetadata)

@@ -264,7 +264,7 @@ func (o *SybilProtection) Export(writer io.WriteSeeker, targetSlot iotago.SlotIn
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (o *SybilProtection) Reset() {
-	// TODO: check if performance tracker needs to be reset
+	o.performanceTracker.Reset(o.lastCommittedSlot)
 }
 
 func (o *SybilProtection) slotFinalized(slot iotago.SlotIndex) {
@@ -371,9 +371,14 @@ func (o *SybilProtection) OrderedRegisteredCandidateValidatorsList(epoch iotago.
 	}); err != nil {
 		return nil, ierrors.Wrapf(err, "failed to iterate over eligible validator candidates")
 	}
-	// sort candidates by stake
+
+	// sort validators by pool stake, then by address
 	sort.Slice(validatorResp, func(i int, j int) bool {
-		return validatorResp[i].ValidatorStake > validatorResp[j].ValidatorStake
+		if validatorResp[i].PoolStake == validatorResp[j].PoolStake {
+			return validatorResp[i].AddressBech32 < validatorResp[j].AddressBech32
+		}
+
+		return validatorResp[i].PoolStake > validatorResp[j].PoolStake
 	})
 
 	return validatorResp, nil

@@ -59,13 +59,14 @@ type Engine struct {
 	SlotGadget          slotgadget.Gadget
 	SybilProtection     sybilprotection.SybilProtection
 	Notarization        notarization.Notarization
+	SyncManager         syncmanager.SyncManager
 	Attestations        attestation.Attestations
 	Ledger              ledger.Ledger
 	Scheduler           scheduler.Scheduler
 	TipManager          tipmanager.TipManager
 	TipSelection        tipselection.TipSelection
-	Retainer            retainer.Retainer
-	SyncManager         syncmanager.SyncManager
+	BlockRetainer       retainer.BlockRetainer
+	TxRetainer          retainer.TransactionRetainer
 	UpgradeOrchestrator upgrade.Orchestrator
 
 	// RootCommitment contains the earliest commitment that that blocks we are solidifying will refer to, and is mainly
@@ -105,14 +106,15 @@ func New(
 	slotGadgetProvider module.Provider[*Engine, slotgadget.Gadget],
 	sybilProtectionProvider module.Provider[*Engine, sybilprotection.SybilProtection],
 	notarizationProvider module.Provider[*Engine, notarization.Notarization],
+	syncManagerProvider module.Provider[*Engine, syncmanager.SyncManager],
 	attestationProvider module.Provider[*Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*Engine, ledger.Ledger],
 	schedulerProvider module.Provider[*Engine, scheduler.Scheduler],
 	tipManagerProvider module.Provider[*Engine, tipmanager.TipManager],
 	tipSelectionProvider module.Provider[*Engine, tipselection.TipSelection],
-	retainerProvider module.Provider[*Engine, retainer.Retainer],
+	blockRetainerProvider module.Provider[*Engine, retainer.BlockRetainer],
+	txRetainerProvider module.Provider[*Engine, retainer.TransactionRetainer],
 	upgradeOrchestratorProvider module.Provider[*Engine, upgrade.Orchestrator],
-	syncManagerProvider module.Provider[*Engine, syncmanager.SyncManager],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
 	var importSnapshot bool
@@ -167,14 +169,15 @@ func New(
 			e.BlockGadget = blockGadgetProvider(e)
 			e.SlotGadget = slotGadgetProvider(e)
 			e.Notarization = notarizationProvider(e)
+			e.SyncManager = syncManagerProvider(e)
 			e.Attestations = attestationProvider(e)
 			e.Ledger = ledgerProvider(e)
 			e.TipManager = tipManagerProvider(e)
 			e.Scheduler = schedulerProvider(e)
 			e.TipSelection = tipSelectionProvider(e)
-			e.Retainer = retainerProvider(e)
+			e.BlockRetainer = blockRetainerProvider(e)
+			e.TxRetainer = txRetainerProvider(e)
 			e.UpgradeOrchestrator = upgradeOrchestratorProvider(e)
-			e.SyncManager = syncManagerProvider(e)
 		},
 		(*Engine).setupBlockStorage,
 		(*Engine).setupEvictionState,
@@ -251,7 +254,9 @@ func (e *Engine) ProcessBlockFromPeer(block *model.Block, source peer.ID) {
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (e *Engine) Reset() {
-	e.LogDebug("resetting", "target-slot", e.Storage.Settings().LatestCommitment().Slot())
+	latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
+
+	e.LogDebug("resetting", "target-slot", latestCommittedSlot)
 
 	// Reset should be performed in the same order as Shutdown.
 	e.BlockRequester.Clear()
@@ -261,7 +266,7 @@ func (e *Engine) Reset() {
 	e.Attestations.Reset()
 	e.SyncManager.Reset()
 	e.Notarization.Reset()
-	e.SlotGadget.Reset()
+	e.SlotGadget.Reset(latestCommittedSlot)
 	e.BlockGadget.Reset()
 	e.UpgradeOrchestrator.Reset()
 	e.SybilProtection.Reset()
@@ -270,12 +275,12 @@ func (e *Engine) Reset() {
 	e.PostSolidFilter.Reset()
 	e.BlockDAG.Reset()
 	e.PreSolidFilter.Reset()
-	e.Retainer.Reset()
+	e.BlockRetainer.Reset()
+	e.TxRetainer.Reset(latestCommittedSlot)
 	e.EvictionState.Reset()
 	e.BlockCache.Reset()
 	e.Storage.Reset()
 
-	latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
 	latestCommittedTime := e.APIForSlot(latestCommittedSlot).TimeProvider().SlotEndTime(latestCommittedSlot)
 	e.Clock.Reset(latestCommittedTime)
 }
@@ -506,7 +511,7 @@ func (e *Engine) setupBlockRequester() {
 	e.Events.BlockDAG.BlockMissing.Hook(func(block *blocks.Block) {
 		e.BlockRequester.StartTicker(block.ID())
 	})
-	e.Events.BlockDAG.MissingBlockAttached.Hook(func(block *blocks.Block) {
+	e.Events.BlockDAG.MissingBlockAppended.Hook(func(block *blocks.Block) {
 		e.BlockRequester.StopTicker(block.ID())
 	}, event.WithWorkerPool(e.Workers.CreatePool("BlockRequester", workerpool.WithWorkerCount(1)))) // Using just 1 worker to avoid contention
 }
@@ -608,7 +613,8 @@ func (e *Engine) initReactiveModule(parentLogger log.Logger) (reactiveModule *mo
 		e.PostSolidFilter.Shutdown()
 		e.BlockDAG.Shutdown()
 		e.PreSolidFilter.Shutdown()
-		e.Retainer.Shutdown()
+		e.BlockRetainer.Shutdown()
+		e.TxRetainer.Shutdown()
 		e.Workers.Shutdown()
 		e.Storage.Shutdown()
 

@@ -20,6 +20,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
+	"github.com/iotaledger/iota-core/pkg/retainer"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -44,7 +45,7 @@ type Events struct {
 	Scheduler       *scheduler.Events
 	SeatManager     *seatmanager.Events
 	SyncManager     *syncmanager.Events
-
+	Retainer        *retainer.Events
 	event.Group[Events, *Events]
 }
 
@@ -70,5 +71,6 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		Scheduler:              scheduler.NewEvents(),
 		SeatManager:            seatmanager.NewEvents(),
 		SyncManager:            syncmanager.NewEvents(),
+		Retainer:               retainer.NewEvents(),
 	}
 })

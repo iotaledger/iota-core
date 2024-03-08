@@ -1,8 +1,6 @@
 package presolidblockfilter
 
 import (
-	"time"
-
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -16,9 +14,8 @@ import (
 )
 
 var (
-	ErrBlockTimeTooFarAheadInFuture = ierrors.New("a block cannot be too far ahead in the future")
-	ErrValidatorNotInCommittee      = ierrors.New("validation block issuer is not in the committee")
-	ErrInvalidBlockVersion          = ierrors.New("block has invalid protocol version")
+	ErrValidatorNotInCommittee = ierrors.New("validation block issuer is not in the committee")
+	ErrInvalidBlockVersion     = ierrors.New("block has invalid protocol version")
 )
 
 // PreSolidBlockFilter filters blocks.
@@ -26,8 +23,6 @@ type PreSolidBlockFilter struct {
 	events *presolidfilter.Events
 
 	apiProvider iotago.APIProvider
-
-	optsMaxAllowedWallClockDrift time.Duration
 
 	committeeFunc func(iotago.SlotIndex) (*account.SeatedAccounts, bool)
 
@@ -78,18 +73,6 @@ func (f *PreSolidBlockFilter) ProcessReceivedBlock(block *model.Block, source pe
 		return
 	}
 
-	// Verify the timestamp is not too far in the future.
-	timeDelta := time.Since(block.ProtocolBlock().Header.IssuingTime)
-	if timeDelta < -f.optsMaxAllowedWallClockDrift {
-		f.events.BlockPreFiltered.Trigger(&presolidfilter.BlockPreFilteredEvent{
-			Block:  block,
-			Reason: ierrors.Wrapf(ErrBlockTimeTooFarAheadInFuture, "issuing time ahead %s vs %s allowed", -timeDelta, f.optsMaxAllowedWallClockDrift),
-			Source: source,
-		})
-
-		return
-	}
-
 	if _, isValidation := block.ValidationBlock(); isValidation {
 		blockSlot := block.ProtocolBlock().API.TimeProvider().SlotFromTime(block.ProtocolBlock().Header.IssuingTime)
 		committee, exists := f.committeeFunc(blockSlot)
@@ -122,11 +105,4 @@ func (f *PreSolidBlockFilter) Reset() { /* nothing to reset but comply with inte
 
 func (f *PreSolidBlockFilter) Shutdown() {
 	f.TriggerStopped()
-}
-
-// WithMaxAllowedWallClockDrift specifies how far in the future are blocks allowed to be ahead of our own wall clock (defaults to 0 seconds).
-func WithMaxAllowedWallClockDrift(d time.Duration) options.Option[PreSolidBlockFilter] {
-	return func(filter *PreSolidBlockFilter) {
-		filter.optsMaxAllowedWallClockDrift = d
-	}
 }
