@@ -67,7 +67,7 @@ func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 	}
 	slotRange := uint32(requestedSlot) / restapi.ParamsRestAPI.RequestsMemoryCacheGranularity
 
-	return deps.RequestHandler.Validators(slotRange, pageSize, cursorIndex)
+	return deps.RequestHandler.Validators(slotRange, cursorIndex, pageSize)
 }
 
 func validatorByAccountAddress(c echo.Context) (*api.ValidatorResponse, error) {
