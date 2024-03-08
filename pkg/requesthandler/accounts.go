@@ -8,7 +8,6 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -250,10 +249,4 @@ func (r *RequestHandler) SelectedCommittee(epoch iotago.EpochIndex) (*api.Commit
 		TotalStake:          accounts.TotalStake(),
 		TotalValidatorStake: accounts.TotalValidatorStake(),
 	}, nil
-}
-
-func WithCacheMaxSizeOptions(size int) options.Option[RequestHandler] {
-	return func(r *RequestHandler) {
-		r.optsCacheMaxSize = size
-	}
 }
