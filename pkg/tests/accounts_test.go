@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -218,7 +219,6 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	require.NoError(t, err)
 
 	var block1Slot iotago.SlotIndex = 1
-	ts.DefaultWallet().GetNewBlockIssuanceResponse()
 	tx1 := ts.DefaultWallet().CreateAccountFromInput(
 		"TX1",
 		"Genesis:0",
@@ -816,6 +816,7 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 	block3Slot := ts.CurrentSlot()
 	newExpirySlot = block3Slot + ts.API.ProtocolParameters().MaxCommittableAge()
 	{
+
 		// Prepare a transaction that will try to spend an AccountOutput of an already unlocked account.
 		tx3 := wallet1.TransitionAccount(
 			"TX3",
@@ -825,6 +826,7 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 		)
 
 		block3Commitment := node1.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment()
+		fmt.Printf("block3Commitment slot: %d\n", block3Commitment.Slot)
 
 		// Wallet 1, which already has non-negative BIC issues the block.
 		block3 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block3", wallet1, tx3, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block3Commitment)))

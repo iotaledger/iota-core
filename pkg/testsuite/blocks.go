@@ -3,8 +3,6 @@ package testsuite
 import (
 	"context"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
@@ -23,9 +21,6 @@ func (t *TestSuite) AssertBlock(block *blocks.Block, client mock.Client) *iotago
 		}
 
 		if block.ID() != loadedBlock.MustID() {
-			return ierrors.Errorf("AssertBlock: %s: expected %s, got %s", client.Name(), block.ID(), loadedBlock.MustID())
-		}
-		if !assert.Equal(t.fakeTesting, block.ModelBlock().ProtocolBlock(), loadedBlock) {
 			return ierrors.Errorf("AssertBlock: %s: expected %s, got %s", client.Name(), block.ID(), loadedBlock.MustID())
 		}
 

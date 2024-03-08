@@ -196,7 +196,7 @@ func (w *Wallet) DelayedClaimingTransition(transactionName string, inputName str
 		transactionName,
 		[]uint32{0},
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.latestBlockIssuanceResp.LatestCommitment.MustID(),
+			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithInputs(input),
 		WithOutputs(delegationOutput),
@@ -227,7 +227,7 @@ func (w *Wallet) TransitionAccount(transactionName string, inputName string, opt
 			AccountID: accountOutput.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.latestBlockIssuanceResp.LatestCommitment.MustID(),
+			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithOutputs(accountOutput),
 	)
@@ -260,7 +260,7 @@ func (w *Wallet) TransitionAccounts(transactionName string, inputNames []string,
 		WithInputs(inputs...),
 		WithOutputs(outputs...),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.latestBlockIssuanceResp.LatestCommitment.MustID(),
+			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 	)
 
@@ -296,7 +296,7 @@ func (w *Wallet) DestroyAccount(transactionName string, inputName string) *iotag
 			AccountID: inputAccount.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.latestBlockIssuanceResp.LatestCommitment.MustID(),
+			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithAccountInput(input),
 		WithOutputs(destructionOutputs...),
@@ -418,7 +418,7 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string
 			AccountID: implicitAccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.latestBlockIssuanceResp.LatestCommitment.MustID(),
+			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithInputs(inputs...),
 		WithOutputs(accountOutput),

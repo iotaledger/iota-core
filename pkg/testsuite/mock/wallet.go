@@ -180,15 +180,10 @@ func (w *Wallet) AddressSigner(indexes ...uint32) iotago.AddressSigner {
 }
 
 func (w *Wallet) LatestBlockIssuanceResponse() *api.IssuanceBlockHeaderResponse {
+	// if the response is not cached, query the node for the latest block issuance.
 	if w.latestBlockIssuanceResp == nil {
-		panic(ierrors.Errorf("latest block issuance response not set for wallet %s", w.Name))
+		w.latestBlockIssuanceResp = w.Client.BlockIssuance(context.Background())
 	}
-
-	return w.latestBlockIssuanceResp
-}
-
-func (w *Wallet) GetNewBlockIssuanceResponse() *api.IssuanceBlockHeaderResponse {
-	w.latestBlockIssuanceResp = w.Client.BlockIssuance(context.Background())
 
 	return w.latestBlockIssuanceResp
 }

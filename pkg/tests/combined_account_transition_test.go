@@ -78,7 +78,6 @@ func createFullAccount(ts *testsuite.TestSuite) iotago.AccountID {
 	// set the expiry slot of the transitioned genesis account to the latest committed + MaxCommittableAge
 	newAccountExpirySlot := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot() + ts.API.ProtocolParameters().MaxCommittableAge()
 
-	ts.DefaultWallet().GetNewBlockIssuanceResponse()
 	tx1 := ts.DefaultWallet().CreateAccountFromInput(
 		"TX2",
 		"TX1:0",
