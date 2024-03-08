@@ -466,18 +466,19 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 	// This should be booked on the rejected tx1 conflict
 	tx4 := wallet.CreateBasicOutputsEquallyFromInput("tx4", 1, "tx1:0")
 
-	// Issue TX3 on top of rejected TX1 and 1 commitment on node2 (committed to slot 1)
+	// Issue TX4 on top of rejected TX1 and 1 commitment on node2 (committed to slot 1)
 	{
 		wallet.SetDefaultNode(node2)
 		ts.IssueBasicBlockWithOptions("n2-commit1", wallet, tx4, mock.WithSlotCommitment(commitment1))
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
-			ts.Block("n2-commit1"): {}, // no conflits inherited as the block is invalid and doesn't get booked.
+			ts.Block("n2-commit1"): {}, // no conflicts inherited as the block is invalid and doesn't get booked.
 			ts.Block("block2.tx1"): {"tx1"},
 		}, node2)
 
 		ts.AssertTransactionsExist(wallet.Transactions("tx1"), true, node2)
 		ts.AssertTransactionsInCacheRejected(wallet.Transactions("tx4"), true, node2)
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx4"), true, node2)
 		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx4"), true, node2)
 
 		// As the block commits to 1 but spending something orphaned in 1 it should be invalid
@@ -485,7 +486,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-commit1"), true, node2)
 	}
 
-	// Issue a block on node1 that inherits a pending conflict that has been orphaned on node2
+	// Issue a block on node1 that inherits a rejected, but not yet orphaned conflict that has been orphaned on node2
 	{
 		ts.IssueValidationBlockWithHeaderOptions("n1-rejected-genesis", node1, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDs("block2.tx1")...))
 
@@ -532,7 +533,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 	ts.MergePartitionsToMain(lo.Keys(partitions)...)
 
-	// Sync up the nodes to he same point and check consistency between them.
+	// Sync up the nodes to the same point and check the consistency between them.
 	{
 		// Let node1 catch up with commitment 1
 		ts.IssueBlocksAtSlots("5.1", []iotago.SlotIndex{5}, 1, "5.0", ts.Nodes("node2"), false, false)
@@ -766,6 +767,278 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 	{
 		ts.AssertTransactionsExist(wallet.Transactions("tx1", "tx2"), true, node1, node2)
 		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1", "tx2"), true, node1, node2)
+
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{6, 7, 8, 9, 10}, 5, "5.1", ts.Nodes("node1", "node2"), false, false)
+
+		ts.AssertNodeState(ts.Nodes("node1", "node2"),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(8),
+			testsuite.WithEqualStoredCommitmentAtIndex(8),
+			testsuite.WithEvictedSlot(8),
+		)
+
+		ts.AssertTransactionsExist(wallet.Transactions("tx1", "tx2"), false, node1, node2)
+	}
+}
+
+func Test_ReattachRejectedCommittedRace(t *testing.T) {
+	ts := testsuite.NewTestSuite(t,
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				0,
+				testsuite.GenesisTimeWithOffsetBySlots(20, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				testsuite.DefaultSlotsPerEpochExponent,
+			),
+			iotago.WithLivenessOptions(
+				15,
+				15,
+				2,
+				5,
+				testsuite.DefaultEpochNearingThreshold,
+			),
+		),
+	)
+	defer ts.Shutdown()
+
+	node1 := ts.AddValidatorNode("node1")
+	node2 := ts.AddValidatorNode("node2")
+	wallet := ts.AddDefaultWallet(node1)
+
+	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
+
+	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
+		node1.Validator.AccountID,
+		node2.Validator.AccountID,
+	}, ts.Nodes()...)
+
+	genesisCommitment := lo.PanicOnErr(node1.Protocol.Engines.Main.Get().Storage.Commitments().Load(0)).Commitment()
+
+	tx1 := wallet.CreateBasicOutputsEquallyFromInput("tx1", 1, "Genesis:0")
+	tx2 := wallet.CreateBasicOutputsEquallyFromInput("tx2", 1, "Genesis:0")
+	// Create and issue double spends
+	{
+		wallet.SetDefaultNode(node1)
+		ts.SetCurrentSlot(1)
+		ts.IssueBasicBlockWithOptions("block1.1", wallet, tx1, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueBasicBlockWithOptions("block1.2", wallet, tx2, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.SetCurrentSlot(2)
+		ts.IssueValidationBlockWithHeaderOptions("block2.tx1", node1, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDs("block1.1")...))
+
+		ts.AssertTransactionsExist(wallet.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("block1.1"):   {"tx1"},
+			ts.Block("block1.2"):   {"tx2"},
+			ts.Block("block2.tx1"): {"tx1"},
+		}, node1, node2)
+
+		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
+			wallet.Transaction("tx2"): {"tx2"},
+			wallet.Transaction("tx1"): {"tx1"},
+		}, node1, node2)
+	}
+
+	// Issue some more blocks and assert that conflicts are propagated to blocks.
+	{
+		ts.IssueValidationBlockWithHeaderOptions("block2.1", node1, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDs("block1.1")...))
+		ts.IssueValidationBlockWithHeaderOptions("block2.2", node1, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDs("block1.2")...))
+
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("block2.1"):   {"tx1"},
+			ts.Block("block2.2"):   {"tx2"},
+			ts.Block("block2.tx1"): {"tx1"},
+		}, node1, node2)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1", "tx2"), true, node1, node2)
+	}
+
+	// Issue valid blocks that resolve the conflict.
+	{
+		ts.IssueValidationBlockWithHeaderOptions("block2.3", node2, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDs("block2.2")...))
+		ts.IssueValidationBlockWithHeaderOptions("block2.4", node1, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDs("block2.3")...))
+
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("block2.3"):   {"tx2"},
+			ts.Block("block2.tx1"): {"tx1"},
+		}, node1, node2)
+		ts.AssertTransactionsInCacheAccepted(wallet.Transactions("tx2"), true, node1, node2)
+		ts.AssertTransactionsInCacheRejected(wallet.Transactions("tx1"), true, node1, node2)
+	}
+
+	// Advance both nodes at the edge of slot 1 committability
+	{
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{2, 3, 4}, 1, "block2.4", ts.Nodes("node1", "node2"), false, false)
+
+		ts.AssertNodeState(ts.Nodes(),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(0),
+			testsuite.WithEqualStoredCommitmentAtIndex(0),
+			testsuite.WithEvictedSlot(0),
+		)
+
+		ts.SetCurrentSlot(5)
+		ts.IssueValidationBlockWithHeaderOptions("block5.1", node1, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDsWithPrefix("block1.1")...))
+		ts.IssueValidationBlockWithHeaderOptions("block5.2", node1, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDsWithPrefix("block1.2")...))
+
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("block5.1"):   {"tx1"}, // on rejected conflict
+			ts.Block("block5.2"):   {},      // accepted merged-to-master
+			ts.Block("block2.tx1"): {"tx1"},
+		}, node1, node2)
+
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{5}, 1, "4.0", ts.Nodes("node1"), false, false)
+
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("5.0"), true, ts.Nodes()...)
+	}
+
+	partitions := map[string][]*mock.Node{
+		"node1": {node1},
+		"node2": {node2},
+	}
+
+	// Split the nodes into partitions and commit slot 1 only on node2
+	{
+
+		ts.SplitIntoPartitions(partitions)
+
+		// Only node2 will commit after issuing this one
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{5}, 1, "5.0", ts.Nodes("node2"), false, false)
+
+		ts.AssertNodeState(ts.Nodes("node1"),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(0),
+			testsuite.WithEqualStoredCommitmentAtIndex(0),
+			testsuite.WithEvictedSlot(0),
+		)
+
+		ts.AssertNodeState(ts.Nodes("node2"),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(1),
+			testsuite.WithEqualStoredCommitmentAtIndex(1),
+			testsuite.WithEvictedSlot(1),
+		)
+	}
+
+	commitment1 := lo.PanicOnErr(node2.Protocol.Engines.Main.Get().Storage.Commitments().Load(1)).Commitment()
+
+	// This should be booked on the rejected tx1 conflict
+
+	// Issue a reattachment of the rejected TX1 with 1 commitment on node2 (committed to slot 1)
+	{
+		wallet.SetDefaultNode(node2)
+		ts.IssueBasicBlockWithOptions("n2-rejected-tx1-commit1", wallet, tx1, mock.WithSlotCommitment(commitment1))
+
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("n2-rejected-tx1-commit1"): {}, // no conflicts inherited as the block is invalid and doesn't get booked.
+			ts.Block("block2.tx1"):              {"tx1"},
+		}, node2)
+
+		ts.AssertTransactionsExist(wallet.Transactions("tx1"), true, node2)
+		ts.AssertTransactionsInCacheRejected(wallet.Transactions("tx1"), true, node2)
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1"), true, node2)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1"), true, node2)
+
+		// As the block commits to 1 but spending something orphaned in 1 it should be invalid
+		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-rejected-tx1-commit1"), false, node2)
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-rejected-tx1-commit1"), true, node2)
+	}
+
+	// Issue a reattachment of the rejected, but not yet orphaned TX1 that has been orphaned on node2
+	{
+		ts.IssueValidationBlockWithHeaderOptions("n1-rejected-tx1-genesis", node1, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDs("block2.tx1")...))
+
+		ts.AssertBlocksInCacheBooked(ts.Blocks("n1-rejected-tx1-genesis"), true, node1)
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("n1-rejected-tx1-genesis"), false, node1)
+
+		ts.AssertTransactionsInCacheRejected(wallet.Transactions("tx1"), true, node2)
+
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("block2.tx1"):              {"tx1"},
+			ts.Block("n1-rejected-tx1-genesis"): {"tx1"}, // on rejected conflict
+		}, node1)
+	}
+
+	// Issue reattachment of TX1 but Genesis commitment on node2 (committed to slot 1)
+	{
+		wallet.SetDefaultNode(node2)
+		ts.IssueBasicBlockWithOptions("n2-tx1-genesis", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")), mock.WithSlotCommitment(genesisCommitment))
+
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("n2-tx1-genesis"): {"tx1"}, // on rejected conflict
+		}, node2)
+
+		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-tx1-genesis"), true, node2)
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-tx1-genesis"), false, node2)
+	}
+
+	// Issue reattachment of TX1 but Genesis commitment on node1 (committed to slot 0)
+	{
+		wallet.SetDefaultNode(node1)
+		ts.IssueBasicBlockWithOptions("n1-tx1-genesis", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")), mock.WithSlotCommitment(genesisCommitment))
+
+		ts.AssertTransactionsExist(wallet.Transactions("tx1"), true, node2)
+		ts.AssertTransactionsInCacheRejected(wallet.Transactions("tx1"), true, node2)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1"), true, node2)
+
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("n1-tx1-genesis"): {"tx1"}, // on rejected conflict
+		}, node1)
+
+		ts.AssertBlocksInCacheBooked(ts.Blocks("n1-tx1-genesis"), true, node1)
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("n1-tx1-genesis"), false, node1)
+	}
+
+	ts.MergePartitionsToMain(lo.Keys(partitions)...)
+
+	// Sync up the nodes to the same point and check the consistency between them.
+	{
+		// Let node1 catch up with commitment 1
+		ts.IssueBlocksAtSlots("5.1", []iotago.SlotIndex{5}, 1, "5.0", ts.Nodes("node2"), false, false)
+
+		ts.AssertNodeState(ts.Nodes("node1", "node2"),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(1),
+			testsuite.WithEqualStoredCommitmentAtIndex(1),
+			testsuite.WithEvictedSlot(1),
+		)
+
+		// Exchange each-other blocks, ignoring invalidity
+		wallet.SetDefaultNode(node1)
+		ts.IssueExistingBlock("n2-tx1-genesis", wallet)
+		ts.IssueExistingBlock("n2-rejected-tx1-commit1", wallet)
+		wallet.SetDefaultNode(node2)
+		ts.IssueExistingBlock("n1-tx1-genesis", wallet)
+		ts.IssueExistingBlock("n1-rejected-tx1-genesis", wallet)
+
+		ts.IssueValidationBlockWithHeaderOptions("n1-rejected-tx1-commit1", node1, mock.WithSlotCommitment(commitment1), mock.WithStrongParents(ts.BlockIDs("n1-tx1-genesis")...))
+		// Needs reissuing on node2 because it is invalid
+		ts.IssueExistingBlock("n1-rejected-tx1-commit1", wallet)
+
+		// The nodes agree on the results of the invalid blocks
+		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-tx1-genesis", "n1-tx1-genesis", "n1-rejected-tx1-genesis"), true, node1, node2)
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-tx1-genesis", "n1-tx1-genesis", "n1-rejected-tx1-genesis"), false, node1, node2)
+
+		// This block propagates the orphaned conflict from Tangle
+		ts.AssertBlocksInCacheBooked(ts.Blocks("n1-rejected-tx1-commit1"), true, node1, node2)
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("n1-rejected-tx1-commit1"), false, node1, node2)
+
+		// This block spends an orphaned conflict from its Transaction
+		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-rejected-tx1-commit1"), false, node1, node2)
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-rejected-tx1-commit1"), true, node1, node2)
+
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("n1-tx1-genesis"):          {"tx1"}, // on rejected conflict
+			ts.Block("n2-tx1-genesis"):          {"tx1"}, // on rejected conflict
+			ts.Block("n1-rejected-tx1-genesis"): {"tx1"}, // on rejected conflict
+			ts.Block("n2-rejected-tx1-commit1"): {},      // invalid block
+			ts.Block("n1-rejected-tx1-commit1"): {},      // merged-to-master
+		}, node1, node2)
+	}
+
+	// Commit further and test eviction of transactions
+	{
+		ts.AssertTransactionsExist(wallet.Transactions("tx1", "tx2"), true, node1, node2)
 
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{6, 7, 8, 9, 10}, 5, "5.1", ts.Nodes("node1", "node2"), false, false)
 
@@ -1046,7 +1319,7 @@ func Test_OrphanedTransactionRace_Scenario1(t *testing.T) {
 // that a fresh attachment of an orphaned transaction before it's evicted, can mark it as unorphaned.
 // On the other node, the transaction is evicted before a fresh attachment arrives,
 // simulating a possible race that could cause a divergence if both cases weren't handled correctly.
-// In the end, both nodes orphaned the transaction again and evict it from cache.
+// In the end, both nodes orphaned the transaction again and evicted it from the cache.
 func Test_OrphanedTransactionRace_Scenario2(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
