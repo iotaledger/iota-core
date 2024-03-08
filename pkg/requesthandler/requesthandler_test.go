@@ -1,0 +1,191 @@
+package requesthandler
+
+import (
+	"testing"
+
+	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
+	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/topstakers"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
+	"github.com/iotaledger/iota-core/pkg/testsuite"
+	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
+	"github.com/stretchr/testify/require"
+)
+
+func Test_ValidatorsAPI(t *testing.T) {
+	ts := testsuite.NewTestSuite(t,
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				0,
+				testsuite.GenesisTimeWithOffsetBySlots(200, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				4,
+			),
+			iotago.WithLivenessOptions(
+				10,
+				10,
+				2,
+				4,
+				5,
+			),
+			iotago.WithTargetCommitteeSize(3),
+		),
+	)
+	defer ts.Shutdown()
+
+	node1 := ts.AddValidatorNode("node1", testsuite.WithWalletAmount(1_000_006))
+	ts.AddValidatorNode("node2", testsuite.WithWalletAmount(1_000_005))
+	ts.AddValidatorNode("node3", testsuite.WithWalletAmount(1_000_004))
+	ts.AddValidatorNode("node4", testsuite.WithWalletAmount(1_000_003))
+	ts.AddDefaultWallet(node1)
+
+	nodeOpts := []options.Option[protocol.Protocol]{
+		protocol.WithNotarizationProvider(
+			slotnotarization.NewProvider(),
+		),
+		protocol.WithSybilProtectionProvider(
+			sybilprotectionv1.NewProvider(
+				sybilprotectionv1.WithSeatManagerProvider(
+					topstakers.NewProvider(),
+				),
+			),
+		),
+	}
+
+	ts.Run(true, map[string][]options.Option[protocol.Protocol]{
+		"node1": nodeOpts,
+		"node2": nodeOpts,
+		"node3": nodeOpts,
+		"node4": nodeOpts,
+	})
+	ts.DefaultWallet().Node.Protocol.SetLogLevel(log.LevelTrace)
+
+	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
+		ts.Node("node1").Validator.AccountID,
+		ts.Node("node2").Validator.AccountID,
+		ts.Node("node3").Validator.AccountID,
+	}, ts.Nodes()...)
+
+	requestHandler := New(ts.DefaultWallet().Node.Protocol)
+	hrp := ts.API.ProtocolParameters().Bech32HRP()
+
+	// Select committee for epoch 1 and test candidacy announcements at different times.
+	{
+		ts.IssueBlocksAtSlots("wave-1:", []iotago.SlotIndex{1, 2, 3, 4}, 4, "Genesis", ts.Nodes(), true, false)
+
+		ts.IssueCandidacyAnnouncementInSlot("node1-candidacy:1", 4, "wave-1:4.3", ts.Wallet("node1"))
+		ts.IssueCandidacyAnnouncementInSlot("node4-candidacy:1", 5, "node1-candidacy:1", ts.Wallet("node4"))
+
+		ts.IssueBlocksAtSlots("wave-2:", []iotago.SlotIndex{5, 6, 7, 8}, 4, "node4-candidacy:1", ts.Nodes(), true, false)
+
+		// Assert that only candidates that issued before slot 11 are considered.
+		ts.AssertSybilProtectionCandidates(0, []iotago.AccountID{
+			ts.Node("node1").Validator.AccountID,
+			ts.Node("node4").Validator.AccountID,
+		}, ts.Nodes()...)
+
+		ts.AssertSybilProtectionRegisteredValidators(0, []string{
+			ts.Node("node1").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node4").Validator.AccountID.ToAddress().Bech32(hrp),
+		}, ts.Nodes()...)
+
+		assertValidatorsFromRequestHandler(t, []string{
+			ts.Node("node1").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node4").Validator.AccountID.ToAddress().Bech32(hrp),
+		}, requestHandler, 0)
+	}
+
+	{
+		ts.IssueCandidacyAnnouncementInSlot("node2-candidacy:1", 9, "wave-2:8.3", ts.Wallet("node2"))
+		ts.IssueBlocksAtSlots("wave-3:", []iotago.SlotIndex{9, 10}, 4, "node2-candidacy:1", ts.Nodes(), true, false)
+
+		ts.AssertSybilProtectionCandidates(0, []iotago.AccountID{
+			ts.Node("node1").Validator.AccountID,
+			ts.Node("node2").Validator.AccountID,
+			ts.Node("node4").Validator.AccountID,
+		}, ts.Nodes()...)
+
+		ts.AssertSybilProtectionRegisteredValidators(0, []string{
+			ts.Node("node1").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node2").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node4").Validator.AccountID.ToAddress().Bech32(hrp),
+		}, ts.Nodes()...)
+
+		assertValidatorsFromRequestHandler(t, []string{
+			ts.Node("node1").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node2").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node4").Validator.AccountID.ToAddress().Bech32(hrp),
+		}, requestHandler, 0)
+	}
+
+	{
+		// Those candidacies should not be considered as they're issued after EpochNearingThreshold (slot 10).
+		ts.IssueCandidacyAnnouncementInSlot("node3-candidacy:1", 11, "wave-3:10.3", ts.Wallet("node3"))
+		ts.IssueBlocksAtSlots("wave-5:", []iotago.SlotIndex{11}, 4, "node3-candidacy:1", ts.Nodes(), true, false)
+
+		ts.AssertSybilProtectionCandidates(0, []iotago.AccountID{
+			ts.Node("node1").Validator.AccountID,
+			ts.Node("node2").Validator.AccountID,
+			ts.Node("node4").Validator.AccountID,
+		}, ts.Nodes()...)
+
+		ts.AssertSybilProtectionRegisteredValidators(0, []string{
+			ts.Node("node1").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node2").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node4").Validator.AccountID.ToAddress().Bech32(hrp),
+		}, ts.Nodes()...)
+
+		assertValidatorsFromRequestHandler(t, []string{
+			ts.Node("node1").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node2").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node4").Validator.AccountID.ToAddress().Bech32(hrp),
+		}, requestHandler, 0)
+	}
+
+	{
+		ts.IssueBlocksAtSlots("wave-6:", []iotago.SlotIndex{12, 13, 14, 15, 16}, 4, "wave-5:11.3", ts.Nodes(), true, false)
+
+		ts.IssueCandidacyAnnouncementInSlot("node2-candidacy:2", 17, "wave-6:16.3", ts.Wallet("node2"))
+		ts.IssueCandidacyAnnouncementInSlot("node3-candidacy:2", 17, "node2-candidacy:2", ts.Wallet("node3"))
+		ts.IssueBlocksAtSlots("wave-7:", []iotago.SlotIndex{18}, 4, "node3-candidacy:2", ts.Nodes(), true, false)
+
+		// advance to next epoch, the validator cache should be used.
+		assertValidatorsFromRequestHandler(t, []string{
+			ts.Node("node1").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node2").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node4").Validator.AccountID.ToAddress().Bech32(hrp),
+		}, requestHandler, 0)
+
+		// new epoch should have 2 validators (node2, node3)
+		ts.AssertSybilProtectionCandidates(1, []iotago.AccountID{
+			ts.Node("node2").Validator.AccountID,
+			ts.Node("node3").Validator.AccountID,
+		}, ts.Nodes()...)
+
+		ts.AssertSybilProtectionRegisteredValidators(1, []string{
+			ts.Node("node2").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node3").Validator.AccountID.ToAddress().Bech32(hrp),
+		}, ts.Nodes()...)
+
+		assertValidatorsFromRequestHandler(t, []string{
+			ts.Node("node2").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node3").Validator.AccountID.ToAddress().Bech32(hrp),
+		}, requestHandler, 1)
+
+	}
+
+}
+
+func assertValidatorsFromRequestHandler(t *testing.T, expectedValidators []string, requestHandler *RequestHandler, requestedEpoch iotago.EpochIndex) {
+	resp, err := requestHandler.Validators(requestedEpoch, 0, 10)
+	require.NoError(t, err)
+	actualValidators := lo.Map(resp.Validators, func(validator *api.ValidatorResponse) string {
+		return validator.AddressBech32
+	})
+
+	require.ElementsMatch(t, expectedValidators, actualValidators)
+}
