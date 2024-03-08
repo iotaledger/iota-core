@@ -146,6 +146,7 @@ func provide(c *dig.Container) error {
 				),
 			),
 			protocol.WithSnapshotPath(ParamsProtocol.Snapshot.Path),
+			protocol.WithCommitmentCheck(ParamsProtocol.CommitmentCheck),
 			protocol.WithSybilProtectionProvider(
 				sybilprotectionv1.NewProvider(),
 			),

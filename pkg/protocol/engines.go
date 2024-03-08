@@ -253,7 +253,7 @@ func (e *Engines) injectEngineInstances() (shutdown func()) {
 
 				if newEngine, err := func() (*engine.Engine, error) {
 					if e.Main.Get() == nil {
-						return e.loadMainEngine(e.protocol.Options.SnapshotPath)
+						return e.loadMainEngine(e.protocol.Options.SnapshotPath, e.protocol.Options.CommitmentCheck)
 					}
 
 					return e.ForkAtSlot(chain.ForkingPoint.Get().Slot() - 1)

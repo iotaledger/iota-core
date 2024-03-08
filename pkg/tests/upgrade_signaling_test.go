@@ -269,6 +269,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 			nodeG.Initialize(true,
 				append(nodeOptionsWithoutV5,
 					protocol.WithSnapshotPath(snapshotPath),
+					protocol.WithCommitmentCheck(true),
 					protocol.WithBaseDirectory(ts.Directory.PathWithCreate(nodeG.Name)),
 				)...,
 			)
@@ -327,6 +328,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 			nodeG.Initialize(true,
 				append(nodeOptionsWithV5,
 					protocol.WithSnapshotPath(snapshotPath),
+					protocol.WithCommitmentCheck(true),
 					protocol.WithBaseDirectory(ts.Directory.PathWithCreate(nodeG.Name)),
 				)...,
 			)

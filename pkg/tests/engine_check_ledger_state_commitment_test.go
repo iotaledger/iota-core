@@ -58,6 +58,7 @@ func TestCheckLedgerStateCommitmentFromNonGenesisSnapshot(t *testing.T) {
 		node2.Validator = node0.Validator
 		node2.Initialize(true,
 			protocol.WithSnapshotPath(snapshotPath),
+			protocol.WithCommitmentCheck(true),
 			protocol.WithBaseDirectory(ts.Directory.PathWithCreate(node2.Name)),
 		)
 		ts.Wait()

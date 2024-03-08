@@ -51,7 +51,7 @@ type Options struct {
 	// SnapshotPath is the path to the snapshot file that should be used to initialize the protocol.
 	SnapshotPath string
 
-	// CommitmentCheck is an optional flag whether upon startup, the engine needs to check the correctness of the commitment and ledger state
+	// CommitmentCheck is an opt flag that allows enginem upon startup, check correctness of commitment and ledger state
 	CommitmentCheck bool
 
 	// EngineOptions contains the options for the Engines.
@@ -152,6 +152,13 @@ func WithBaseDirectory(baseDirectory string) options.Option[Protocol] {
 func WithSnapshotPath(snapshot string) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.Options.SnapshotPath = snapshot
+	}
+}
+
+// WithCommitmentCheck is an option for the Protocol that allows to check the commitment and ledger state upon startup.
+func WithCommitmentCheck(commitmentCheck bool) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.Options.CommitmentCheck = commitmentCheck
 	}
 }
 

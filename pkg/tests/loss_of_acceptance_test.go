@@ -82,6 +82,7 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 		node3 := ts.AddNode("node3")
 		node3.Initialize(true,
 			protocol.WithSnapshotPath(snapshotPath),
+			protocol.WithCommitmentCheck(true),
 			protocol.WithBaseDirectory(ts.Directory.PathWithCreate(node3.Name)),
 		)
 		ts.Wait()
@@ -148,6 +149,7 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 		node0restarted.Validator = node0.Validator
 		node0restarted.Initialize(true,
 			protocol.WithSnapshotPath(snapshotPath),
+			protocol.WithCommitmentCheck(true),
 			protocol.WithBaseDirectory(ts.Directory.PathWithCreate(node0restarted.Name)),
 		)
 		ts.Wait()

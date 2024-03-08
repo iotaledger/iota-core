@@ -16,6 +16,8 @@ type ParametersProtocol struct {
 		Depth int `default:"5" usage:"defines how many slot diffs are stored in the snapshot, starting from the full ledgerstate"`
 	}
 
+	CommitmentCheck bool `default:"true" usage:"specifies whether commitment and ledger checks should be enabled"`
+
 	Filter struct {
 		// MaxAllowedClockDrift defines the maximum drift our wall clock can have to future blocks being received from the network.
 		MaxAllowedClockDrift time.Duration `default:"5s" usage:"the maximum drift our wall clock can have to future blocks being received from the network"`
