@@ -188,8 +188,8 @@ func (s *Storage) Flush() {
 	s.prunable.Flush()
 }
 
-// Checks the correctness of the latest commitment
-// Additionally, for non-genesis slots it checks whether the ledger state corresponds to the state root
+// Checks the correctness of the latest commitment.
+// Additionally, for non-genesis slots it checks whether the ledger state corresponds to the state root.
 func (s *Storage) CheckCorrectnessCommitmentLedgerState() error {
 
 	// Get the latest commitment
@@ -198,7 +198,7 @@ func (s *Storage) CheckCorrectnessCommitmentLedgerState() error {
 	latestCommitmentID := latestCommitment.ID()
 	latestCommittedSlotIndex := latestCommitment.Slot()
 
-	// Do the ledger state check only for non-genesis slots
+	// Do the ledger state check only for non-genesis slots.
 	// TODO: once the genesis slot provides the roots, change this
 	if latestCommittedSlotIndex > s.Settings().APIProvider().CommittedAPI().ProtocolParameters().GenesisSlot() {
 		// Get the state root in the permanent storage (that corresponds to the last commitment)
