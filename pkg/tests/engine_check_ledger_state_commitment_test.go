@@ -13,8 +13,9 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// This Go code snippet is a test function that checks the ledger state commitment from a non-genesis snapshot. It involves setting up a test suite, issuing blocks at specific slots, creating and using snapshots, and starting nodes based on those snapshots. The test verifies node states and commitments during the process.
-
+// Test function that checks the ledger state commitment from a non-genesis snapshot.
+// It involves setting up a test suite, issuing blocks at specific slots, creating and using snapshots, and starting nodes based on those snapshots.
+// The test verifies node states and commitments during the process.
 func TestCheckLedgerStateCommitmentFromNonGenesisSnapshot(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
