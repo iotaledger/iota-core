@@ -55,7 +55,7 @@ func sendVertex(blk *blocks.Block, confirmed bool) {
 		IsTx:                isTx,
 		IsTxAccepted: func() bool {
 			if isTx {
-				txMetadata, exists := deps.Protocol.Engines.Main.Get().Ledger.MemPool().TransactionMetadata(lo.PanicOnErr(signedTransaction.Transaction.ID()))
+				txMetadata, exists := deps.Protocol.Engines.Main.Get().Ledger.MemPool().TransactionMetadata(signedTransaction.Transaction.MustID())
 				if exists {
 					return txMetadata.IsAccepted()
 				}
@@ -88,7 +88,7 @@ func runVisualizer(component *app.Component) {
 				attachmentID := transactionMetadata.EarliestIncludedAttachment()
 				sendTxAccepted(attachmentID, true)
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
-			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
+			deps.Protocol.Events.Engine.PostSolidFilter.BlockAllowed.Hook(func(block *blocks.Block) {
 				sendVertex(block, false)
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
 			deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {

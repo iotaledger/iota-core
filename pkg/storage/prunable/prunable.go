@@ -23,10 +23,10 @@ type Prunable struct {
 	semiPermanentDBConfig database.Config
 	semiPermanentDB       *database.DBInstance
 
-	decidedUpgradeSignals *epochstore.Store[model.VersionAndHash]
+	decidedUpgradeSignals *epochstore.BaseStore[model.VersionAndHash]
 	poolRewards           *epochstore.EpochKVStore
-	poolStats             *epochstore.Store[*model.PoolsStats]
-	committee             *epochstore.Store[*account.SeatedAccounts]
+	poolStats             *epochstore.BaseStore[*model.PoolsStats]
+	committee             *epochstore.CachedStore[*account.SeatedAccounts]
 }
 
 func New(dbConfig database.Config, apiProvider iotago.APIProvider, errorHandler func(error), opts ...options.Option[BucketManager]) *Prunable {
@@ -65,12 +65,15 @@ func New(dbConfig database.Config, apiProvider iotago.APIProvider, errorHandler 
 			(*model.PoolsStats).Bytes,
 			model.PoolsStatsFromBytes,
 		),
-		committee: epochstore.NewStore(
-			kvstore.Realm{epochPrefixCommittee},
-			semiPermanentDB.KVStore(),
-			rewardPruningDelayFunc,
-			(*account.SeatedAccounts).Bytes,
-			account.SeatedAccountsFromBytes,
+		committee: epochstore.NewCachedStore(
+			epochstore.NewStore(
+				kvstore.Realm{epochPrefixCommittee},
+				semiPermanentDB.KVStore(),
+				rewardPruningDelayFunc,
+				(*account.SeatedAccounts).Bytes,
+				account.SeatedAccountsFromBytes,
+			),
+			5,
 		),
 	}
 }
@@ -121,7 +124,7 @@ func (p *Prunable) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago.Epo
 	}
 
 	// prune prunable_epoch: each component has its own pruning delay.
-	if err := p.decidedUpgradeSignals.Prune(epoch, defaultPruningDelay); err != nil {
+	if _, err := p.decidedUpgradeSignals.Prune(epoch, defaultPruningDelay); err != nil {
 		return ierrors.Wrapf(err, "prune decidedUpgradeSignals failed for epoch %d", epoch)
 	}
 
@@ -129,11 +132,11 @@ func (p *Prunable) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago.Epo
 		return ierrors.Wrapf(err, "prune poolRewards failed for epoch %d", epoch)
 	}
 
-	if err := p.poolStats.Prune(epoch, defaultPruningDelay); err != nil {
+	if _, err := p.poolStats.Prune(epoch, defaultPruningDelay); err != nil {
 		return ierrors.Wrapf(err, "prune poolStats failed for epoch %d", epoch)
 	}
 
-	if err := p.committee.Prune(epoch, defaultPruningDelay); err != nil {
+	if _, err := p.committee.Prune(epoch, defaultPruningDelay); err != nil {
 		return ierrors.Wrapf(err, "prune committee failed for epoch %d", epoch)
 	}
 
@@ -181,12 +184,12 @@ func (p *Prunable) Rollback(targetEpoch iotago.EpochIndex, startPruneRange iotag
 		return ierrors.Wrapf(err, "failed to rollback committee epochs to target epoch %d", targetEpoch)
 	}
 
-	lastPrunedPoolStatsEpoch, err := p.poolStats.RollbackEpochs(targetEpoch)
+	lastPrunedPoolStatsEpoch, _, err := p.poolStats.RollbackEpochs(targetEpoch)
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to rollback pool stats epochs to target epoch %d", targetEpoch)
 	}
 
-	lastPrunedDecidedUpgradeSignalsEpoch, err := p.decidedUpgradeSignals.RollbackEpochs(targetEpoch)
+	lastPrunedDecidedUpgradeSignalsEpoch, _, err := p.decidedUpgradeSignals.RollbackEpochs(targetEpoch)
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to rollback decided upgrade signals epochs to target epoch %d", targetEpoch)
 	}

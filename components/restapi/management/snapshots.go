@@ -9,21 +9,21 @@ import (
 func createSnapshots(_ echo.Context) (*api.CreateSnapshotResponse, error) {
 	/*
 		if deps.SnapshotManager.IsSnapshotting() || deps.PruningManager.IsPruning() {
-			return nil, errors.WithMessage(echo.ErrServiceUnavailable, "node is already creating a snapshot or pruning is running")
+			return nil, ierrors.WithMessage(echo.ErrServiceUnavailable, "node is already creating a snapshot or pruning is running")
 		}
 
 		request := &createSnapshotsRequest{}
 		if err := c.Bind(request); err != nil {
-			return nil, errors.WithMessagef(httpserver.ErrInvalidParameter, "invalid request, error: %s", err)
+			return nil, ierrors.WithMessagef(httpserver.ErrInvalidParameter, "invalid request, error: %s", err)
 		}
 
 		if request.Slot == 0 {
-			return nil, errors.WithMessage(httpserver.ErrInvalidParameter, "index needs to be specified")
+			return nil, ierrors.WithMessage(httpserver.ErrInvalidParameter, "index needs to be specified")
 		}
 
 		filePath := filepath.Join(filepath.Dir(deps.SnapshotsFullPath), fmt.Sprintf("full_snapshot_%d.bin", request.Slot))
 		if err := deps.SnapshotManager.CreateFullSnapshot(Component.Daemon().ContextStopped(), request.Slot, filePath, false); err != nil {
-			return nil, errors.WithMessagef(echo.ErrInternalServerError, "creating snapshot failed: %s", err)
+			return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "creating snapshot failed: %s", err)
 		}
 
 		return &createSnapshotsResponse{

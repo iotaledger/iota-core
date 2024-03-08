@@ -103,7 +103,7 @@ func (t *TestSuite) assertPrunedUntil(storageInstance *storage.Storage,
 	return nil
 }
 
-func assertPrunableEpochStoragesPruned[V any](t *TestSuite, store *epochstore.Store[V], epoch iotago.EpochIndex) error {
+func assertPrunableEpochStoragesPruned[V any](t *TestSuite, store epochstore.Store[V], epoch iotago.EpochIndex) error {
 	// Check that all store returns the expected error when trying to access the data.
 	_, err := store.Load(epoch)
 	if !ierrors.Is(err, database.ErrEpochPruned) {
@@ -193,9 +193,9 @@ func (t *TestSuite) assertPrunableSlotStoragesPruned(storageInstance *storage.St
 		return ierrors.Errorf("expected epoch %d to be pruned when calling Roots", epoch)
 	}
 
-	_, err = storageInstance.Retainer(endSlot)
+	_, err = storageInstance.BlockMetadata(endSlot)
 	if !ierrors.Is(err, database.ErrEpochPruned) {
-		return ierrors.Errorf("expected epoch %d to be pruned when calling Retainer", epoch)
+		return ierrors.Errorf("expected epoch %d to be pruned when calling BlockMetadata", epoch)
 	}
 
 	return nil

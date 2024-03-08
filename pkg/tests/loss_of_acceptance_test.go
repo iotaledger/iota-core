@@ -324,14 +324,15 @@ func TestLossOfAcceptanceWithoutRestart(t *testing.T) {
 
 	// Revive chain on node0 without restarting.
 	// There will be blocks and transactions in the slot 9 and 10 that are committed but don't have a future cone of
-	// blocks anymore because when reviving a chain, we pick a parent from the last committed slot.
+	// blocks anymore because when reviving a chain, we pick a parent from the last non-empty (10 in this case)
+	// slot when force committing.
 	{
 		ts.SetCurrentSlot(20)
 		block0 := ts.IssueValidationBlockWithHeaderOptions("block0", node0)
 		require.EqualValues(t, 18, block0.SlotCommitmentID().Slot())
 		// Reviving the chain should select one parent from the last committed slot.
 		require.Len(t, block0.Parents(), 1)
-		require.EqualValues(t, block0.Parents()[0].Slot(), 8)
+		require.EqualValues(t, 10, block0.Parents()[0].Slot())
 		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.Nodes("node0")...)
 	}
 
@@ -381,7 +382,7 @@ func expectedTransactions(allBLocks []*blocks.Block) iotago.TransactionIDs {
 			return iotago.EmptyTransactionID
 		}
 
-		return lo.PanicOnErr(tx.Transaction.ID())
+		return tx.Transaction.MustID()
 	}), func(txID iotago.TransactionID) bool {
 		return txID != iotago.EmptyTransactionID
 	})

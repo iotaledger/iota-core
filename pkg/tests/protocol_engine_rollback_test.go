@@ -463,7 +463,7 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 		}
 	}
 
-	ts.Run(false, nodeOptions)
+	ts.Run(true, nodeOptions)
 
 	// Verify that nodes have the expected states.
 
@@ -511,7 +511,7 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 	// Issue up to slot 11 - just before committee selection for the next epoch.
 	// Committee will be reused at slot 10 is finalized or slot 12 is committed, whichever happens first.
 	{
-		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, 4, "Genesis", ts.Nodes(), true, false)
+		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, 4, "Genesis", ts.Nodes(), true, true)
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(8),
@@ -544,13 +544,13 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 	}
 
 	{
-		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{12, 13, 14, 15, 16, 17, 18, 19}, 4, "P0:11.3", []*mock.Node{node0, node1}, true, false)
+		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{12, 13, 14, 15, 16, 17, 18, 19}, 4, "P0:11.3", []*mock.Node{node0, node1}, true, true)
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(8),
 			testsuite.WithLatestCommitmentSlotIndex(17),
 			testsuite.WithEqualStoredCommitmentAtIndex(17),
-			testsuite.WithLatestCommitmentCumulativeWeight(50), // 7 for each slot starting from 4
+			testsuite.WithLatestCommitmentCumulativeWeight(48), // 7 for each slot starting from 4
 			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(17), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommitteeHalf...),
 			testsuite.WithEvictedSlot(17),

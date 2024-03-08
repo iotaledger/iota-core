@@ -7,11 +7,15 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
+
+var validatorResponsesTypeSettings = serix.TypeSettings{}.WithLengthPrefixType(serix.LengthPrefixTypeAsByte)
 
 func (r *RequestHandler) CongestionByAccountAddress(accountAddress *iotago.AccountAddress, commitment *model.Commitment, workScores ...iotago.WorkScore) (*api.CongestionResponse, error) {
 	accountID := accountAddress.AccountID()
@@ -31,10 +35,51 @@ func (r *RequestHandler) CongestionByAccountAddress(accountAddress *iotago.Accou
 	}, nil
 }
 
-func (r *RequestHandler) Validators(epochIndex iotago.EpochIndex, cursorIndex, pageSize uint32) (*api.ValidatorsResponse, error) {
-	registeredValidators, err := r.protocol.Engines.Main.Get().Retainer.RegisteredValidators(epochIndex)
+func (r *RequestHandler) registeredValidatorsFromCache(index iotago.EpochIndex) ([]*api.ValidatorResponse, error) {
+	apiForEpoch := r.APIProvider().APIForEpoch(index)
+
+	registeredValidatorsBytes := r.registeredValidatorsCache.Get(index.MustBytes())
+	if registeredValidatorsBytes == nil {
+		// get the ordered registered validators list from engine.
+		registeredValidators, err := r.protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(index)
+		if err != nil {
+			return nil, ierrors.Wrapf(echo.ErrNotFound, " ordered registered validators list for epoch %d not found: %s", index, err)
+		}
+
+		// store validator responses in cache.
+		registeredValidatorsBytes, err := apiForEpoch.Encode(registeredValidators, serix.WithTypeSettings(validatorResponsesTypeSettings))
+		if err != nil {
+			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to encode ordered registered validators list for epoch %d : %s", index, err)
+		}
+		r.registeredValidatorsCache.Set(index.MustBytes(), registeredValidatorsBytes)
+
+		return registeredValidators, nil
+	}
+
+	validatorResp := make([]*api.ValidatorResponse, 0)
+	_, err := apiForEpoch.Decode(registeredValidatorsBytes, &validatorResp, serix.WithTypeSettings(validatorResponsesTypeSettings))
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(err, "failed to decode validator responses for epoch %d", index)
+	}
+
+	return validatorResp, nil
+}
+
+func (r *RequestHandler) Validators(epochIndex iotago.EpochIndex, cursorIndex, pageSize uint32) (*api.ValidatorsResponse, error) {
+	apiForEpoch := r.APIProvider().APIForEpoch(epochIndex)
+	currentEpoch := apiForEpoch.TimeProvider().EpochFromSlot(r.protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot())
+	registeredValidators := make([]*api.ValidatorResponse, 0)
+	var err error
+
+	// return registered validators of current epoch from node, because they are not yet finalized.
+	if epochIndex == currentEpoch {
+		registeredValidators, err = r.protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(epochIndex)
+	} else {
+		registeredValidators, err = r.registeredValidatorsFromCache(epochIndex)
+	}
+
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to get registered validators for epoch %d", epochIndex)
 	}
 
 	page := registeredValidators[cursorIndex:lo.Min(cursorIndex+pageSize, uint32(len(registeredValidators)))]
@@ -195,4 +240,10 @@ func (r *RequestHandler) SelectedCommittee(epoch iotago.EpochIndex) (*api.Commit
 		TotalStake:          accounts.TotalStake(),
 		TotalValidatorStake: accounts.TotalValidatorStake(),
 	}, nil
+}
+
+func WithCacheMaxSizeOptions(size int) options.Option[RequestHandler] {
+	return func(r *RequestHandler) {
+		r.optsCacheMaxSize = size
+	}
 }

@@ -40,25 +40,27 @@ func (b *Blocks) Block(id iotago.BlockID) (block *Block, exists bool) {
 		}
 	}
 
-	if commitmentID, isRootBlock := b.evictionState.RootBlockCommitmentID(id); isRootBlock {
-		return NewRootBlock(id, commitmentID, b.apiProvider.APIForSlot(id.Slot()).TimeProvider().SlotEndTime(id.Slot())), true
+	if _, isInRange := b.evictionState.BelowOrInActiveRootBlockRange(id); isInRange {
+		if commitmentID, isRootBlock := b.evictionState.RootBlockCommitmentID(id); isRootBlock {
+			return NewRootBlock(id, commitmentID, b.apiProvider.APIForSlot(id.Slot()).TimeProvider().SlotEndTime(id.Slot())), true
+		}
 	}
 
 	return nil, false
 }
 
-func (b *Blocks) StoreOrUpdate(data *model.Block) (storedBlock *Block, evicted bool, updated bool) {
+func (b *Blocks) StoreOrUpdate(modelBlock *model.Block) (storedBlock *Block, evicted bool, updated bool) {
 	b.evictionMutex.RLock()
 	defer b.evictionMutex.RUnlock()
 
-	if evictedIndex := b.evictionState.LastEvictedSlot(); evictedIndex >= data.ID().Slot() {
+	if evictedIndex := b.evictionState.LastEvictedSlot(); evictedIndex >= modelBlock.ID().Slot() {
 		return nil, true, false
 	}
 
-	storage := b.blocks.Get(data.ID().Slot(), true)
-	createdBlock, created := storage.GetOrCreate(data.ID(), func() *Block { return NewBlock(data) })
+	storage := b.blocks.Get(modelBlock.ID().Slot(), true)
+	createdBlock, created := storage.GetOrCreate(modelBlock.ID(), func() *Block { return NewBlock(modelBlock) })
 	if !created {
-		return createdBlock, false, createdBlock.Update(data)
+		return createdBlock, false, createdBlock.Update(modelBlock)
 	}
 
 	return createdBlock, false, false

@@ -56,7 +56,7 @@ func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 	// no cursor provided will be the first request
 	var cursorIndex uint32
 	if len(c.QueryParam(api.ParameterCursor)) != 0 {
-		requestedEpoch, cursorIndex, err = httpserver.ParseCursorQueryParam(c, api.ParameterCursor)
+		requestedEpoch, cursorIndex, err = httpserver.ParseEpochCursorQueryParam(c, api.ParameterCursor)
 		if err != nil {
 			return nil, err
 		}

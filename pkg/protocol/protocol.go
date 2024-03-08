@@ -16,7 +16,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
-	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -30,7 +29,7 @@ type Protocol struct {
 	Workers *workerpool.Group
 
 	// Network contains the network endpoint of the protocol.
-	Network *core.Protocol
+	Network *Network
 
 	// Commitments contains the commitments that are managed by the protocol.
 	Commitments *Commitments
@@ -144,7 +143,7 @@ func (p *Protocol) LatestAPI() iotago.API {
 
 // initSubcomponents initializes the subcomponents of the protocol and returns a function that shuts them down.
 func (p *Protocol) initSubcomponents(networkEndpoint network.Endpoint) (shutdown func()) {
-	p.Network = core.NewProtocol(networkEndpoint, p.Workers.CreatePool("NetworkProtocol"), p)
+	p.Network = newNetwork(p, networkEndpoint)
 	p.Blocks = newBlocks(p)
 	p.Attestations = newAttestations(p)
 	p.WarpSync = newWarpSync(p)

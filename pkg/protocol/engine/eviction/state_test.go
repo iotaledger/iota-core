@@ -3,9 +3,10 @@ package eviction_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/iotaledger/hive.go/db"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
@@ -30,9 +31,9 @@ func TestState_RootBlocks(t *testing.T) {
 	}, iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI), errorHandler)
 
 	newSettings := permanent.NewSettings(mapdb.NewMapDB())
-	newSettings.StoreProtocolParametersForStartEpoch(TestAPISmallMCA.ProtocolParameters(), 0)
+	require.NoError(t, newSettings.StoreProtocolParametersForStartEpoch(TestAPISmallMCA.ProtocolParameters(), 0))
 
-	ts := NewTestFramework(t, prunableStorage, eviction.NewState(newSettings, prunableStorage.RootBlocks))
+	ts := NewTestFramework(t, prunableStorage, newSettings)
 
 	ts.CreateAndAddRootBlock("Genesis", 0, iotago.NewEmptyCommitment(TestAPISmallMCA).MustID())
 	ts.RequireActiveRootBlocks("Genesis")
@@ -52,31 +53,62 @@ func TestState_RootBlocks(t *testing.T) {
 	ts.RequireLastEvictedSlot(0)
 	ts.RequireStorageRootBlocks("Genesis", "Root1.0", "Root1.1", "Root2.0", "Root3.0", "Root4.0", "Root4.1", "Root5.0")
 
-	ts.Instance.AdvanceActiveWindowToIndex(0)
-	ts.RequireActiveRootBlocks("Genesis")
-	ts.RequireLastEvictedSlot(0)
-	ts.RequireStorageRootBlocks("Genesis", "Root1.0", "Root1.1", "Root2.0", "Root3.0", "Root4.0", "Root4.1", "Root5.0")
+	{
+		ts.AdvanceActiveWindowToIndex(0, false)
+		ts.RequireActiveRootBlocks("Genesis")
+		ts.RequireLastEvictedSlot(0)
+		ts.RequireStorageRootBlocks("Genesis", "Root1.0", "Root1.1", "Root2.0", "Root3.0", "Root4.0", "Root4.1", "Root5.0")
 
-	ts.Instance.AdvanceActiveWindowToIndex(1)
-	ts.RequireActiveRootBlocks("Genesis", "Root1.0", "Root1.1")
-	ts.RequireLastEvictedSlot(1)
-	ts.RequireStorageRootBlocks("Genesis", "Root1.0", "Root1.1", "Root2.0", "Root3.0", "Root4.0", "Root4.1", "Root5.0")
+	}
 
-	ts.Instance.AdvanceActiveWindowToIndex(2)
-	ts.RequireActiveRootBlocks("Genesis", "Root1.0", "Root1.1", "Root2.0")
-	ts.RequireLastEvictedSlot(2)
-	ts.RequireStorageRootBlocks("Genesis", "Root1.0", "Root1.1", "Root2.0", "Root3.0", "Root4.0", "Root4.1", "Root5.0")
+	{
+		ts.AdvanceActiveWindowToIndex(1, false)
 
-	ts.Instance.AdvanceActiveWindowToIndex(3)
-	// Genesis is evicted because the rootBlockEviction delay is 3: we keep the root blocks of the last 3 slots
-	// starting from the last evicted one: 3, 2, 1.
-	ts.RequireActiveRootBlocks("Root1.0", "Root1.1", "Root2.0", "Root3.0")
-	// Now 0 should be expected to have been evicted.
-	ts.RequireLastEvictedSlot(3)
-	ts.RequireStorageRootBlocks("Genesis", "Root1.0", "Root1.1", "Root2.0", "Root3.0", "Root4.0", "Root4.1", "Root5.0")
+		ts.RequireActiveRootBlocks("Genesis", "Root1.0", "Root1.1")
+		ts.RequireLastEvictedSlot(1)
+		ts.RequireStorageRootBlocks("Genesis", "Root1.0", "Root1.1", "Root2.0", "Root3.0", "Root4.0", "Root4.1", "Root5.0")
+	}
 
-	ts.Instance.AdvanceActiveWindowToIndex(4)
-	ts.RequireActiveRootBlocks("Root2.0", "Root3.0", "Root4.0", "Root4.1")
-	ts.RequireLastEvictedSlot(4)
-	ts.RequireStorageRootBlocks("Root1.0", "Root1.1", "Root2.0", "Root3.0", "Root4.0", "Root4.1", "Root5.0")
+	{
+		ts.AdvanceActiveWindowToIndex(2, false)
+
+		ts.RequireActiveRootBlocks("Genesis", "Root1.0", "Root1.1", "Root2.0")
+		ts.RequireLastEvictedSlot(2)
+		ts.RequireStorageRootBlocks("Genesis", "Root1.0", "Root1.1", "Root2.0", "Root3.0", "Root4.0", "Root4.1", "Root5.0")
+	}
+
+	{
+		ts.AdvanceActiveWindowToIndex(3, false)
+
+		// Genesis is evicted because the rootBlockEviction delay is 3: we keep the root blocks of the last 3 slots
+		// starting from the last evicted one: 3, 2, 1.
+		ts.RequireActiveRootBlocks("Root1.0", "Root1.1", "Root2.0", "Root3.0")
+		// Now 0 should be expected to have been evicted.
+		ts.RequireLastEvictedSlot(3)
+		ts.RequireStorageRootBlocks("Genesis", "Root1.0", "Root1.1", "Root2.0", "Root3.0", "Root4.0", "Root4.1", "Root5.0")
+	}
+
+	{
+		ts.AdvanceActiveWindowToIndex(4, false)
+
+		ts.RequireActiveRootBlocks("Root2.0", "Root3.0", "Root4.0", "Root4.1")
+		ts.RequireLastEvictedSlot(4)
+		ts.RequireStorageRootBlocks("Root1.0", "Root1.1", "Root2.0", "Root3.0", "Root4.0", "Root4.1", "Root5.0")
+	}
+
+	{
+		ts.AdvanceActiveWindowToIndex(5, false)
+
+		ts.RequireActiveRootBlocks("Root3.0", "Root4.0", "Root4.1", "Root5.0")
+		ts.RequireLastEvictedSlot(5)
+		ts.RequireStorageRootBlocks("Root1.0", "Root1.1", "Root2.0", "Root3.0", "Root4.0", "Root4.1", "Root5.0")
+	}
+
+	{
+		ts.AdvanceActiveWindowToIndex(100, true)
+
+		ts.RequireActiveRootBlocks("Root5.0")
+		ts.RequireLastEvictedSlot(100)
+		ts.RequireStorageRootBlocks("Root1.0", "Root1.1", "Root2.0", "Root3.0", "Root4.0", "Root4.1", "Root5.0")
+	}
 }

@@ -72,7 +72,6 @@ type Node struct {
 	mainEngineSwitchedCount       atomic.Uint32
 
 	mutex                    syncutils.RWMutex
-	attachedBlocks           []*blocks.Block
 	currentSlot              iotago.SlotIndex
 	filteredBlockEvents      []*postsolidfilter.BlockFilteredEvent
 	invalidTransactionEvents map[iotago.SignedTransactionID]InvalidSignedTransactionEvent
@@ -110,7 +109,6 @@ func NewNode(t *testing.T, parentLogger log.Logger, net *Network, partition stri
 		Endpoint:  net.JoinWithEndpointID(peerID, partition),
 		Workers:   workerpool.NewGroup(name),
 
-		attachedBlocks:           make([]*blocks.Block, 0),
 		invalidTransactionEvents: make(map[iotago.SignedTransactionID]InvalidSignedTransactionEvent),
 	}
 }
@@ -218,12 +216,6 @@ func (n *Node) hookEngineEvents(failOnBlockFiltered bool) {
 
 func (n *Node) attachEngineEvents(failOnBlockFiltered bool, instance *engine.Engine) {
 	events := instance.Events
-
-	events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
-		n.mutex.Lock()
-		defer n.mutex.Unlock()
-		n.attachedBlocks = append(n.attachedBlocks, block)
-	})
 
 	events.PreSolidFilter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
 		if failOnBlockFiltered {
@@ -342,13 +334,6 @@ func (n *Node) TransactionFailure(txID iotago.SignedTransactionID) (InvalidSigne
 
 func (n *Node) MainEngineSwitchedCount() int {
 	return int(n.mainEngineSwitchedCount.Load())
-}
-
-func (n *Node) AttachedBlocks() []*blocks.Block {
-	n.mutex.RLock()
-	defer n.mutex.RUnlock()
-
-	return n.attachedBlocks
 }
 
 func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...options.Option[ValidationBlockParams]) *blocks.Block {

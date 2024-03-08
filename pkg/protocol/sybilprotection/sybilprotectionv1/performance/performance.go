@@ -20,8 +20,8 @@ import (
 
 type Tracker struct {
 	rewardsStorePerEpochFunc       func(epoch iotago.EpochIndex) (kvstore.KVStore, error)
-	poolStatsStore                 *epochstore.Store[*model.PoolsStats]
-	committeeStore                 *epochstore.Store[*account.SeatedAccounts]
+	poolStatsStore                 epochstore.Store[*model.PoolsStats]
+	committeeStore                 epochstore.Store[*account.SeatedAccounts]
 	committeeCandidatesInEpochFunc func(epoch iotago.EpochIndex) (*kvstore.TypedStore[iotago.AccountID, iotago.SlotIndex], error)
 	nextEpochCommitteeCandidates   *shrinkingmap.ShrinkingMap[iotago.AccountID, iotago.SlotIndex]
 	validatorPerformancesFunc      func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error)
@@ -39,8 +39,8 @@ type Tracker struct {
 
 func NewTracker(
 	rewardsStorePerEpochFunc func(epoch iotago.EpochIndex) (kvstore.KVStore, error),
-	poolStatsStore *epochstore.Store[*model.PoolsStats],
-	committeeStore *epochstore.Store[*account.SeatedAccounts],
+	poolStatsStore epochstore.Store[*model.PoolsStats],
+	committeeStore epochstore.Store[*account.SeatedAccounts],
 	committeeCandidatesInEpochFunc func(epoch iotago.EpochIndex) (*kvstore.TypedStore[iotago.AccountID, iotago.SlotIndex], error),
 	validatorPerformancesFunc func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error),
 	latestAppliedEpoch iotago.EpochIndex,
