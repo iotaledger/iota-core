@@ -143,7 +143,6 @@ func (p *Protocol) LatestAPI() iotago.API {
 }
 
 // initSubcomponents initializes the subcomponents of the protocol and returns a function that shuts them down.
-
 func (p *Protocol) initSubcomponents(networkEndpoint network.Endpoint) (shutdown func()) {
 	p.Network = core.NewProtocol(networkEndpoint, p.Workers.CreatePool("NetworkProtocol"), p)
 	p.Blocks = newBlocks(p)

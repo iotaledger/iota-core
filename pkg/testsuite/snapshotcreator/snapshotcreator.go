@@ -113,7 +113,8 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		retainer.NewProvider(),
 		signalingupgradeorchestrator.NewProvider(),
 		trivialsyncmanager.NewProvider(),
-		engine.WithSnapshotPath(""), // magic to disable loading snapshot
+		engine.WithSnapshotPath(""),       // magic to disable loading snapshot
+		engine.WithCommitmentCheck(false), // to not check the commitment when creating a first snapshot
 	)
 	defer engineInstance.Shutdown.Trigger()
 

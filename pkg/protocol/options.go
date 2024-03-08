@@ -51,6 +51,9 @@ type Options struct {
 	// SnapshotPath is the path to the snapshot file that should be used to initialize the protocol.
 	SnapshotPath string
 
+	// CommitmentCheck is an optional flag whether upon startup, the engine needs to check the correctness of the commitment and ledger state
+	CommitmentCheck bool
+
 	// EngineOptions contains the options for the Engines.
 	EngineOptions []options.Option[engine.Engine]
 

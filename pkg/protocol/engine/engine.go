@@ -630,6 +630,12 @@ func WithSnapshotPath(snapshotPath string) options.Option[Engine] {
 	}
 }
 
+func WithCommitmentCheck(checkCommitment bool) options.Option[Engine] {
+	return func(e *Engine) {
+		e.optsCheckCommitment = checkCommitment
+	}
+}
+
 func WithEntryPointsDepth(entryPointsDepth int) options.Option[Engine] {
 	return func(engine *Engine) {
 		engine.optsEntryPointsDepth = entryPointsDepth

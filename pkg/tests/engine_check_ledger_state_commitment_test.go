@@ -47,7 +47,9 @@ func TestCheckLedgerStateCommitmentFromNonGenesisSnapshot(t *testing.T) {
 			testsuite.WithEqualStoredCommitmentAtIndex(8),
 		)
 	}
-	// Create snapshot from node0 and start node 2 from it. Stop node 0
+	// Create snapshot from node0 and start node 2 from it.
+	// During startup, it will correctly validate the ledger state for the last committed slot against the latest commitment.
+	// Stop node 0.
 	var node2 *mock.Node
 	{
 		snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))

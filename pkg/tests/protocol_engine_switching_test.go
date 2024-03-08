@@ -190,6 +190,8 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			ts.AssertAttestationsForSlot(slot, attestationBlocks, ts.Nodes()...)
 		}
 
+		//ts.AssertAttestationsForSlot(4, ts.Blocks("P0:4.3-node0", "P0:4.3-node1", "P0:4.3-node2", "P0:4.3-node3", "P0:4.3-node4", "P0:4.3-node6", "P0:4.3-node7"), ts.Nodes()...)
+
 		// Make sure the tips are properly set.
 		var tipBlocks []*blocks.Block
 		for _, node := range ts.Nodes() {
