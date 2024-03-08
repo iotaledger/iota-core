@@ -57,6 +57,7 @@ func (r *RequestHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *mo
 		case <-exit:
 		}
 	}, event.WithWorkerPool(r.workerPool)).Unhook
+
 	postfilteredUnhook := r.protocol.Events.Engine.PostSolidFilter.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
 		if blockID != event.Block.ID() {
 			return
@@ -67,8 +68,7 @@ func (r *RequestHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *mo
 		}
 	}, event.WithWorkerPool(r.workerPool)).Unhook
 
-	defer lo.Batch(evtUnhook, prefilteredUnhook)()
-	defer lo.Batch(evtUnhook, postfilteredUnhook)()
+	defer lo.BatchReverse(evtUnhook, prefilteredUnhook, postfilteredUnhook)()
 
 	if err := r.submitBlock(block); err != nil {
 		return ierrors.Wrapf(err, "failed to issue block %s", blockID)

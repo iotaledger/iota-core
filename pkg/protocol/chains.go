@@ -176,6 +176,10 @@ func attachEngineLogs(instance *engine.Engine) func() {
 			instance.LogTrace("BlockProcessed", "block", blockID)
 		}).Unhook,
 
+		events.Retainer.BlockRetained.Hook(func(block *blocks.Block) {
+			instance.LogTrace("Retainer.BlockRetained", "block", block.ID())
+		}).Unhook,
+
 		events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 			instance.LogTrace("NotarizationManager.SlotCommitted", "commitment", details.Commitment.ID(), "acceptedBlocks count", details.AcceptedBlocks.Size(), "accepted transactions", len(details.Mutations))
 		}).Unhook,
