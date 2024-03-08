@@ -1155,7 +1155,7 @@ func Test_BlockWithInvalidTransactionGetsBooked(t *testing.T) {
 	ts.AssertStorageCommitmentTransactionAccepted(block1Slot, tx1.Transaction.MustID(), false, ts.Nodes()...)
 }
 
-// This test checks that a fresh attachment of an orphaned transaction before it's evicted, can mark it as unorphaned.
+// This test checks that a fresh attachment of an orphaned transaction before it's evicted, can mark it as unorphaned and successfully accept it.
 // On the other node, the transaction is evicted before a fresh attachment arrives,
 // simulating a possible race that could cause a divergence if both cases weren't handled correctly.
 // In the end, both nodes accept the transaction,
@@ -1210,7 +1210,7 @@ func Test_OrphanedTransactionRace_Scenario1(t *testing.T) {
 		}, node1, node2)
 	}
 
-	// Advance both nodes at the edge of slot 1 committability
+	// Advance both nodes at the edge of slot 1 evictability.
 	{
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{2, 3, 4, 5, 6, 7, 8}, 1, "Genesis", ts.Nodes("node1"), false, false)
 
@@ -1267,11 +1267,11 @@ func Test_OrphanedTransactionRace_Scenario1(t *testing.T) {
 		wallet.SetDefaultNode(node1)
 		ts.IssueExistingBlock("more-attachment-2-tx1", wallet)
 
+		// Both nodes agree on the perception of the transaction.
 		ts.AssertBlocksInCacheInvalid(ts.Blocks("more-attachment-2-tx1"), false, ts.Nodes()...)
 		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1"), true, ts.Nodes()...)
 		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1"), true, ts.Nodes()...)
-		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1"), false, node1)
-		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1"), false, node2)
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1"), false, ts.Nodes()...)
 	}
 
 	ts.MergePartitionsToMain(lo.Keys(partitions)...)
@@ -1316,7 +1316,7 @@ func Test_OrphanedTransactionRace_Scenario1(t *testing.T) {
 }
 
 // This test checks, similar to the previous one,
-// that a fresh attachment of an orphaned transaction before it's evicted, can mark it as unorphaned.
+// that a fresh attachment of an orphaned transaction before it's evicted, can mark it as unorphaned and then orphaned again.
 // On the other node, the transaction is evicted before a fresh attachment arrives,
 // simulating a possible race that could cause a divergence if both cases weren't handled correctly.
 // In the end, both nodes orphaned the transaction again and evicted it from the cache.
@@ -1469,3 +1469,430 @@ func Test_OrphanedTransactionRace_Scenario2(t *testing.T) {
 		ts.AssertTransactionsExist(wallet.Transactions("tx1"), false, ts.Nodes()...)
 	}
 }
+
+// This test checks that a fresh attachment of an orphaned transaction before it's evicted, can mark it as unorphaned and successfully accept it.
+// This also tests that the chain of transactions, spending from the orphaned transaction is unorphaned
+// and then successfully accepted.
+// In the end, both nodes accept the transaction,
+func Test_OrphanedTransactionReattached_Scenario1(t *testing.T) {
+	ts := testsuite.NewTestSuite(t,
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				0,
+				testsuite.GenesisTimeWithOffsetBySlots(20, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				testsuite.DefaultSlotsPerEpochExponent,
+			),
+			iotago.WithLivenessOptions(
+				15,
+				15,
+				2,
+				5,
+				testsuite.DefaultEpochNearingThreshold,
+			),
+		),
+	)
+	defer ts.Shutdown()
+
+	node1 := ts.AddValidatorNode("node1")
+	node2 := ts.AddNode("node2")
+	wallet := ts.AddDefaultWallet(node1)
+
+	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
+
+	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
+		node1.Validator.AccountID,
+	}, ts.Nodes()...)
+
+	tx1 := wallet.CreateBasicOutputsEquallyFromInput("tx1", 1, "Genesis:0")
+	tx2 := wallet.CreateBasicOutputsEquallyFromInput("tx2", 1, "tx1:0")
+	tx3 := wallet.CreateBasicOutputsEquallyFromInput("tx3", 1, "tx2:0")
+	// Create a transaction to be orphaned.
+	{
+
+		ts.SetCurrentSlot(1)
+		ts.IssueBasicBlockWithOptions("attachment-1-tx1-orphaned", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
+
+		ts.AssertTransactionsExist(wallet.Transactions("tx1"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1"), true, node1, node2)
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("attachment-1-tx1-orphaned"): {"tx1"},
+		}, node1, node2)
+
+		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
+			wallet.Transaction("tx1"): {"tx1"},
+		}, node1, node2)
+	}
+
+	{
+		ts.SetCurrentSlot(2)
+		ts.IssueBasicBlockWithOptions("attachment-tx2", wallet, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
+
+		ts.AssertTransactionsExist(wallet.Transactions("tx2"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx2"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx2"), true, node1, node2)
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("attachment-tx2"): {"tx2"},
+		}, node1, node2)
+
+		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
+			wallet.Transaction("tx2"): {"tx2"},
+		}, node1, node2)
+	}
+
+	{
+		ts.IssueBasicBlockWithOptions("attachment-tx3", wallet, tx3, mock.WithStrongParents(ts.BlockID("attachment-tx2")))
+
+		ts.AssertTransactionsExist(wallet.Transactions("tx3"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx3"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx3"), true, node1, node2)
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("attachment-tx3"): {"tx2", "tx3"},
+		}, node1, node2)
+
+		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
+			wallet.Transaction("tx3"): {"tx3"},
+		}, node1, node2)
+	}
+
+	// Commit slot 1 so that the tx1 becomes orphaned along with its UTXO future cone.
+	{
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{2, 3}, 3, "attachment-tx3", ts.Nodes("node1"), false, false)
+
+		ts.AssertNodeState(ts.Nodes(),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(1),
+			testsuite.WithEqualStoredCommitmentAtIndex(1),
+			testsuite.WithEvictedSlot(1),
+		)
+
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1", "tx2", "tx3"), true, node1, node2)
+	}
+
+	// Issue the reattachment of tx1, which makes
+	{
+		ts.SetCurrentSlot(2)
+		ts.IssueBasicBlockWithOptions("3.2-attachment-2-tx1", wallet, tx1, mock.WithStrongParents(ts.BlockIDsWithPrefix("2.2")...), mock.WithSlotCommitment(ts.CommitmentOfMainEngine(node1, 0).Commitment()))
+
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("3.2-attachment-2-tx1"), false, ts.Nodes()...)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1", "tx2", "tx3"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1", "tx2", "tx3"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1", "tx2", "tx3"), false, ts.Nodes()...)
+	}
+
+	// Accept the new attachment of TX1, which triggers acceptance of TX2 and TX3 as a consequence.
+	{
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{3}, 3, "3.2", ts.Nodes("node1"), true, true)
+
+		ts.AssertNodeState(ts.Nodes("node1", "node2"),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(1),
+			testsuite.WithEqualStoredCommitmentAtIndex(1),
+			testsuite.WithEvictedSlot(1),
+		)
+		ts.AssertEqualStoredCommitmentAtIndex(1, ts.Nodes()...)
+
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1", "tx2", "tx3"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1", "tx2", "tx3"), false, ts.Nodes()...)
+		ts.AssertTransactionsInCacheAccepted(wallet.Transactions("tx1", "tx2", "tx3"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1", "tx2", "tx3"), false, ts.Nodes()...)
+	}
+}
+
+// This test checks that a fresh attachment of an orphaned transaction can mark it as unorphaned and then orphaned again.
+// This also tests that the chain of transactions, spending from the orphaned transaction is unorphaned
+// and then orphaned again.
+func Test_OrphanedTransactionReattached_Scenario2(t *testing.T) {
+	ts := testsuite.NewTestSuite(t,
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				0,
+				testsuite.GenesisTimeWithOffsetBySlots(20, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				testsuite.DefaultSlotsPerEpochExponent,
+			),
+			iotago.WithLivenessOptions(
+				15,
+				15,
+				2,
+				5,
+				testsuite.DefaultEpochNearingThreshold,
+			),
+		),
+	)
+	defer ts.Shutdown()
+
+	node1 := ts.AddValidatorNode("node1")
+	node2 := ts.AddNode("node2")
+	wallet := ts.AddDefaultWallet(node1)
+
+	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
+
+	node2.Protocol.SetLogLevel(log.LevelTrace)
+
+	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
+		node1.Validator.AccountID,
+	}, ts.Nodes()...)
+
+	tx1 := wallet.CreateBasicOutputsEquallyFromInput("tx1", 1, "Genesis:0")
+	tx2 := wallet.CreateBasicOutputsEquallyFromInput("tx2", 1, "tx1:0")
+	tx3 := wallet.CreateBasicOutputsEquallyFromInput("tx3", 1, "tx2:0")
+	// Create a transaction to be orphaned.
+	{
+
+		ts.SetCurrentSlot(1)
+		ts.IssueBasicBlockWithOptions("attachment-1-tx1-orphaned", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
+
+		ts.AssertTransactionsExist(wallet.Transactions("tx1"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1"), true, node1, node2)
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("attachment-1-tx1-orphaned"): {"tx1"},
+		}, node1, node2)
+
+		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
+			wallet.Transaction("tx1"): {"tx1"},
+		}, node1, node2)
+	}
+
+	// Issue tx2
+	{
+		ts.SetCurrentSlot(2)
+		ts.IssueBasicBlockWithOptions("attachment-tx2", wallet, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
+
+		ts.AssertTransactionsExist(wallet.Transactions("tx2"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx2"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx2"), true, node1, node2)
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("attachment-tx2"): {"tx2"},
+		}, node1, node2)
+
+		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
+			wallet.Transaction("tx2"): {"tx2"},
+		}, node1, node2)
+	}
+
+	// Issue tx3
+	{
+		ts.IssueBasicBlockWithOptions("attachment-tx3", wallet, tx3, mock.WithStrongParents(ts.BlockID("attachment-tx2")))
+
+		ts.AssertTransactionsExist(wallet.Transactions("tx3"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx3"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx3"), true, node1, node2)
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("attachment-tx3"): {"tx2", "tx3"},
+		}, node1, node2)
+
+		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
+			wallet.Transaction("tx3"): {"tx3"},
+		}, node1, node2)
+	}
+
+	// Commit slot 1 so that tx1 is orphaned along with its UTXO future cone.
+	{
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{2, 3}, 3, "Genesis", ts.Nodes("node1"), false, false)
+
+		ts.AssertNodeState(ts.Nodes(),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(1),
+			testsuite.WithEqualStoredCommitmentAtIndex(1),
+			testsuite.WithEvictedSlot(1),
+		)
+
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1", "tx2", "tx3"), true, node1, node2)
+	}
+
+	// Issue the block on two partitions, to simulate a situation in which one node already committed and evicted the transaction,
+	// while on the other node transaction is still present.
+	{
+		ts.SetCurrentSlot(2)
+		ts.IssueBasicBlockWithOptions("3.2-attachment-2-tx1-orphaned", wallet, tx1, mock.WithStrongParents(ts.BlockIDsWithPrefix("2.2")...), mock.WithSlotCommitment(ts.CommitmentOfMainEngine(node1, 0).Commitment()))
+
+		wallet.SetDefaultNode(node1)
+		ts.IssueExistingBlock("3.2-attachment-2-tx1-orphaned", wallet)
+
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("attachment-2-tx1-orphaned"), false, ts.Nodes()...)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1", "tx2", "tx3"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1", "tx2", "tx3"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1", "tx2", "tx3"), false, ts.Nodes()...)
+	}
+
+	// Commit further so that tx2 and 3 are orphaned, because they belong to slot 2,
+	// while tx1 is not orphaned, because the new attachment is in slot 3.
+	{
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{4}, 3, "3.2", ts.Nodes("node1"), true, true)
+
+		ts.AssertNodeState(ts.Nodes("node1", "node2"),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(2),
+			testsuite.WithEqualStoredCommitmentAtIndex(2),
+			testsuite.WithEvictedSlot(2),
+		)
+		ts.AssertEqualStoredCommitmentAtIndex(2, ts.Nodes()...)
+
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1", "tx2", "tx3"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1", "tx2", "tx3"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1"), false, ts.Nodes()...)
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx2", "tx3"), true, ts.Nodes()...)
+	}
+
+	// Commit further so that tx1 becomes orphaned as well.
+	{
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{5}, 3, "4.2", ts.Nodes("node1"), true, true)
+
+		ts.AssertNodeState(ts.Nodes("node1", "node2"),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(3),
+			testsuite.WithEqualStoredCommitmentAtIndex(3),
+			testsuite.WithEvictedSlot(3),
+		)
+		ts.AssertEqualStoredCommitmentAtIndex(3, ts.Nodes()...)
+
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1", "tx2", "tx3"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1", "tx2", "tx3"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1", "tx2", "tx3"), true, ts.Nodes()...)
+	}
+}
+
+// This test checks that a fresh attachment of an orphaned transaction can mark it as unorphaned and accepted.
+// A chain of transaction spending from the first transaction is orphaned, then unorphaned,
+// then orphaned again, while the first transaction is accepted.
+func Test_OrphanedTransactionReattached_Scenario3(t *testing.T) {
+	ts := testsuite.NewTestSuite(t,
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				0,
+				testsuite.GenesisTimeWithOffsetBySlots(20, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				testsuite.DefaultSlotsPerEpochExponent,
+			),
+			iotago.WithLivenessOptions(
+				15,
+				15,
+				2,
+				5,
+				testsuite.DefaultEpochNearingThreshold,
+			),
+		),
+	)
+	defer ts.Shutdown()
+
+	node1 := ts.AddValidatorNode("node1")
+	node2 := ts.AddNode("node2")
+	wallet := ts.AddDefaultWallet(node1)
+
+	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
+
+	node2.Protocol.SetLogLevel(log.LevelTrace)
+
+	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
+		node1.Validator.AccountID,
+	}, ts.Nodes()...)
+
+	tx1 := wallet.CreateBasicOutputsEquallyFromInput("tx1", 1, "Genesis:0")
+	tx2 := wallet.CreateBasicOutputsEquallyFromInput("tx2", 1, "tx1:0")
+	tx3 := wallet.CreateBasicOutputsEquallyFromInput("tx3", 1, "tx2:0")
+	// Create a transaction to be orphaned.
+	{
+
+		ts.SetCurrentSlot(1)
+		ts.IssueBasicBlockWithOptions("attachment-1-tx1-orphaned", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
+
+		ts.AssertTransactionsExist(wallet.Transactions("tx1"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1"), true, node1, node2)
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("attachment-1-tx1-orphaned"): {"tx1"},
+		}, node1, node2)
+
+		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
+			wallet.Transaction("tx1"): {"tx1"},
+		}, node1, node2)
+	}
+
+	// Issue tx2
+	{
+		ts.SetCurrentSlot(2)
+		ts.IssueBasicBlockWithOptions("attachment-tx2", wallet, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
+
+		ts.AssertTransactionsExist(wallet.Transactions("tx2"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx2"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx2"), true, node1, node2)
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("attachment-tx2"): {"tx2"},
+		}, node1, node2)
+
+		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
+			wallet.Transaction("tx2"): {"tx2"},
+		}, node1, node2)
+	}
+
+	// Issue tx3
+	{
+		ts.IssueBasicBlockWithOptions("attachment-tx3", wallet, tx3, mock.WithStrongParents(ts.BlockID("attachment-tx2")))
+
+		ts.AssertTransactionsExist(wallet.Transactions("tx3"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx3"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx3"), true, node1, node2)
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("attachment-tx3"): {"tx2", "tx3"},
+		}, node1, node2)
+
+		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
+			wallet.Transaction("tx3"): {"tx3"},
+		}, node1, node2)
+	}
+
+	// Commit slot 1 so that tx1 is orphaned along with its UTXO future cone.
+	{
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{2, 3}, 3, "attachment-tx3", ts.Nodes("node1"), false, false)
+
+		ts.AssertNodeState(ts.Nodes(),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(1),
+			testsuite.WithEqualStoredCommitmentAtIndex(1),
+			testsuite.WithEvictedSlot(1),
+		)
+
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1", "tx2", "tx3"), true, node1, node2)
+	}
+
+	// Issue a new attachment of tx1 in slot 4. This marks all transactions as not orphaned.
+	{
+		ts.SetCurrentSlot(4)
+		ts.IssueBasicBlockWithOptions("attachment-2-tx1", wallet, tx1, mock.WithStrongParents(ts.BlockIDsWithPrefix("3.2")...), mock.WithSlotCommitment(ts.CommitmentOfMainEngine(node1, 1).Commitment()))
+
+		wallet.SetDefaultNode(node1)
+		ts.IssueExistingBlock("attachment-2-tx1", wallet)
+
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("attachment-2-tx1"), false, ts.Nodes()...)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1", "tx2", "tx3"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1", "tx2", "tx3"), true, ts.Nodes()...)
+		// Tx2 and Tx3 cannot be marked as not orphaned, because their earliest attachment belongs to an earlier slot,
+		// than the earliest attachment of the transaction they spend from.
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx1"), false, ts.Nodes()...)
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx2", "tx3"), true, ts.Nodes()...)
+	}
+
+	// Commit further so that tx1 is accepted, which should not trigger acceptance of Tx2 and Tx3 because they're attachment is too old and orphaned.
+	{
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{4}, 3, "attachment-2-tx1", ts.Nodes("node1"), true, true)
+
+		ts.AssertNodeState(ts.Nodes("node1", "node2"),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(2),
+			testsuite.WithEqualStoredCommitmentAtIndex(2),
+			testsuite.WithEvictedSlot(2),
+		)
+		ts.AssertEqualStoredCommitmentAtIndex(2, ts.Nodes()...)
+
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1", "tx2", "tx3"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCacheAccepted(wallet.Transactions("tx1"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCacheOrphaned(wallet.Transactions("tx2", "tx3"), false, ts.Nodes()...)
+	}
+}
+
+// TODO: balanced StateDiff in the mempool
+
+// TODO: UTXO ledger should react when we try to delete an output that does not exist
