@@ -61,7 +61,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.ErrorHandler("ledger"),
 		)
 
-		e.Constructed.OnTrigger(func() {
+		e.ConstructedEvent().OnTrigger(func() {
 			e.Events.Ledger.LinkTo(l.events)
 			l.spendDAG = spenddagv1.New[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank](func() int {
 				return l.sybilProtection.SeatManager().OnlineCommittee().Size()

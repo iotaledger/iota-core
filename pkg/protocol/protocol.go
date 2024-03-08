@@ -56,7 +56,7 @@ type Protocol struct {
 	reactive.EvictionState[iotago.SlotIndex]
 
 	// ReactiveModule embeds the reactive module logic of the protocol.
-	*module.ReactiveModule
+	module.ReactiveModule
 }
 
 // New creates a new protocol instance from the given parameters.
@@ -70,7 +70,7 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 	}, opts, func(p *Protocol) {
 		shutdownSubComponents := p.initSubcomponents(networkEndpoint)
 
-		p.Initialized.OnTrigger(func() {
+		p.InitializedEvent().OnTrigger(func() {
 			shutdown := lo.BatchReverse(
 				p.initEviction(),
 				p.initGlobalEventsRedirection(),
@@ -79,10 +79,10 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 				shutdownSubComponents,
 			)
 
-			p.Shutdown.OnTrigger(shutdown)
+			p.ShutdownEvent().OnTrigger(shutdown)
 		})
 
-		p.Constructed.Trigger()
+		p.ConstructedEvent().Trigger()
 
 		p.waitInitialized()
 	})
@@ -97,12 +97,12 @@ func (p *Protocol) IssueBlock(block *model.Block) error {
 
 // Run starts the protocol.
 func (p *Protocol) Run(ctx context.Context) error {
-	p.Initialized.Trigger()
+	p.InitializedEvent().Trigger()
 
 	<-ctx.Done()
 
-	p.Shutdown.Trigger()
-	p.Stopped.Trigger()
+	p.ShutdownEvent().Trigger()
+	p.StoppedEvent().Trigger()
 
 	return ctx.Err()
 }
@@ -156,7 +156,7 @@ func (p *Protocol) initSubcomponents(networkEndpoint network.Endpoint) (shutdown
 		p.WarpSync.Shutdown()
 		p.Network.Shutdown()
 		p.Workers.WaitChildren()
-		p.Engines.Shutdown.Trigger()
+		p.Engines.ShutdownEvent().Trigger()
 		p.Workers.Shutdown()
 	}
 }

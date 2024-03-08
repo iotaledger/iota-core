@@ -11,7 +11,6 @@ import (
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
@@ -37,7 +36,7 @@ type WarpSync struct {
 // newWarpSync creates a new warp sync protocol instance for the given protocol.
 func newWarpSync(protocol *Protocol) *WarpSync {
 	c := &WarpSync{
-		Logger:     lo.Return1(protocol.Logger.NewChildLogger("WarpSync")),
+		Logger:     protocol.NewChildLogger("WarpSync"),
 		protocol:   protocol,
 		workerPool: protocol.Workers.CreatePool("WarpSync", workerpool.WithWorkerCount(1)),
 		ticker:     eventticker.New[iotago.SlotIndex, iotago.CommitmentID](protocol.Options.WarpSyncRequesterOptions...),
@@ -45,7 +44,7 @@ func newWarpSync(protocol *Protocol) *WarpSync {
 
 	c.ticker.Events.Tick.Hook(c.SendRequest)
 
-	protocol.Constructed.OnTrigger(func() {
+	protocol.ConstructedEvent().OnTrigger(func() {
 		protocol.Chains.WithInitializedEngines(func(chain *Chain, engine *engine.Engine) (shutdown func()) {
 			return chain.WarpSyncMode.OnUpdate(func(_ bool, warpSyncModeEnabled bool) {
 				if warpSyncModeEnabled {

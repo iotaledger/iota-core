@@ -74,7 +74,7 @@ func NewProvider() module.Provider[*engine.Engine, attestation.Attestations] {
 		latestCommitment := e.Storage.Settings().LatestCommitment()
 
 		return NewManager(
-			e.Logger.NewChildLogger("AttestationManager"),
+			e.NewChildLogger("AttestationManager"),
 			latestCommitment.Slot(),
 			latestCommitment.CumulativeWeight(),
 			e.Storage.Attestations,

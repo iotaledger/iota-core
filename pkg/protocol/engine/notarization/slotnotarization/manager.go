@@ -59,7 +59,7 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 
 		m.apiProvider = e
 
-		e.Constructed.OnTrigger(func() {
+		e.ConstructedEvent().OnTrigger(func() {
 			m.storage = e.Storage
 			m.acceptedTimeFunc = e.Clock.Accepted().Time
 
@@ -87,7 +87,7 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 			m.TriggerConstructed()
 		})
 
-		e.Shutdown.OnTrigger(m.Shutdown)
+		e.ShutdownEvent().OnTrigger(m.Shutdown)
 
 		return m
 	})

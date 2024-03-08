@@ -59,7 +59,7 @@ func newCommitments(protocol *Protocol) *Commitments {
 		c.initRequester(),
 	)
 
-	protocol.Shutdown.OnTrigger(shutdown)
+	protocol.ShutdownEvent().OnTrigger(shutdown)
 
 	return c
 }
@@ -110,7 +110,7 @@ func (c *Commitments) initLogger() (shutdown func()) {
 
 // initEngineCommitmentSynchronization initializes the synchronization of commitments that are published by the engines.
 func (c *Commitments) initEngineCommitmentSynchronization() func() {
-	return c.protocol.Constructed.WithNonEmptyValue(func(_ bool) (shutdown func()) {
+	return c.protocol.ConstructedEvent().WithNonEmptyValue(func(_ bool) (shutdown func()) {
 		return lo.BatchReverse(
 			// advance the root commitment of the main chain
 			c.protocol.Chains.Main.WithNonEmptyValue(func(mainChain *Chain) (shutdown func()) {

@@ -141,7 +141,7 @@ func NewProvider(opts ...options.Option[TransactionRetainer]) module.Provider[*e
 
 		asyncOpt := event.WithWorkerPool(r.workerPool)
 
-		e.Initialized.OnTrigger(func() {
+		e.InitializedEvent().OnTrigger(func() {
 			// attaching the transaction failed for some reason => store the error
 			// HINT: we treat the transaction as unsigned here, because we don't know if it was signed or not.
 			// This should not be a problem, because the error reason will still be stored and visible to the user,

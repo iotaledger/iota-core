@@ -16,7 +16,7 @@ func NewProvider() module.Provider[*engine.Engine, tipmanager.TipManager] {
 	return module.Provide(func(e *engine.Engine) tipmanager.TipManager {
 		t := New(e.BlockCache.Block, e.SybilProtection.SeatManager().CommitteeInSlot)
 
-		e.Constructed.OnTrigger(func() {
+		e.ConstructedEvent().OnTrigger(func() {
 			tipWorker := e.Workers.CreatePool("AddTip", workerpool.WithWorkerCount(2))
 
 			e.Events.Scheduler.BlockScheduled.Hook(lo.Void(t.AddBlock), event.WithWorkerPool(tipWorker))
@@ -33,7 +33,7 @@ func NewProvider() module.Provider[*engine.Engine, tipmanager.TipManager] {
 			t.TriggerInitialized()
 		})
 
-		e.Shutdown.OnTrigger(func() {
+		e.ShutdownEvent().OnTrigger(func() {
 			t.TriggerShutdown()
 			t.TriggerStopped()
 		})

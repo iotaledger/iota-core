@@ -55,7 +55,7 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 			func(o *SybilProtection) {
 				o.seatManager = o.optsSeatManagerProvider(e)
 
-				e.Constructed.OnTrigger(func() {
+				e.ConstructedEvent().OnTrigger(func() {
 					o.ledger = e.Ledger
 					o.errHandler = e.ErrorHandler("SybilProtection")
 					logger := e.NewChildLogger("PerformanceTracker")
@@ -74,7 +74,7 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 
 					// When the engine is triggered initialized, snapshot has been read or database has been initialized properly,
 					// so the committee should be available in the performance manager.
-					e.Initialized.OnTrigger(func() {
+					e.InitializedEvent().OnTrigger(func() {
 						// Mark the committee for the last committed slot as active.
 						currentEpoch := e.CommittedAPI().TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Slot())
 						err := o.seatManager.InitializeCommittee(currentEpoch, e.Clock.Accepted().RelativeTime())

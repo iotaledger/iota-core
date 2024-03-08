@@ -119,7 +119,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		signalingupgradeorchestrator.NewProvider(),
 		engine.WithSnapshotPath(""), // magic to disable loading snapshot
 	)
-	defer engineInstance.Shutdown.Trigger()
+	defer engineInstance.ShutdownEvent().Trigger()
 
 	if opt.AddGenesisRootBlock {
 		engineInstance.EvictionState.AddRootBlock(api.ProtocolParameters().GenesisBlockID(), genesisCommitment.ID())

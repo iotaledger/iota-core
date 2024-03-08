@@ -89,7 +89,7 @@ type Engine struct {
 	optsSnapshotDepth    int
 	optsBlockRequester   []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]]
 
-	*module.ReactiveModule
+	module.ReactiveModule
 }
 
 func New(
@@ -183,7 +183,7 @@ func New(
 		(*Engine).setupPruning,
 		(*Engine).acceptanceHandler,
 		func(e *Engine) {
-			e.Constructed.Trigger()
+			e.ConstructedEvent().Trigger()
 
 			// Make sure that we have the protocol parameters for the latest supported iota.go protocol version of the software.
 			// If not the user needs to update the protocol parameters file.
@@ -230,7 +230,7 @@ func New(
 				e.Reset()
 			}
 
-			e.Initialized.Trigger()
+			e.InitializedEvent().Trigger()
 
 			e.LogTrace("initialized", "settings", e.Storage.Settings().String())
 		},
@@ -540,14 +540,14 @@ func (e *Engine) initRootCommitment() {
 		})
 	}
 
-	e.Constructed.OnTrigger(func() {
+	e.ConstructedEvent().OnTrigger(func() {
 		unsubscribe := e.Events.SlotGadget.SlotFinalized.Hook(updateRootCommitment).Unhook
 
-		e.Initialized.OnTrigger(func() {
+		e.InitializedEvent().OnTrigger(func() {
 			updateRootCommitment(e.Storage.Settings().LatestFinalizedSlot())
 		})
 
-		e.Shutdown.OnTrigger(unsubscribe)
+		e.ShutdownEvent().OnTrigger(unsubscribe)
 	})
 }
 
@@ -558,25 +558,25 @@ func (e *Engine) initLatestCommitment() {
 		})
 	}
 
-	e.Constructed.OnTrigger(func() {
+	e.ConstructedEvent().OnTrigger(func() {
 		unsubscribe := e.Events.Notarization.LatestCommitmentUpdated.Hook(updateLatestCommitment).Unhook
 
-		e.Initialized.OnTrigger(func() {
+		e.InitializedEvent().OnTrigger(func() {
 			updateLatestCommitment(e.Storage.Settings().LatestCommitment())
 		})
 
-		e.Shutdown.OnTrigger(unsubscribe)
+		e.ShutdownEvent().OnTrigger(unsubscribe)
 	})
 }
 
-func (e *Engine) initReactiveModule(parentLogger log.Logger) (reactiveModule *module.ReactiveModule) {
+func (e *Engine) initReactiveModule(parentLogger log.Logger) (reactiveModule module.ReactiveModule) {
 	logger := parentLogger.NewChildLogger("Engine", true)
 	reactiveModule = module.NewReactiveModule(logger)
 
-	e.RootCommitment.LogUpdates(reactiveModule, log.LevelTrace, "RootCommitment")
-	e.LatestCommitment.LogUpdates(reactiveModule, log.LevelTrace, "LatestCommitment")
+	e.RootCommitment.LogUpdates(logger, log.LevelTrace, "RootCommitment")
+	e.LatestCommitment.LogUpdates(logger, log.LevelTrace, "LatestCommitment")
 
-	reactiveModule.Shutdown.OnTrigger(func() {
+	reactiveModule.ShutdownEvent().OnTrigger(func() {
 		reactiveModule.LogDebug("shutting down")
 
 		logger.UnsubscribeFromParentLogger()
@@ -606,7 +606,7 @@ func (e *Engine) initReactiveModule(parentLogger log.Logger) (reactiveModule *mo
 
 		reactiveModule.LogDebug("stopped")
 
-		e.Stopped.Trigger()
+		e.StoppedEvent().Trigger()
 	})
 
 	return reactiveModule
