@@ -76,6 +76,14 @@ func Test_CoreAPI(t *testing.T) {
 					require.Equal(t, block.MustID(), resp.BlockID, "BlockID of retrieved block does not match: %s != %s", block.MustID(), resp.BlockID)
 					require.Equal(t, api.BlockStateFinalized, resp.BlockState)
 				})
+
+				assetsPerSlot.forEachReattachment(t, func(t *testing.T, blockID iotago.BlockID) {
+					resp, err := d.wallet.Clients[nodeAlias].BlockMetadataByBlockID(context.Background(), blockID)
+					require.NoError(t, err)
+					require.NotNil(t, resp)
+					require.Equal(t, blockID, resp.BlockID, "BlockID of retrieved block does not match: %s != %s", blockID, resp.BlockID)
+					require.Equal(t, api.BlockStateFinalized, resp.BlockState)
+				})
 			},
 		},
 		{
@@ -210,34 +218,35 @@ func Test_CoreAPI(t *testing.T) {
 		{
 			name: "Test_TransactionsIncludedBlock",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				assetsPerSlot.forEachTransaction(t, func(t *testing.T, transaction *iotago.SignedTransaction) {
+				assetsPerSlot.forEachTransaction(t, func(t *testing.T, transaction *iotago.SignedTransaction, firstAttachmentID iotago.BlockID) {
 					resp, err := d.wallet.Clients[nodeAlias].TransactionIncludedBlock(context.Background(), lo.PanicOnErr(transaction.Transaction.ID()))
 					require.NoError(t, err)
 					require.NotNil(t, resp)
+					require.EqualValues(t, firstAttachmentID, resp.MustID())
 				})
-
-				// todo issue second block with the same tx, and make sure that the first one is returned here
 			},
 		},
 		{
 			name: "Test_TransactionsIncludedBlockMetadata",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				assetsPerSlot.forEachTransaction(t, func(t *testing.T, transaction *iotago.SignedTransaction) {
+				assetsPerSlot.forEachTransaction(t, func(t *testing.T, transaction *iotago.SignedTransaction, firstAttachmentID iotago.BlockID) {
 					resp, err := d.wallet.Clients[nodeAlias].TransactionIncludedBlockMetadata(context.Background(), lo.PanicOnErr(transaction.Transaction.ID()))
 					require.NoError(t, err)
 					require.NotNil(t, resp)
 					require.EqualValues(t, api.BlockStateFinalized, resp.BlockState)
+					require.EqualValues(t, firstAttachmentID, resp.BlockID, "Inclusion BlockID of retrieved transaction does not match: %s != %s", firstAttachmentID, resp.BlockID)
 				})
 			},
 		},
 		{
 			name: "Test_TransactionsMetadata",
 			testFunc: func(t *testing.T, nodeAlias string) {
-				assetsPerSlot.forEachTransaction(t, func(t *testing.T, transaction *iotago.SignedTransaction) {
+				assetsPerSlot.forEachTransaction(t, func(t *testing.T, transaction *iotago.SignedTransaction, firstAttachmentID iotago.BlockID) {
 					resp, err := d.wallet.Clients[nodeAlias].TransactionMetadata(context.Background(), lo.PanicOnErr(transaction.Transaction.ID()))
 					require.NoError(t, err)
 					require.NotNil(t, resp)
 					require.Equal(t, api.TransactionStateFinalized, resp.TransactionState)
+					require.EqualValues(t, resp.EarliestAttachmentSlot, firstAttachmentID.Slot())
 				})
 			},
 		},

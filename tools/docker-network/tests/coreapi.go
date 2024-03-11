@@ -47,10 +47,19 @@ func (a coreAPIAssets) forEachBlock(t *testing.T, f func(*testing.T, *iotago.Blo
 	}
 }
 
-func (a coreAPIAssets) forEachTransaction(t *testing.T, f func(*testing.T, *iotago.SignedTransaction)) {
+func (a coreAPIAssets) forEachTransaction(t *testing.T, f func(*testing.T, *iotago.SignedTransaction, iotago.BlockID)) {
 	for _, asset := range a {
-		for _, tx := range asset.transactions {
-			f(t, tx)
+		for i, tx := range asset.transactions {
+			blockID := asset.valueBlocks[i].MustID()
+			f(t, tx, blockID)
+		}
+	}
+}
+
+func (a coreAPIAssets) forEachReattachment(t *testing.T, f func(*testing.T, iotago.BlockID)) {
+	for _, asset := range a {
+		for _, reattachment := range asset.reattachments {
+			f(t, reattachment)
 		}
 	}
 }
@@ -141,6 +150,7 @@ type coreAPISlotAssets struct {
 	dataBlocks        []*iotago.Block
 	valueBlocks       []*iotago.Block
 	transactions      []*iotago.SignedTransaction
+	reattachments     []iotago.BlockID
 	basicOutputs      map[iotago.OutputID]iotago.Output
 	faucetOutputs     map[iotago.OutputID]iotago.Output
 	delegationOutputs map[iotago.OutputID]iotago.Output
@@ -172,6 +182,7 @@ func newAssetsPerSlot() *coreAPISlotAssets {
 		dataBlocks:        make([]*iotago.Block, 0),
 		valueBlocks:       make([]*iotago.Block, 0),
 		transactions:      make([]*iotago.SignedTransaction, 0),
+		reattachments:     make([]iotago.BlockID, 0),
 		basicOutputs:      make(map[iotago.OutputID]iotago.Output),
 		faucetOutputs:     make(map[iotago.OutputID]iotago.Output),
 		delegationOutputs: make(map[iotago.OutputID]iotago.Output),
@@ -212,11 +223,17 @@ func (d *DockerTestFramework) prepareAssets(totalAssetsNum int) (coreAPIAssets, 
 		d.SubmitBlock(ctx, valueBlock)
 		d.AwaitTransactionPayloadAccepted(ctx, signedTx.Transaction.MustID())
 
+		// issue reattachment after the fisrt one is already included
+		issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, d.wallet.DefaultClient(), account.Address)
+		secondAttachment := d.SubmitPayload(ctx, signedTx, account.Address.AccountID(), congestionResp, issuerResp)
+		assets[valueBlockSlot].reattachments = append(assets[valueBlockSlot].reattachments, secondAttachment)
+
+		// delegation
 		delegationOutputID, delegationOutput := d.DelegateToValidator(account.ID, d.Node("V1").AccountAddress(d.Testing))
 		assets.setupAssetsForSlot(delegationOutputID.CreationSlot())
 		assets[delegationOutputID.CreationSlot()].delegationOutputs[delegationOutputID] = delegationOutput
 
-		latestSlot = lo.Max[iotago.SlotIndex](latestSlot, blockSlot, valueBlockSlot, delegationOutputID.CreationSlot())
+		latestSlot = lo.Max[iotago.SlotIndex](latestSlot, blockSlot, valueBlockSlot, delegationOutputID.CreationSlot(), secondAttachment.Slot())
 
 		fmt.Printf("Assets for slot %d\n: dataBlock: %s block: %s\ntx: %s\nbasic output: %s, faucet output: %s\n delegation output: %s\n",
 			valueBlockSlot, block.MustID().String(), valueBlock.MustID().String(), lo.PanicOnErr(signedTx.ID()).String(),
