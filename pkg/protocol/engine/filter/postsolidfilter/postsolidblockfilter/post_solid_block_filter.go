@@ -60,19 +60,19 @@ func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
 		for _, parentID := range block.Parents() {
 			parent, exists := c.blockCacheRetrieveFunc(parentID)
 			if !exists {
-				c.events.BlockFiltered.Trigger(&postsolidfilter.BlockFilteredEvent{
-					Block:  block,
-					Reason: ierrors.Join(iotago.ErrBlockParentNotFound, ierrors.Errorf("parent %s of block %s is not known", parentID, block.ID())),
-				})
+				c.filterBlock(
+					block,
+					ierrors.Join(iotago.ErrBlockParentNotFound, ierrors.Errorf("parent %s of block %s is not known", parentID, block.ID())),
+				)
 
 				return
 			}
 
 			if !block.IssuingTime().After(parent.IssuingTime()) {
-				c.events.BlockFiltered.Trigger(&postsolidfilter.BlockFilteredEvent{
-					Block:  block,
-					Reason: ierrors.Join(iotago.ErrBlockIssuingTimeNonMonotonic, ierrors.Errorf("block %s issuing time %s not greater than parent's %s issuing time %s", block.ID(), block.IssuingTime(), parentID, parent.IssuingTime())),
-				})
+				c.filterBlock(
+					block,
+					ierrors.Join(iotago.ErrBlockIssuingTimeNonMonotonic, ierrors.Errorf("block %s issuing time %s not greater than parent's %s issuing time %s", block.ID(), block.IssuingTime(), parentID, parent.IssuingTime())),
+				)
 
 				return
 			}
@@ -84,18 +84,18 @@ func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
 		// check if the account exists in the specified slot.
 		accountData, exists, err := c.accountRetrieveFunc(block.ProtocolBlock().Header.IssuerID, block.SlotCommitmentID().Slot())
 		if err != nil {
-			c.events.BlockFiltered.Trigger(&postsolidfilter.BlockFilteredEvent{
-				Block:  block,
-				Reason: ierrors.Join(iotago.ErrIssuerAccountNotFound, ierrors.Wrapf(err, "could not retrieve account information for block issuer %s", block.ProtocolBlock().Header.IssuerID)),
-			})
+			c.filterBlock(
+				block,
+				ierrors.Join(iotago.ErrIssuerAccountNotFound, ierrors.Wrapf(err, "could not retrieve account information for block issuer %s", block.ProtocolBlock().Header.IssuerID)),
+			)
 
 			return
 		}
 		if !exists {
-			c.events.BlockFiltered.Trigger(&postsolidfilter.BlockFilteredEvent{
-				Block:  block,
-				Reason: ierrors.Join(iotago.ErrIssuerAccountNotFound, ierrors.Errorf("block issuer account %s does not exist in slot commitment %s", block.ProtocolBlock().Header.IssuerID, block.ProtocolBlock().Header.SlotCommitmentID.Slot())),
-			})
+			c.filterBlock(
+				block,
+				ierrors.Join(iotago.ErrIssuerAccountNotFound, ierrors.Errorf("block issuer account %s does not exist in slot commitment %s", block.ProtocolBlock().Header.IssuerID, block.ProtocolBlock().Header.SlotCommitmentID.Slot())),
+			)
 
 			return
 		}
@@ -105,26 +105,26 @@ func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
 			rmcSlot := block.ProtocolBlock().Header.SlotCommitmentID.Slot()
 			rmc, err := c.rmcRetrieveFunc(rmcSlot)
 			if err != nil {
-				c.events.BlockFiltered.Trigger(&postsolidfilter.BlockFilteredEvent{
-					Block:  block,
-					Reason: ierrors.Join(iotago.ErrRMCNotFound, ierrors.Wrapf(err, "could not retrieve RMC for slot commitment %s", rmcSlot)),
-				})
+				c.filterBlock(
+					block,
+					ierrors.Join(iotago.ErrRMCNotFound, ierrors.Wrapf(err, "could not retrieve RMC for slot commitment %s", rmcSlot)),
+				)
 
 				return
 			}
 			if basicBlock, isBasic := block.BasicBlock(); isBasic {
 				manaCost, err := block.ProtocolBlock().ManaCost(rmc)
 				if err != nil {
-					c.events.BlockFiltered.Trigger(&postsolidfilter.BlockFilteredEvent{
-						Block:  block,
-						Reason: ierrors.Join(iotago.ErrFailedToCalculateManaCost, ierrors.Wrapf(err, "could not calculate Mana cost for block")),
-					})
+					c.filterBlock(
+						block,
+						ierrors.Join(iotago.ErrFailedToCalculateManaCost, ierrors.Wrapf(err, "could not calculate Mana cost for block")),
+					)
 				}
 				if basicBlock.MaxBurnedMana < manaCost {
-					c.events.BlockFiltered.Trigger(&postsolidfilter.BlockFilteredEvent{
-						Block:  block,
-						Reason: ierrors.Join(iotago.ErrBurnedInsufficientMana, ierrors.Errorf("block issuer account %s burned insufficient Mana, required %d, burned %d", block.ProtocolBlock().Header.IssuerID, manaCost, basicBlock.MaxBurnedMana)),
-					})
+					c.filterBlock(
+						block,
+						ierrors.Join(iotago.ErrBurnedInsufficientMana, ierrors.Errorf("block issuer account %s burned insufficient Mana, required %d, burned %d", block.ProtocolBlock().Header.IssuerID, manaCost, basicBlock.MaxBurnedMana)),
+					)
 
 					return
 				}
@@ -134,10 +134,10 @@ func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
 		// Check that the issuer of this block has non-negative block issuance credit
 		{
 			if accountData.Credits.Value < 0 {
-				c.events.BlockFiltered.Trigger(&postsolidfilter.BlockFilteredEvent{
-					Block:  block,
-					Reason: ierrors.Wrapf(iotago.ErrAccountLocked, "block issuer account %s", block.ProtocolBlock().Header.IssuerID),
-				})
+				c.filterBlock(
+					block,
+					ierrors.Wrapf(iotago.ErrAccountLocked, "block issuer account %s", block.ProtocolBlock().Header.IssuerID),
+				)
 
 				return
 			}
@@ -146,10 +146,10 @@ func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
 		// Check that the account is not expired
 		{
 			if accountData.ExpirySlot < block.ProtocolBlock().Header.SlotCommitmentID.Slot() {
-				c.events.BlockFiltered.Trigger(&postsolidfilter.BlockFilteredEvent{
-					Block:  block,
-					Reason: ierrors.Wrapf(iotago.ErrAccountExpired, "block issuer account %s is expired, expiry slot %d in commitment %d", block.ProtocolBlock().Header.IssuerID, accountData.ExpirySlot, block.ProtocolBlock().Header.SlotCommitmentID.Slot()),
-				})
+				c.filterBlock(
+					block,
+					ierrors.Wrapf(iotago.ErrAccountExpired, "block issuer account %s is expired, expiry slot %d in commitment %d", block.ProtocolBlock().Header.IssuerID, accountData.ExpirySlot, block.ProtocolBlock().Header.SlotCommitmentID.Slot()),
+				)
 
 				return
 			}
@@ -162,36 +162,36 @@ func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
 				expectedBlockIssuerKey := iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(signature.PublicKey)
 
 				if !accountData.BlockIssuerKeys.Has(expectedBlockIssuerKey) {
-					c.events.BlockFiltered.Trigger(&postsolidfilter.BlockFilteredEvent{
-						Block:  block,
-						Reason: ierrors.Wrapf(iotago.ErrInvalidSignature, "block issuer account %s does not have block issuer key corresponding to public key %s in slot %d", block.ProtocolBlock().Header.IssuerID, hexutil.EncodeHex(signature.PublicKey[:]), block.ProtocolBlock().Header.SlotCommitmentID.Index()),
-					})
+					c.filterBlock(
+						block,
+						ierrors.Wrapf(iotago.ErrInvalidSignature, "block issuer account %s does not have block issuer key corresponding to public key %s in slot %d", block.ProtocolBlock().Header.IssuerID, hexutil.EncodeHex(signature.PublicKey[:]), block.ProtocolBlock().Header.SlotCommitmentID.Index()),
+					)
 
 					return
 				}
 
 				signingMessage, err := block.ProtocolBlock().SigningMessage()
 				if err != nil {
-					c.events.BlockFiltered.Trigger(&postsolidfilter.BlockFilteredEvent{
-						Block:  block,
-						Reason: ierrors.Wrapf(iotago.ErrInvalidSignature, "error: %s", err.Error()),
-					})
+					c.filterBlock(
+						block,
+						ierrors.Wrapf(iotago.ErrInvalidSignature, "error: %s", err.Error()),
+					)
 
 					return
 				}
 				if !hiveEd25519.Verify(signature.PublicKey[:], signingMessage, signature.Signature[:]) {
-					c.events.BlockFiltered.Trigger(&postsolidfilter.BlockFilteredEvent{
-						Block:  block,
-						Reason: iotago.ErrInvalidSignature,
-					})
+					c.filterBlock(
+						block,
+						iotago.ErrInvalidSignature,
+					)
 
 					return
 				}
 			default:
-				c.events.BlockFiltered.Trigger(&postsolidfilter.BlockFilteredEvent{
-					Block:  block,
-					Reason: ierrors.Wrapf(iotago.ErrInvalidSignature, "only ed25519 signatures supported, got %s", block.ProtocolBlock().Signature.Type()),
-				})
+				c.filterBlock(
+					block,
+					ierrors.Wrapf(iotago.ErrInvalidSignature, "only ed25519 signatures supported, got %s", block.ProtocolBlock().Signature.Type()),
+				)
 
 				return
 			}
@@ -206,4 +206,13 @@ func (c *PostSolidBlockFilter) Reset() { /* nothing to reset but comply with int
 
 func (c *PostSolidBlockFilter) Shutdown() {
 	c.TriggerStopped()
+}
+
+func (c *PostSolidBlockFilter) filterBlock(block *blocks.Block, reason error) {
+	block.SetInvalid()
+
+	c.events.BlockFiltered.Trigger(&postsolidfilter.BlockFilteredEvent{
+		Block:  block,
+		Reason: reason,
+	})
 }

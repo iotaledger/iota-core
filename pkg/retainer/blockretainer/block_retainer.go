@@ -81,6 +81,8 @@ func NewProvider() module.Provider[*engine.Engine, retainer.BlockRetainer] {
 			}
 		})
 
+		e.Events.Retainer.BlockRetained.LinkTo(r.events.BlockRetained)
+
 		r.TriggerInitialized()
 
 		return r

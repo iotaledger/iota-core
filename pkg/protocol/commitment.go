@@ -118,7 +118,7 @@ func newCommitment(commitments *Commitments, model *model.Commitment) *Commitmen
 		commitments:                     commitments,
 	}
 
-	shutdown := lo.Batch(
+	shutdown := lo.BatchReverse(
 		c.initLogger(),
 		c.initDerivedProperties(),
 	)
@@ -206,7 +206,7 @@ func (c *Commitment) Less(other *Commitment) bool {
 func (c *Commitment) initLogger() (shutdown func()) {
 	c.Logger = c.commitments.NewChildLogger(fmt.Sprintf("Slot%d.", c.Slot()), true)
 
-	return lo.Batch(
+	return lo.BatchReverse(
 		c.Parent.LogUpdates(c, log.LevelTrace, "Parent", (*Commitment).LogName),
 		c.MainChild.LogUpdates(c, log.LevelTrace, "MainChild", (*Commitment).LogName),
 		c.Chain.LogUpdates(c, log.LevelTrace, "Chain", (*Chain).LogName),
@@ -231,7 +231,7 @@ func (c *Commitment) initLogger() (shutdown func()) {
 
 // initDerivedProperties initializes the behavior of this Commitment by setting up the relations between its properties.
 func (c *Commitment) initDerivedProperties() (shutdown func()) {
-	return lo.Batch(
+	return lo.BatchReverse(
 		// mark commitments that are marked as root as verified
 		c.IsVerified.InheritFrom(c.IsRoot),
 
@@ -256,7 +256,7 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 				c.deriveIsAboveLatestVerifiedCommitment(parent),
 
 				c.Chain.WithNonEmptyValue(func(chain *Chain) func() {
-					return lo.Batch(
+					return lo.BatchReverse(
 						c.deriveRequestAttestations(chain, parent),
 
 						// only start requesting blocks once the engine is ready
@@ -269,7 +269,7 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 		}),
 
 		c.Chain.WithNonEmptyValue(func(chain *Chain) func() {
-			return lo.Batch(
+			return lo.BatchReverse(
 				chain.addCommitment(c),
 
 				c.deriveReplayDroppedBlocks(chain),
