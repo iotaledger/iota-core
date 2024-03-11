@@ -71,10 +71,6 @@ func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 		}
 	}
 
-	// do not respond to really old requests
-	if requestedSlot+iotago.SlotIndex(restapi.ParamsRestAPI.MaxRequestedSlotAge) < latestCommittedSlot {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "request is too old, request started at %d, latest committed slot index is %d", requestedSlot, latestCommittedSlot)
-	}
 	slotRange := uint32(requestedSlot) / restapi.ParamsRestAPI.RequestsMemoryCacheGranularity
 
 	return deps.RequestHandler.Validators(slotRange, cursorIndex, pageSize)
