@@ -78,7 +78,7 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 					sybilprotectionv1.WithSeatManagerProvider(module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
 						poa := mock2.NewManualPOAProvider()(e).(*mock2.ManualPOA)
 						for _, node := range lo.Filter(nodes, (*mock.Node).IsValidator) {
-							poa.AddAccount(node.Validator.AccountID, node.Name)
+							poa.AddAccount(node.Validator.AccountData.ID, node.Name)
 						}
 
 						return poa
@@ -91,18 +91,18 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 	ts.Run(false, nodeOptions)
 
 	expectedCommittee := []iotago.AccountID{
-		node0.Validator.AccountID,
-		node1.Validator.AccountID,
-		node3.Validator.AccountID,
-		node4.Validator.AccountID,
+		node0.Validator.AccountData.ID,
+		node1.Validator.AccountData.ID,
+		node3.Validator.AccountData.ID,
+		node4.Validator.AccountData.ID,
 	}
 	expectedP1OnlineCommittee := []account.SeatIndex{
-		lo.Return1(lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node0.Validator.AccountID)),
-		lo.Return1(lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node1.Validator.AccountID)),
+		lo.Return1(lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node0.Validator.AccountData.ID)),
+		lo.Return1(lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node1.Validator.AccountData.ID)),
 	}
 	expectedP2OnlineCommittee := []account.SeatIndex{
-		lo.Return1(lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node3.Validator.AccountID)),
-		lo.Return1(lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node4.Validator.AccountID)),
+		lo.Return1(lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node3.Validator.AccountData.ID)),
+		lo.Return1(lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node4.Validator.AccountData.ID)),
 	}
 	expectedOnlineCommittee := append(expectedP1OnlineCommittee, expectedP2OnlineCommittee...)
 
@@ -148,7 +148,7 @@ func TestProtocol_EngineSwitching_No_Verified_Commitments(t *testing.T) {
 		// Make sure the tips are properly set.
 		ts.AssertStrongTips(ts.BlocksWithPrefix("P0:8.3"), ts.Nodes()...)
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.Nodes()...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.ClientsForNodes()...)
 	}
 
 	// Split into partitions P1 and P2.

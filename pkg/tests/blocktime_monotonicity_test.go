@@ -35,24 +35,24 @@ func Test_MaxAllowedWallClockDrift(t *testing.T) {
 		protocol.WithMaxAllowedWallClockDrift(allowedDrift),
 	}})
 
-	pastBlock := lo.PanicOnErr(node0.Validator.CreateBasicBlock(context.Background(), "past", node0, mock.WithBasicBlockHeader(mock.WithIssuingTime(time.Now().Add(-allowedDrift)))))
+	pastBlock := lo.PanicOnErr(node0.Validator.CreateBasicBlock(context.Background(), "past", mock.WithBasicBlockHeader(mock.WithIssuingTime(time.Now().Add(-allowedDrift)))))
 	ts.RegisterBlock("past", pastBlock)
-	require.NoError(t, node0.Validator.IssueBlock(pastBlock.ModelBlock(), node0))
+	require.NoError(t, node0.Validator.SubmitBlock(context.Background(), pastBlock.ModelBlock()))
 
-	presentBlock := lo.PanicOnErr(node0.Validator.CreateBasicBlock(context.Background(), "present", node0, mock.WithBasicBlockHeader(mock.WithIssuingTime(time.Now()))))
+	presentBlock := lo.PanicOnErr(node0.Validator.CreateBasicBlock(context.Background(), "present", mock.WithBasicBlockHeader(mock.WithIssuingTime(time.Now()))))
 	ts.RegisterBlock("present", presentBlock)
-	require.NoError(t, node0.Validator.IssueBlock(presentBlock.ModelBlock(), node0))
+	require.NoError(t, node0.Validator.SubmitBlock(context.Background(), presentBlock.ModelBlock()))
 
-	acceptedFutureBlock := lo.PanicOnErr(node0.Validator.CreateBasicBlock(context.Background(), "acceptedFuture", node0, mock.WithBasicBlockHeader(mock.WithIssuingTime(time.Now().Add(allowedDrift)))))
+	acceptedFutureBlock := lo.PanicOnErr(node0.Validator.CreateBasicBlock(context.Background(), "acceptedFuture", mock.WithBasicBlockHeader(mock.WithIssuingTime(time.Now().Add(allowedDrift)))))
 	ts.RegisterBlock("acceptedFuture", acceptedFutureBlock)
-	require.NoError(t, node0.Validator.IssueBlock(acceptedFutureBlock.ModelBlock(), node0))
+	require.NoError(t, node0.Validator.SubmitBlock(context.Background(), acceptedFutureBlock.ModelBlock()))
 
-	tooFarAheadFutureBlock := lo.PanicOnErr(node0.Validator.CreateBasicBlock(context.Background(), "tooFarAheadFuture", node0, mock.WithBasicBlockHeader(mock.WithIssuingTime(time.Now().Add(allowedDrift).Add(1*time.Second)))))
+	tooFarAheadFutureBlock := lo.PanicOnErr(node0.Validator.CreateBasicBlock(context.Background(), "tooFarAheadFuture", mock.WithBasicBlockHeader(mock.WithIssuingTime(time.Now().Add(allowedDrift).Add(1*time.Second)))))
 	ts.RegisterBlock("tooFarAheadFuture", tooFarAheadFutureBlock)
-	require.NoError(t, node0.Validator.IssueBlock(tooFarAheadFutureBlock.ModelBlock(), node0))
+	require.NoError(t, node0.Validator.SubmitBlock(context.Background(), tooFarAheadFutureBlock.ModelBlock()))
 
-	ts.AssertBlocksExist(ts.Blocks("past", "present", "acceptedFuture"), true, node0)
-	ts.AssertBlocksExist(ts.Blocks("tooFarAheadFuture"), false, node0)
+	ts.AssertBlocksExist(ts.Blocks("past", "present", "acceptedFuture"), true, node0.Client)
+	ts.AssertBlocksExist(ts.Blocks("tooFarAheadFuture"), false, node0.Client)
 }
 func Test_BlockTimeMonotonicity(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
