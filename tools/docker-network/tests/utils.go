@@ -228,6 +228,17 @@ func (d *DockerTestFramework) AwaitCommitment(targetSlot iotago.SlotIndex) {
 	}
 }
 
+func (d *DockerTestFramework) AwaitFinalization(targetSlot iotago.SlotIndex) {
+	d.Eventually(func() error {
+		currentFinalisedSlot := d.NodeStatus("V1").LatestFinalizedSlot
+		if targetSlot > currentFinalisedSlot {
+			return ierrors.Errorf("finalized slot %d is not reached yet", targetSlot)
+		}
+
+		return nil
+	})
+}
+
 func (d *DockerTestFramework) AwaitAddressUnspentOutputAccepted(ctx context.Context, addr iotago.Address) (outputID iotago.OutputID, output iotago.Output, err error) {
 	indexerClt, err := d.wallet.DefaultClient().Indexer(ctx)
 	require.NoError(d.Testing, err)

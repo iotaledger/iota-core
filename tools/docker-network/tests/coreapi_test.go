@@ -40,8 +40,8 @@ func Test_CoreAPI(t *testing.T) {
 
 	assetsPerSlot, lastSlot := d.prepareAssets(5)
 
-	fmt.Println("AwaitCommitment for slot", lastSlot)
-	d.AwaitCommitment(lastSlot)
+	fmt.Println("Await finalisation of slot", lastSlot)
+	d.AwaitFinalization(lastSlot)
 
 	tests := []struct {
 		name     string

@@ -656,7 +656,7 @@ func (d *DockerTestFramework) RequestFaucetFunds(ctx context.Context, addressTyp
 		Output:       output,
 	})
 
-	fmt.Println("Faucet funds received, txID:", outputID.TransactionID().ToHex(), ", amount:", output.BaseTokenAmount(), ", mana:", output.StoredMana())
+	fmt.Printf("Faucet funds received, txID: %s, amount: %d, mana: %d", outputID.TransactionID().ToHex(), output.BaseTokenAmount(), output.StoredMana())
 
 	return outputID
 }
