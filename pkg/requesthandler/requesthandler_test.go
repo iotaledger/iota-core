@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
+	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/require"
 )
 
@@ -174,9 +175,13 @@ func Test_ValidatorsAPI(t *testing.T) {
 			ts.Node("node2").Validator.AccountID.ToAddress().Bech32(hrp),
 			ts.Node("node3").Validator.AccountID.ToAddress().Bech32(hrp),
 		}, requestHandler, 1)
-
 	}
 
+	// error returned, requesting with invalid cursor index.
+	{
+		_, err := requestHandler.Validators(1, 6, 10)
+		require.ErrorAs(t, echo.ErrBadRequest, &err)
+	}
 }
 
 func assertValidatorsFromRequestHandler(t *testing.T, expectedValidators []string, requestHandler *RequestHandler, requestedEpoch iotago.EpochIndex) {
