@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
@@ -62,7 +61,6 @@ func Test_ValidatorsAPI(t *testing.T) {
 		"node3": nodeOpts,
 		"node4": nodeOpts,
 	})
-	ts.DefaultWallet().Node.Protocol.SetLogLevel(log.LevelTrace)
 
 	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
 		ts.Node("node1").Validator.AccountID,
@@ -73,7 +71,7 @@ func Test_ValidatorsAPI(t *testing.T) {
 	requestHandler := New(ts.DefaultWallet().Node.Protocol)
 	hrp := ts.API.ProtocolParameters().Bech32HRP()
 
-	// Select committee for epoch 1 and test candidacy announcements at different times.
+	// Epoch 0, assert that node1 and node4 are the only candidates.
 	{
 		ts.IssueBlocksAtSlots("wave-1:", []iotago.SlotIndex{1, 2, 3, 4}, 4, "Genesis", ts.Nodes(), true, false)
 
@@ -82,7 +80,6 @@ func Test_ValidatorsAPI(t *testing.T) {
 
 		ts.IssueBlocksAtSlots("wave-2:", []iotago.SlotIndex{5, 6, 7, 8}, 4, "node4-candidacy:1", ts.Nodes(), true, false)
 
-		// Assert that only candidates that issued before slot 11 are considered.
 		ts.AssertSybilProtectionCandidates(0, []iotago.AccountID{
 			ts.Node("node1").Validator.AccountID,
 			ts.Node("node4").Validator.AccountID,
@@ -99,6 +96,7 @@ func Test_ValidatorsAPI(t *testing.T) {
 		}, requestHandler, 0)
 	}
 
+	// Epoch 0, assert that node1, node2 and node4 are the only candidates.
 	{
 		ts.IssueCandidacyAnnouncementInSlot("node2-candidacy:1", 9, "wave-2:8.3", ts.Wallet("node2"))
 		ts.IssueBlocksAtSlots("wave-3:", []iotago.SlotIndex{9, 10}, 4, "node2-candidacy:1", ts.Nodes(), true, false)
@@ -122,8 +120,8 @@ func Test_ValidatorsAPI(t *testing.T) {
 		}, requestHandler, 0)
 	}
 
+	// Epoch 0, assert that node1, node2 and node4 are the only registered validators. Since node3 issued a candidacy payload after epoch nearing threshold (slot 11), it should not be a registered validators.
 	{
-		// Those candidacies should not be considered as they're issued after EpochNearingThreshold (slot 10).
 		ts.IssueCandidacyAnnouncementInSlot("node3-candidacy:1", 11, "wave-3:10.3", ts.Wallet("node3"))
 		ts.IssueBlocksAtSlots("wave-5:", []iotago.SlotIndex{11}, 4, "node3-candidacy:1", ts.Nodes(), true, false)
 
@@ -146,6 +144,7 @@ func Test_ValidatorsAPI(t *testing.T) {
 		}, requestHandler, 0)
 	}
 
+	// Epoch 1, assert that node1, node2 and node4 are the only registered validators in Epoch 0. And node2 and node3 are the only registered validators in Epoch 1.
 	{
 		ts.IssueBlocksAtSlots("wave-6:", []iotago.SlotIndex{12, 13, 14, 15, 16}, 4, "wave-5:11.3", ts.Nodes(), true, false)
 
@@ -153,14 +152,14 @@ func Test_ValidatorsAPI(t *testing.T) {
 		ts.IssueCandidacyAnnouncementInSlot("node3-candidacy:2", 17, "node2-candidacy:2", ts.Wallet("node3"))
 		ts.IssueBlocksAtSlots("wave-7:", []iotago.SlotIndex{18}, 4, "node3-candidacy:2", ts.Nodes(), true, false)
 
-		// advance to next epoch, the validator cache should be used.
+		// request registered validators of epoch 0, the validator cache should be used.
 		assertValidatorsFromRequestHandler(t, []string{
 			ts.Node("node1").Validator.AccountID.ToAddress().Bech32(hrp),
 			ts.Node("node2").Validator.AccountID.ToAddress().Bech32(hrp),
 			ts.Node("node4").Validator.AccountID.ToAddress().Bech32(hrp),
 		}, requestHandler, 0)
 
-		// new epoch should have 2 validators (node2, node3)
+		// epoch 1 should have 2 validators (node2, node3)
 		ts.AssertSybilProtectionCandidates(1, []iotago.AccountID{
 			ts.Node("node2").Validator.AccountID,
 			ts.Node("node3").Validator.AccountID,
