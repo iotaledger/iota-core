@@ -35,23 +35,23 @@ func (r *RequestHandler) CongestionByAccountAddress(accountAddress *iotago.Accou
 	}, nil
 }
 
-func (r *RequestHandler) registeredValidatorsFromCache(index iotago.EpochIndex) ([]*api.ValidatorResponse, error) {
-	apiForEpoch := r.APIProvider().APIForEpoch(index)
+func (r *RequestHandler) registeredValidatorsFromCache(epochIndex iotago.EpochIndex, key []byte) ([]*api.ValidatorResponse, error) {
+	apiForEpoch := r.APIProvider().APIForEpoch(epochIndex)
 
-	registeredValidatorsBytes := r.registeredValidatorsCache.Get(index.MustBytes())
+	registeredValidatorsBytes := r.registeredValidatorsCache.Get(key)
 	if registeredValidatorsBytes == nil {
 		// get the ordered registered validators list from engine.
-		registeredValidators, err := r.protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(index)
+		registeredValidators, err := r.protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(epochIndex)
 		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrNotFound, " ordered registered validators list for epoch %d not found: %s", index, err)
+			return nil, ierrors.Wrapf(echo.ErrNotFound, " ordered registered validators list for epoch %d not found: %s", epochIndex, err)
 		}
 
 		// store validator responses in cache.
 		registeredValidatorsBytes, err := apiForEpoch.Encode(registeredValidators, serix.WithTypeSettings(validatorResponsesTypeSettings))
 		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to encode ordered registered validators list for epoch %d : %s", index, err)
+			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to encode ordered registered validators list for epoch %d : %s", epochIndex, err)
 		}
-		r.registeredValidatorsCache.Set(index.MustBytes(), registeredValidatorsBytes)
+		r.registeredValidatorsCache.Set(key, registeredValidatorsBytes)
 
 		return registeredValidators, nil
 	}
@@ -59,7 +59,7 @@ func (r *RequestHandler) registeredValidatorsFromCache(index iotago.EpochIndex) 
 	validatorResp := make([]*api.ValidatorResponse, 0)
 	_, err := apiForEpoch.Decode(registeredValidatorsBytes, &validatorResp, serix.WithTypeSettings(validatorResponsesTypeSettings))
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to decode validator responses for epoch %d", index)
+		return nil, ierrors.Wrapf(err, "failed to decode validator responses for epoch %d", epochIndex)
 	}
 
 	return validatorResp, nil
@@ -67,15 +67,17 @@ func (r *RequestHandler) registeredValidatorsFromCache(index iotago.EpochIndex) 
 
 func (r *RequestHandler) Validators(epochIndex iotago.EpochIndex, cursorIndex, pageSize uint32) (*api.ValidatorsResponse, error) {
 	apiForEpoch := r.APIProvider().APIForEpoch(epochIndex)
-	currentEpoch := apiForEpoch.TimeProvider().EpochFromSlot(r.protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot())
+	currentSlot := r.protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot()
+	currentEpoch := apiForEpoch.TimeProvider().EpochFromSlot(currentSlot)
 	var registeredValidators []*api.ValidatorResponse
 	var err error
 
-	// return registered validators of current epoch from node, because they are not yet finalized.
 	if epochIndex == currentEpoch {
-		registeredValidators, err = r.protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(epochIndex)
+		// The key of validators cache is the combination of current epoch and current slot. So the results is updated when new commitment is created.
+		key := append(currentEpoch.MustBytes(), currentSlot.MustBytes()...)
+		registeredValidators, err = r.registeredValidatorsFromCache(epochIndex, key)
 	} else {
-		registeredValidators, err = r.registeredValidatorsFromCache(epochIndex)
+		registeredValidators, err = r.registeredValidatorsFromCache(epochIndex, epochIndex.MustBytes())
 	}
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get registered validators for epoch %d", epochIndex)
