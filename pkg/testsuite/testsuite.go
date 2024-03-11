@@ -340,15 +340,6 @@ func (t *TestSuite) Shutdown() {
 		node.Shutdown()
 		return true
 	})
-
-	// fmt.Println("======= ATTACHED BLOCKS =======")
-	// t.nodes.ForEach(func(_ string, node *mock.Node) bool {
-	// 	for _, block := range node.AttachedBlocks() {
-	// 		fmt.Println(node.Name, ">", block)
-	// 	}
-	//
-	// 	return true
-	// })
 }
 
 func (t *TestSuite) addNodeToPartition(name string, partition string, validator bool, walletOpts ...options.Option[WalletOptions]) *mock.Node {
@@ -546,7 +537,7 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 		baseOpts := []options.Option[protocol.Protocol]{
 			protocol.WithSnapshotPath(t.snapshotPath),
 			protocol.WithBaseDirectory(t.Directory.PathWithCreate(node.Name)),
-			protocol.WithEpochGadgetProvider(
+			protocol.WithSybilProtectionProvider(
 				sybilprotectionv1.NewProvider(),
 			),
 		}

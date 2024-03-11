@@ -44,7 +44,7 @@ func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 	requestedSlot := latestCommittedSlot
 	var cursorIndex uint32
 	if len(c.QueryParam(api.ParameterCursor)) != 0 {
-		requestedSlot, cursorIndex, err = httpserver.ParseCursorQueryParam(c, api.ParameterCursor)
+		requestedSlot, cursorIndex, err = httpserver.ParseSlotCursorQueryParam(c, api.ParameterCursor)
 		if err != nil {
 			return nil, err
 		}
@@ -56,7 +56,7 @@ func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 	}
 	slotRange := uint32(requestedSlot) / restapi.ParamsRestAPI.RequestsMemoryCacheGranularity
 
-	return deps.RequestHandler.Validators(slotRange, pageSize, cursorIndex)
+	return deps.RequestHandler.Validators(slotRange, cursorIndex, pageSize)
 }
 
 func validatorByAccountAddress(c echo.Context) (*api.ValidatorResponse, error) {

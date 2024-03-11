@@ -11,6 +11,7 @@ func (p *Protocol) Inspect(session ...inspection.Session) inspection.InspectedOb
 	return inspection.NewInspectedObject(p, func(protocol inspection.InspectedObject) {
 		protocol.Add("Commitments", p.Commitments)
 		protocol.Add("Chains", p.Chains)
+		protocol.Add("Engines", p.Engines)
 	}, session...)
 }
 
@@ -57,8 +58,22 @@ func (c *Chain) Inspect(session ...inspection.Session) inspection.InspectedObjec
 	return inspection.NewInspectedObject(c, func(chain inspection.InspectedObject) {
 		chain.Add("ForkingPoint", c.ForkingPoint.Get())
 		chain.Add("ParentChain", c.ParentChain.Get())
+		chain.Add("LatestCommitment", c.LatestCommitment.Get())
+		chain.Add("LatestAttestedCommitment", c.LatestAttestedCommitment.Get())
+		chain.Add("LatestProducedCommitment", c.LatestProducedCommitment.Get())
+		chain.Add("Engine", c.Engine.Get())
 		chain.Add("ChildChains", c.ChildChains, inspection.SetInspector[*Chain](c.ChildChains, func(childChains inspection.InspectedObject, chain *Chain) {
 			childChains.Add(chain.LogName(), chain)
 		}))
+		chain.Add("commitments", c.commitments, inspection.MapInspector(c.commitments, func(commitments inspection.InspectedObject, slot iotago.SlotIndex, commitment *Commitment) {
+			commitments.Add(slot.String(), commitment)
+		}))
+	}, session...)
+}
+
+// Inspect inspects the Engines and its subcomponents.
+func (e *Engines) Inspect(session ...inspection.Session) inspection.InspectedObject {
+	return inspection.NewInspectedObject(e, func(engines inspection.InspectedObject) {
+		engines.Add("Main", e.Main.Get())
 	}, session...)
 }

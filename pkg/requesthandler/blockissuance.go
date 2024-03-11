@@ -14,12 +14,6 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-var (
-	ErrBlockAttacherInvalidBlock              = ierrors.New("invalid block")
-	ErrBlockAttacherAttachingNotPossible      = ierrors.New("attaching not possible")
-	ErrBlockAttacherIncompleteBlockNotAllowed = ierrors.New("incomplete block is not allowed on this node")
-)
-
 // TODO: make sure an honest validator does not issue blocks within the same slot ratification period in two conflicting chains.
 //  - this can be achieved by remembering the last issued block together with the engine name/chain.
 //  - if the engine name/chain is the same we can always issue a block.
@@ -60,6 +54,7 @@ func (r *RequestHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *mo
 		case <-exit:
 		}
 	}, event.WithWorkerPool(r.workerPool)).Unhook
+
 	postfilteredUnhook := r.protocol.Events.Engine.PostSolidFilter.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
 		if blockID != event.Block.ID() {
 			return
@@ -70,8 +65,7 @@ func (r *RequestHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *mo
 		}
 	}, event.WithWorkerPool(r.workerPool)).Unhook
 
-	defer lo.Batch(evtUnhook, prefilteredUnhook)()
-	defer lo.Batch(evtUnhook, postfilteredUnhook)()
+	defer lo.BatchReverse(evtUnhook, prefilteredUnhook, postfilteredUnhook)()
 
 	if err := r.submitBlock(block); err != nil {
 		return ierrors.Wrapf(err, "failed to issue block %s", blockID)
@@ -94,7 +88,7 @@ func (r *RequestHandler) SubmitBlockAndAwaitBooking(ctx context.Context, iotaBlo
 		return iotago.EmptyBlockID, ierrors.Wrap(err, "error serializing block to model block")
 	}
 
-	if err = r.SubmitBlockAndAwaitEvent(ctx, modelBlock, r.protocol.Events.Engine.Booker.BlockBooked); err != nil {
+	if err = r.SubmitBlockAndAwaitEvent(ctx, modelBlock, r.protocol.Events.Engine.Retainer.BlockRetained); err != nil {
 		return iotago.EmptyBlockID, ierrors.Wrap(err, "error issuing model block")
 	}
 

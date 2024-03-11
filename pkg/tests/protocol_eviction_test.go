@@ -71,7 +71,7 @@ func TestProtocol_Eviction(t *testing.T) {
 						onlineValidators := ds.NewSet[string]()
 
 						e.Constructed.OnTrigger(func() {
-							e.Events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
+							e.Events.BlockDAG.BlockAppended.Hook(func(block *blocks.Block) {
 								if block.ModelBlock().ProtocolBlock().Header.IssuerID == node.Validator.AccountData.ID && onlineValidators.Add(node.Name) {
 									e.LogError("node online", "name", node.Name)
 									poa.SetOnline(onlineValidators.ToSlice()...)

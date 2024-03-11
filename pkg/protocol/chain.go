@@ -92,7 +92,7 @@ func newChain(chains *Chains) *Chain {
 		commitments: shrinkingmap.New[iotago.SlotIndex, *Commitment](),
 	}
 
-	shutdown := lo.Batch(
+	shutdown := lo.BatchReverse(
 		c.initLogger(),
 		c.initDerivedProperties(),
 	)
@@ -161,6 +161,20 @@ func (c *Chain) Commitment(slot iotago.SlotIndex) (commitment *Commitment, exist
 	return nil, false
 }
 
+// CumulativeVerifiedWeightAt returns the cumulative verified weight at the given slot for this chain.
+func (c *Chain) CumulativeVerifiedWeightAt(slot iotago.SlotIndex) uint64 {
+	commitmentAtSlot, exists := c.Commitment(slot)
+	if exists && commitmentAtSlot.IsVerified.Get() {
+		return commitmentAtSlot.CumulativeVerifiedWeight.Get()
+	}
+
+	if latestProducedCommitment := c.LatestProducedCommitment.Get(); latestProducedCommitment != nil {
+		return latestProducedCommitment.CumulativeVerifiedWeight.Get()
+	}
+
+	return 0
+}
+
 // LatestEngine returns the latest engine instance that was spawned by the chain itself or one of its ancestors.
 func (c *Chain) LatestEngine() *engine.Engine {
 	currentChain, currentEngine := c, c.Engine.Get()
@@ -177,7 +191,7 @@ func (c *Chain) LatestEngine() *engine.Engine {
 func (c *Chain) initLogger() (shutdown func()) {
 	c.Logger = c.chains.NewChildLogger("", true)
 
-	return lo.Batch(
+	return lo.BatchReverse(
 		c.WarpSyncMode.LogUpdates(c, log.LevelTrace, "WarpSyncMode"),
 		c.LatestSyncedSlot.LogUpdates(c, log.LevelTrace, "LatestSyncedSlot"),
 		c.OutOfSyncThreshold.LogUpdates(c, log.LevelTrace, "OutOfSyncThreshold"),
@@ -304,7 +318,7 @@ func (c *Chain) addCommitment(newCommitment *Commitment) (shutdown func()) {
 
 	c.LatestCommitment.Set(newCommitment)
 
-	return lo.Batch(
+	return lo.BatchReverse(
 		newCommitment.IsAttested.OnTrigger(func() { c.LatestAttestedCommitment.Set(newCommitment) }),
 		newCommitment.IsVerified.OnTrigger(func() { c.LatestProducedCommitment.Set(newCommitment) }),
 		newCommitment.IsSynced.OnTrigger(func() { c.LatestSyncedSlot.Set(newCommitment.Slot()) }),

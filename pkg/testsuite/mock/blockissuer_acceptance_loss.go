@@ -12,8 +12,6 @@ func (i *BlockIssuer) reviveChain(issuingTime time.Time, node *Node) (*iotago.Co
 	lastCommittedSlot := node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot()
 	apiForSlot := node.Protocol.APIForSlot(lastCommittedSlot)
 
-	// Get a rootblock as recent as possible for the parent.
-	parentBlockID := lo.Return1(node.Protocol.Engines.Main.Get().EvictionState.LatestActiveRootBlock())
 	issuingSlot := apiForSlot.TimeProvider().SlotFromTime(issuingTime)
 
 	// Force commitments until minCommittableAge relative to the block's issuing time. We basically "pretend" that
@@ -31,6 +29,10 @@ func (i *BlockIssuer) reviveChain(issuingTime time.Time, node *Node) (*iotago.Co
 	if err != nil {
 		return nil, iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to commit until slot %d to revive chain", commitUntilSlot)
 	}
+
+	// Get a rootblock after force committing for the parent. This is necessary, as we might accept "pending accepted"
+	// blocks when force committing so slots are not effectively empty.
+	parentBlockID := lo.Return1(node.Protocol.Engines.Main.Get().EvictionState.LatestActiveRootBlock())
 
 	return commitment.Commitment(), parentBlockID, nil
 }

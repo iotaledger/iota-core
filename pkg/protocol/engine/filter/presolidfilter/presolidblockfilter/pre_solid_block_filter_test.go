@@ -108,31 +108,6 @@ func mockedCommitteeFunc(validatorAccountID iotago.AccountID) func(iotago.SlotIn
 	}
 }
 
-func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
-	allowedDrift := 3 * time.Second
-
-	testAPI := tpkg.ZeroCostTestAPI
-
-	tf := NewTestFramework(t,
-		iotago.SingleVersionProvider(testAPI),
-		WithMaxAllowedWallClockDrift(allowedDrift),
-	)
-
-	tf.Filter.events.BlockPreAllowed.Hook(func(block *model.Block) {
-		require.NotEqual(t, "tooFarAheadFuture", block.ID().Alias())
-	})
-
-	tf.Filter.events.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
-		require.Equal(t, "tooFarAheadFuture", event.Block.ID().Alias())
-		require.True(t, ierrors.Is(event.Reason, ErrBlockTimeTooFarAheadInFuture))
-	})
-
-	require.NoError(t, tf.IssueUnsignedBlockAtTime("past", time.Now().Add(-allowedDrift)))
-	require.NoError(t, tf.IssueUnsignedBlockAtTime("present", time.Now()))
-	require.NoError(t, tf.IssueUnsignedBlockAtTime("acceptedFuture", time.Now().Add(allowedDrift)))
-	require.NoError(t, tf.IssueUnsignedBlockAtTime("tooFarAheadFuture", time.Now().Add(allowedDrift).Add(1*time.Second)))
-}
-
 func TestFilter_ProtocolVersion(t *testing.T) {
 	apiProvider := iotago.NewEpochBasedProvider(
 		iotago.WithAPIForMissingVersionCallback(
@@ -148,8 +123,6 @@ func TestFilter_ProtocolVersion(t *testing.T) {
 
 	tf := NewTestFramework(t,
 		apiProvider,
-		// Set this to some value far in the future so that we can arbitrarily manipulate block times.
-		WithMaxAllowedWallClockDrift(time.Duration(uint64(timeProvider.EpochEnd(50))*uint64(timeProvider.SlotDurationSeconds()))*time.Second),
 	)
 
 	valid := ds.NewSet[string]()

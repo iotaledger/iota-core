@@ -15,6 +15,10 @@ func (s *SignedTransaction) ID() (iotago.SignedTransactionID, error) {
 	return s.id, nil
 }
 
+func (s *SignedTransaction) MustID() iotago.SignedTransactionID {
+	return s.id
+}
+
 func (s *SignedTransaction) String() string {
 	return "SignedTransaction(" + s.id.String() + ")"
 }
@@ -43,6 +47,10 @@ func NewTransaction(outputCount uint16, inputs ...mempool.StateReference) *Trans
 
 func (t *Transaction) ID() (iotago.TransactionID, error) {
 	return t.id, nil
+}
+
+func (t *Transaction) MustID() iotago.TransactionID {
+	return t.id
 }
 
 func (t *Transaction) Inputs() ([]mempool.StateReference, error) {

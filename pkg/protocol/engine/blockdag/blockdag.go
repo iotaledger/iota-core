@@ -9,8 +9,8 @@ import (
 )
 
 type BlockDAG interface {
-	// Attach is used to attach new Blocks to the BlockDAG. It is the main function of the BlockDAG that triggers Events.
-	Attach(data *model.Block) (block *blocks.Block, wasAttached bool, err error)
+	// Append is used to append new Blocks to the BlockDAG. It is the main function of the BlockDAG that triggers Events.
+	Append(modelBlock *model.Block) (block *blocks.Block, wasAppended bool, err error)
 
 	// GetOrRequestBlock returns the Block with the given BlockID from the BlockDAG (and requests it from the network if
 	// it is missing). If the requested Block is below the eviction threshold, then this method will return a nil block

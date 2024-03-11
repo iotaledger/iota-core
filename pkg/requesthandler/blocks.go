@@ -20,7 +20,7 @@ func (r *RequestHandler) BlockFromBlockID(blockID iotago.BlockID) (*iotago.Block
 }
 
 func (r *RequestHandler) BlockMetadataFromBlockID(blockID iotago.BlockID) (*api.BlockMetadataResponse, error) {
-	blockMetadata, err := r.protocol.Engines.Main.Get().Retainer.BlockMetadata(blockID)
+	blockMetadata, err := r.protocol.Engines.Main.Get().BlockRetainer.BlockMetadata(blockID)
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get block metadata %s: %s", blockID.ToHex(), err)
 	}

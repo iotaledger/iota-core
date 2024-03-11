@@ -164,7 +164,7 @@ func (w *DockerWallet) AllotManaFromAccount(fromId iotago.AccountID, toId iotago
 		Build()
 	require.NoError(w.Testing, err)
 
-	allotmentOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
+	allotmentOutputId := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0)
 	w.AddOutput(allotmentOutputId, &OutputData{
 		ID:           allotmentOutputId,
 		Output:       basicOutput,
@@ -196,7 +196,7 @@ func (w *DockerWallet) AllotManaFromInput(toId iotago.AccountID, inputId iotago.
 		SetCreationSlot(currentSlot).
 		Build()
 
-	delegationOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
+	delegationOutputId := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0)
 	w.AddOutput(delegationOutputId, &OutputData{
 		ID:           delegationOutputId,
 		Output:       basicOutput,
@@ -241,7 +241,7 @@ func (w *DockerWallet) TransitionImplicitAccountToAccountOutput(inputId iotago.O
 		Build()
 	require.NoError(w.Testing, err)
 
-	accountOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
+	accountOutputId := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0)
 	w.AddOutput(accountOutputId, &OutputData{
 		ID:           accountOutputId,
 		Output:       accountOutput,
@@ -287,7 +287,7 @@ func (w *DockerWallet) CreateDelegationFromInput(issuerId iotago.AccountID, vali
 		Build()
 	require.NoError(w.Testing, err)
 
-	delegationOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
+	delegationOutputId := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0)
 	w.AddOutput(delegationOutputId, &OutputData{
 		ID:           delegationOutputId,
 		Output:       delegationOutput,
@@ -344,7 +344,7 @@ func (w *DockerWallet) CreateFoundryAndNativeTokensFromInput(issuerId iotago.Acc
 		Build()
 	require.NoError(w.Testing, err)
 
-	foundryOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 1)
+	foundryOutputId := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 1)
 	w.AddOutput(foundryOutputId, &OutputData{
 		ID:      foundryOutputId,
 		Output:  foundryOutput,
@@ -356,7 +356,7 @@ func (w *DockerWallet) CreateFoundryAndNativeTokensFromInput(issuerId iotago.Acc
 		Address:      issuer.Address,
 		AddressIndex: issuer.AddressIndex,
 		Output:       signedTx.Transaction.Outputs[0].(*iotago.AccountOutput),
-		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0),
+		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0),
 	})
 
 	return signedTx
@@ -415,7 +415,7 @@ func (w *DockerWallet) TransitionFoundry(issuerId iotago.AccountID, inputId iota
 		Build()
 	require.NoError(w.Testing, err)
 
-	foundryOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 1)
+	foundryOutputId := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 1)
 	w.AddOutput(foundryOutputId, &OutputData{
 		ID:      foundryOutputId,
 		Output:  outputFoundry,
@@ -427,7 +427,7 @@ func (w *DockerWallet) TransitionFoundry(issuerId iotago.AccountID, inputId iota
 		Address:      issuer.Address,
 		AddressIndex: issuer.AddressIndex,
 		Output:       signedTx.Transaction.Outputs[0].(*iotago.AccountOutput),
-		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0),
+		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0),
 	})
 
 	return signedTx
@@ -458,7 +458,7 @@ func (w *DockerWallet) CreateNFTFromInput(issuerId iotago.AccountID, inputId iot
 		Build()
 	require.NoError(w.Testing, err)
 
-	nftOutputId := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
+	nftOutputId := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0)
 	w.AddOutput(nftOutputId, &OutputData{
 		ID:           nftOutputId,
 		Output:       nftOutput,

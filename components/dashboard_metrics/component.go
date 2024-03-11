@@ -14,7 +14,6 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
-	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -42,9 +41,6 @@ func init() {
 		DepsFunc:  func(cDeps dependencies) { deps = cDeps },
 		Configure: configure,
 		Run:       run,
-		IsEnabled: func(c *dig.Container) bool {
-			return restapi.ParamsRestAPI.Enabled
-		},
 	}
 }
 
@@ -63,10 +59,6 @@ type dependencies struct {
 }
 
 func configure() error {
-	// check if RestAPI plugin is disabled
-	if !Component.App().IsComponentEnabled(restapi.Component.Identifier()) {
-		Component.LogPanicf("RestAPI plugin needs to be enabled to use the %s plugin", Component.Name)
-	}
 	configureComponentCountersEvents()
 
 	routeGroup := deps.RestRouteManager.AddRoute("dashboard-metrics/v2")
@@ -110,8 +102,8 @@ func configureComponentCountersEvents() {
 		incComponentCounter(Received)
 	})
 
-	deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(_ *blocks.Block) {
-		incComponentCounter(Attached)
+	deps.Protocol.Events.Engine.PostSolidFilter.BlockAllowed.Hook(func(_ *blocks.Block) {
+		incComponentCounter(Allowed)
 	})
 
 	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(b *blocks.Block) {

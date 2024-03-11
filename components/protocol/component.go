@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 
-	"github.com/labstack/echo/v4"
 	"github.com/labstack/gommon/bytes"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/dig"
@@ -22,8 +21,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade/signalingupgradeorchestrator"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
-	"github.com/iotaledger/iota-core/pkg/requesthandler"
-	"github.com/iotaledger/iota-core/pkg/restapi"
+	"github.com/iotaledger/iota-core/pkg/retainer/txretainer"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
@@ -113,31 +111,6 @@ func initConfigParams(c *dig.Container) error {
 }
 
 func provide(c *dig.Container) error {
-
-	type routeManagerDeps struct {
-		dig.In
-		Echo *echo.Echo
-	}
-
-	// the RestRouteManager is used in several places, so we provide it here
-	if err := c.Provide(func(deps routeManagerDeps) *restapi.RestRouteManager {
-		return restapi.NewRestRouteManager(deps.Echo)
-	}); err != nil {
-		Component.LogPanic(err.Error())
-	}
-
-	type requestHandlerDeps struct {
-		dig.In
-		Protocol *protocol.Protocol
-	}
-
-	// the RequestHandler is used in several places, so we provide it here
-	if err := c.Provide(func(deps requestHandlerDeps) *requesthandler.RequestHandler {
-		return requesthandler.New(deps.Protocol)
-	}); err != nil {
-		Component.LogPanic(err.Error())
-	}
-
 	type protocolDeps struct {
 		dig.In
 
@@ -174,6 +147,10 @@ func provide(c *dig.Container) error {
 				),
 			),
 			protocol.WithSnapshotPath(ParamsProtocol.Snapshot.Path),
+			protocol.WithMaxAllowedWallClockDrift(ParamsProtocol.Filter.MaxAllowedClockDrift),
+			protocol.WithPreSolidFilterProvider(
+				presolidblockfilter.NewProvider(),
+			),
 			protocol.WithSybilProtectionProvider(
 				sybilprotectionv1.NewProvider(),
 			),
@@ -183,9 +160,9 @@ func provide(c *dig.Container) error {
 			protocol.WithAttestationProvider(
 				slotattestation.NewProvider(),
 			),
-			protocol.WithPreSolidFilterProvider(
-				presolidblockfilter.NewProvider(
-					presolidblockfilter.WithMaxAllowedWallClockDrift(ParamsProtocol.Filter.MaxAllowedClockDrift),
+			protocol.WithTransactionRetainerProvider(
+				txretainer.NewProvider(
+					txretainer.WithDebugStoreErrorMessages(ParamsRetainer.DebugStoreErrorMessages),
 				),
 			),
 			protocol.WithUpgradeOrchestratorProvider(

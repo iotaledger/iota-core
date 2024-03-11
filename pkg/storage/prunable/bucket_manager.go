@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/ioutils"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -262,10 +263,16 @@ func (b *BucketManager) DeleteBucket(epoch iotago.EpochIndex) (deleted bool) {
 	b.openDBsCacheMutex.Lock()
 	defer b.openDBsCacheMutex.Unlock()
 
-	if exists, err := PathExists(dbPathFromIndex(b.dbConfig.Directory, epoch)); err != nil {
+	// Check if the directory exists
+	exists, isDir, err := ioutils.PathExists(dbPathFromIndex(b.dbConfig.Directory, epoch))
+	if err != nil {
 		panic(err)
-	} else if !exists {
+	}
+	if !exists {
 		return false
+	}
+	if !isDir {
+		panic(ierrors.Errorf("given path is a file instead of a directory %s", dbPathFromIndex(b.dbConfig.Directory, epoch)))
 	}
 
 	db, exists := b.openDBs.Get(epoch)
@@ -311,16 +318,4 @@ func (b *BucketManager) Flush() error {
 	})
 
 	return innerErr
-}
-
-func PathExists(path string) (bool, error) {
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-
-		return false, err
-	}
-
-	return true, nil
 }

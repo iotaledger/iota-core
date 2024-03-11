@@ -27,7 +27,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade/signalingupgradeorchestrator"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
-	"github.com/iotaledger/iota-core/pkg/retainer/retainer"
+	"github.com/iotaledger/iota-core/pkg/retainer/blockretainer"
+	"github.com/iotaledger/iota-core/pkg/retainer/txretainer"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/wallet"
@@ -51,9 +52,11 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		panic(err)
 	}
 
+	logger := log.NewLogger(log.WithName("snapshot-creator"))
+
 	workers := workerpool.NewGroup("CreateSnapshot")
 	defer workers.Shutdown()
-	s := storage.Create(lo.PanicOnErr(os.MkdirTemp(os.TempDir(), "*")), opt.DataBaseVersion, errorHandler)
+	s := storage.Create(logger, lo.PanicOnErr(os.MkdirTemp(os.TempDir(), "*")), opt.DataBaseVersion, errorHandler)
 	defer s.Shutdown()
 
 	if err := s.Settings().StoreProtocolParametersForStartEpoch(opt.ProtocolParameters, 0); err != nil {
@@ -93,7 +96,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	}
 
 	engineInstance := engine.New(
-		log.NewLogger(log.WithName("snapshot-creator")),
+		logger,
 		workers.CreateGroup("Engine"),
 		s,
 		presolidblockfilter.NewProvider(),
@@ -105,14 +108,15 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		totalweightslotgadget.NewProvider(),
 		sybilprotectionv1.NewProvider(sybilprotectionv1.WithInitialCommittee(committeeAccountsData)),
 		slotnotarization.NewProvider(),
+		trivialsyncmanager.NewProvider(),
 		slotattestation.NewProvider(),
 		opt.LedgerProvider,
 		passthrough.NewProvider(),
 		tipmanagerv1.NewProvider(),
 		tipselectionv1.NewProvider(),
-		retainer.NewProvider(),
+		blockretainer.NewProvider(),
+		txretainer.NewProvider(),
 		signalingupgradeorchestrator.NewProvider(),
-		trivialsyncmanager.NewProvider(),
 		engine.WithSnapshotPath(""), // magic to disable loading snapshot
 	)
 	defer engineInstance.Shutdown.Trigger()
