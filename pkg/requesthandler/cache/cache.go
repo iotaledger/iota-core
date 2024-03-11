@@ -5,21 +5,29 @@ import (
 )
 
 type Cache struct {
-	*fastcache.Cache
+	cache *fastcache.Cache
 }
 
 func NewCache(maxSize int) *Cache {
 	return &Cache{
-		Cache: fastcache.New(maxSize),
+		cache: fastcache.New(maxSize),
 	}
 }
 
+func (c *Cache) Set(key, value []byte) {
+	c.cache.Set(key, value)
+}
+
 func (c *Cache) Get(key []byte) []byte {
-	if c.Has(key) {
+	if c.cache.Has(key) {
 		value := make([]byte, 0)
 
-		return c.Cache.Get(value, key)
+		return c.cache.Get(value, key)
 	}
 
 	return nil
+}
+
+func (c *Cache) Reset() {
+	c.cache.Reset()
 }
