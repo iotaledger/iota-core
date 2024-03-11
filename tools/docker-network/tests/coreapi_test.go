@@ -14,6 +14,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Test_ValidatorsAPI tests if the validators API returns the expected validators.
+// 1. Run docker network.
+// 2. Create 50 new accounts with staking feature.
+// 3. Wait until next epoch then issue candidacy payload for each account.
+// 4. Check if all 54 validators are returned from the validators API with pageSize 10, the pagination of api is also tested.
+// 5. Wait until next epoch then check again if the results remain.
 func Test_ValidatorsAPI(t *testing.T) {
 	d := NewDockerTestFramework(t,
 		WithProtocolParametersOptions(
