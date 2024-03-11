@@ -1,7 +1,6 @@
 package mock
 
 import (
-	"context"
 	"crypto/ed25519"
 	"testing"
 
@@ -56,8 +55,6 @@ type Wallet struct {
 	Name string
 
 	Client Client
-	// LatestBlockIssuanceResp is the cached response from the latest query to the block issuance endpoint.
-	latestBlockIssuanceResp *api.IssuanceBlockHeaderResponse
 
 	keyManager *wallet.KeyManager
 
@@ -179,11 +176,6 @@ func (w *Wallet) AddressSigner(indexes ...uint32) iotago.AddressSigner {
 	return w.keyManager.AddressSigner(indexes...)
 }
 
-func (w *Wallet) LatestBlockIssuanceResponse() *api.IssuanceBlockHeaderResponse {
-	// if the response is not cached, query the node for the latest block issuance.
-	if w.latestBlockIssuanceResp == nil {
-		w.latestBlockIssuanceResp = w.Client.BlockIssuance(context.Background())
-	}
-
-	return w.latestBlockIssuanceResp
+func (w *Wallet) GetNewBlockIssuanceResponse() *api.IssuanceBlockHeaderResponse {
+	return w.BlockIssuer.GetNewBlockIssuanceResponse()
 }

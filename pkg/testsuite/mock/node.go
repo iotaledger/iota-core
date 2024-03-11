@@ -355,7 +355,7 @@ func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...o
 		panic("node is not a validator")
 	}
 
-	return n.Validator.IssueValidationBlock(ctx, alias, opts...)
+	return n.Validator.IssueValidationBlock(ctx, alias, n, opts...)
 }
 
 func ClientsForNodes(nodes []*Node) []Client {

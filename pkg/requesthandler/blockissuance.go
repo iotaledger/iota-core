@@ -24,8 +24,8 @@ func (r *RequestHandler) SubmitBlockWithoutAwaitingBooking(block *model.Block) e
 	return r.submitBlock(block)
 }
 
-// SubmitBlockAndAwaitEvent submits a block to be processed and waits for the event to be triggered.
-func (r *RequestHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *model.Block, evt *event.Event1[*blocks.Block]) error {
+// submitBlockAndAwaitEvent submits a block to be processed and waits for the event to be triggered.
+func (r *RequestHandler) submitBlockAndAwaitEvent(ctx context.Context, block *model.Block, evt *event.Event1[*blocks.Block]) error {
 	filtered := make(chan error, 1)
 	exit := make(chan struct{})
 	defer close(exit)
@@ -88,7 +88,7 @@ func (r *RequestHandler) SubmitBlockAndAwaitBooking(ctx context.Context, iotaBlo
 		return iotago.EmptyBlockID, ierrors.Wrap(err, "error serializing block to model block")
 	}
 
-	if err = r.SubmitBlockAndAwaitEvent(ctx, modelBlock, r.protocol.Events.Engine.Retainer.BlockRetained); err != nil {
+	if err = r.submitBlockAndAwaitEvent(ctx, modelBlock, r.protocol.Events.Engine.Retainer.BlockRetained); err != nil {
 		return iotago.EmptyBlockID, ierrors.Wrap(err, "error issuing model block")
 	}
 

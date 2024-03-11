@@ -14,6 +14,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -44,6 +45,10 @@ type BlockIssuer struct {
 
 	keyManager *wallet.KeyManager
 	client     Client
+	// LatestBlockIssuanceResp is the cached response from the latest query to the block issuance endpoint.
+	latestBlockIssuanceResp   *api.IssuanceBlockHeaderResponse
+	blockIssuanceResponseUsed bool
+	mutex                     syncutils.RWMutex
 
 	AccountData AccountData
 }
@@ -57,11 +62,12 @@ func NewBlockIssuer(t *testing.T, name string, keyManager *wallet.KeyManager, cl
 	accountID.RegisterAlias(name)
 
 	return options.Apply(&BlockIssuer{
-		Testing:    t,
-		Name:       name,
-		Validator:  validator,
-		keyManager: keyManager,
-		client:     client,
+		Testing:                   t,
+		Name:                      name,
+		Validator:                 validator,
+		keyManager:                keyManager,
+		client:                    client,
+		blockIssuanceResponseUsed: true,
 		AccountData: AccountData{
 			ID:           accountID,
 			AddressIndex: addressIndex,
@@ -83,7 +89,7 @@ func (i *BlockIssuer) Address() iotago.Address {
 	return iotago.Ed25519AddressFromPubKey(pub)
 }
 
-func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, opts ...options.Option[ValidationBlockParams]) (*blocks.Block, error) {
+func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, node *Node, opts ...options.Option[ValidationBlockParams]) (*blocks.Block, error) {
 	blockParams := options.Apply(&ValidationBlockParams{}, opts)
 
 	if blockParams.BlockHeader.IssuingTime == nil {
@@ -98,7 +104,13 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, o
 		commitment := blockIssuanceInfo.LatestCommitment
 		blockSlot := apiForBlock.TimeProvider().SlotFromTime(*blockParams.BlockHeader.IssuingTime)
 		if blockSlot > commitment.Slot+protoParams.MaxCommittableAge() {
-			return nil, ierrors.Wrapf(ErrBlockTooRecent, "can't issue block: block slot %d is too far in the future, latest commitment is %d", blockSlot, commitment.Slot)
+			commitment, parentID, err := i.reviveChain(*blockParams.BlockHeader.IssuingTime, node)
+			if err != nil {
+				return nil, ierrors.Wrap(err, "failed to revive chain")
+			}
+			blockParams.BlockHeader.SlotCommitment = commitment
+			blockParams.BlockHeader.References = make(model.ParentReferences)
+			blockParams.BlockHeader.References[iotago.StrongParentType] = []iotago.BlockID{parentID}
 		}
 
 		if blockSlot < commitment.Slot+protoParams.MinCommittableAge() &&
@@ -114,19 +126,6 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, o
 		}
 
 		blockParams.BlockHeader.SlotCommitment = commitment
-		// TODO: check if this is still necessary and, if so, if this is implemented in inx-validator
-		// if err != nil && ierrors.Is(err, ErrBlockTooRecent) {
-		// 	commitment, parentID, err := i.reviveChain(*blockParams.BlockHeader.IssuingTime, node)
-		// 	if err != nil {
-		// 		return nil, ierrors.Wrap(err, "failed to revive chain")
-		// 	}
-		// 	blockParams.BlockHeader.SlotCommitment = commitment
-		// 	blockParams.BlockHeader.References = make(model.ParentReferences)
-		// 	blockParams.BlockHeader.References[iotago.StrongParentType] = []iotago.BlockID{parentID}
-
-		// } else if err != nil {
-		// 	return nil, ierrors.Wrap(err, "error getting commitment")
-		// }
 	}
 
 	if blockParams.BlockHeader.References == nil {
@@ -194,8 +193,8 @@ func referencesFromBlockIssuanceResponse(response *api.IssuanceBlockHeaderRespon
 	return references
 }
 
-func (i *BlockIssuer) IssueValidationBlock(ctx context.Context, alias string, opts ...options.Option[ValidationBlockParams]) (*blocks.Block, error) {
-	block, err := i.CreateValidationBlock(ctx, alias, opts...)
+func (i *BlockIssuer) IssueValidationBlock(ctx context.Context, alias string, node *Node, opts ...options.Option[ValidationBlockParams]) (*blocks.Block, error) {
+	block, err := i.CreateValidationBlock(ctx, alias, node, opts...)
 	require.NoError(i.Testing, err)
 
 	err = i.SubmitBlock(ctx, block.ModelBlock())
@@ -287,7 +286,7 @@ func (i *BlockIssuer) IssueActivity(ctx context.Context, wg *sync.WaitGroup, sta
 
 			blockAlias := fmt.Sprintf("%s-activity.%d", i.Name, counter)
 			timeOffset := time.Since(start)
-			lo.PanicOnErr(i.IssueValidationBlock(ctx, blockAlias,
+			lo.PanicOnErr(i.IssueValidationBlock(ctx, blockAlias, node,
 				WithValidationBlockHeaderOptions(
 					WithIssuingTime(issuingTime.Add(timeOffset)),
 				),
@@ -350,6 +349,11 @@ func (i *BlockIssuer) validateReferences(ctx context.Context, issuingTime time.T
 }
 
 func (i *BlockIssuer) SubmitBlock(ctx context.Context, block *model.Block) error {
+	defer i.mutex.Unlock()
+	i.mutex.Lock()
+	// mark the response as used so that the next time we query the node for the latest block issuance.
+	i.blockIssuanceResponseUsed = true
+	
 	return lo.Return2(i.client.SubmitBlock(ctx, block.ProtocolBlock()))
 }
 
@@ -378,4 +382,26 @@ func (i *BlockIssuer) retrieveAPI(blockParams *BlockHeaderParams) iotago.API {
 
 	// It is crucial to get the API from the issuing time/slot as that defines the version with which the block should be issued.
 	return i.client.APIForTime(*blockParams.IssuingTime)
+}
+
+func (i *BlockIssuer) GetNewBlockIssuanceResponse() *api.IssuanceBlockHeaderResponse {
+	defer i.mutex.Unlock()
+	i.mutex.Lock()
+
+	i.blockIssuanceResponseUsed = false
+	i.latestBlockIssuanceResp = i.client.BlockIssuance(context.Background())
+
+	return i.latestBlockIssuanceResp
+}
+
+func (i *BlockIssuer) LatestBlockIssuanceResponse() *api.IssuanceBlockHeaderResponse {
+	defer i.mutex.Unlock()
+	i.mutex.Lock()
+
+	if i.blockIssuanceResponseUsed {
+		i.blockIssuanceResponseUsed = false
+		i.latestBlockIssuanceResp = i.client.BlockIssuance(context.Background())
+	}
+
+	return i.latestBlockIssuanceResp
 }

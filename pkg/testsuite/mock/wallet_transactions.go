@@ -45,7 +45,7 @@ func (w *Wallet) CreateAccountFromInput(transactionName string, inputName string
 		transactionName,
 		[]uint32{0},
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
+			CommitmentID: w.GetNewBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithInputs(input),
 		WithOutputs(outputStates...),
@@ -78,7 +78,7 @@ func (w *Wallet) CreateAccountsFromInput(transactionName string, inputName strin
 		transactionName,
 		[]uint32{0},
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
+			CommitmentID: w.GetNewBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithInputs(input),
 		WithOutputs(outputStates...),
@@ -125,7 +125,7 @@ func (w *Wallet) CreateDelegationFromInput(transactionName string, inputName str
 		transactionName,
 		[]uint32{0},
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
+			CommitmentID: w.GetNewBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithInputs(input),
 		WithOutputs(outputStates...),
@@ -196,7 +196,7 @@ func (w *Wallet) DelayedClaimingTransition(transactionName string, inputName str
 		transactionName,
 		[]uint32{0},
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
+			CommitmentID: w.GetNewBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithInputs(input),
 		WithOutputs(delegationOutput),
@@ -227,7 +227,7 @@ func (w *Wallet) TransitionAccount(transactionName string, inputName string, opt
 			AccountID: accountOutput.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
+			CommitmentID: w.GetNewBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithOutputs(accountOutput),
 	)
@@ -260,7 +260,7 @@ func (w *Wallet) TransitionAccounts(transactionName string, inputNames []string,
 		WithInputs(inputs...),
 		WithOutputs(outputs...),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
+			CommitmentID: w.GetNewBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 	)
 
@@ -296,7 +296,7 @@ func (w *Wallet) DestroyAccount(transactionName string, inputName string) *iotag
 			AccountID: inputAccount.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
+			CommitmentID: w.GetNewBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithAccountInput(input),
 		WithOutputs(destructionOutputs...),
@@ -418,7 +418,7 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string
 			AccountID: implicitAccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
+			CommitmentID: w.GetNewBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithInputs(inputs...),
 		WithOutputs(accountOutput),
@@ -491,7 +491,7 @@ func (w *Wallet) CreateFoundryAndNativeTokensFromInput(transactionName string, i
 			AccountID: accountOutput.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
+			CommitmentID: w.GetNewBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 	)
 
@@ -545,7 +545,7 @@ func (w *Wallet) TransitionFoundry(transactionName string, inputName string, acc
 			AccountID: outputAccount.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
+			CommitmentID: w.GetNewBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 	)
 
@@ -749,7 +749,7 @@ func (w *Wallet) RemoveFeatureFromAccount(featureType iotago.FeatureType, transa
 			AccountID: accountOutput.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
+			CommitmentID: w.GetNewBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithOutputs(accountOutput),
 	)
@@ -900,7 +900,7 @@ func (w *Wallet) ClaimValidatorRewards(transactionName string, inputName string)
 			AccountID: accountOutput.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
+			CommitmentID: w.GetNewBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithOutputs(accountOutput),
 	)
@@ -978,7 +978,7 @@ func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string)
 			rewardsResp.Rewards,
 		),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
+			CommitmentID: w.GetNewBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithOutputs(outputStates...),
 	)
@@ -1063,7 +1063,7 @@ func (w *Wallet) CreateNativeTokenFromInput(transactionName string, inputName st
 			AccountID: accID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.LatestBlockIssuanceResponse().LatestCommitment.MustID(),
+			CommitmentID: w.GetNewBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
 		WithAllotAllManaToAccount(w.currentSlot, accID),
 	)

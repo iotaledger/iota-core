@@ -117,7 +117,7 @@ func getStandardBlock(t *testing.T) *iotago.Block {
 	node := ts.AddValidatorNode("node1")
 	ts.AddDefaultWallet(node)
 	ts.Run(true)
-	blockIssuanceResp := ts.DefaultWallet().LatestBlockIssuanceResponse()
+	blockIssuanceResp := ts.DefaultWallet().GetNewBlockIssuanceResponse()
 	tx := ts.DefaultWallet().CreateAccountFromInput(
 		"tx",
 		"Genesis:0",
@@ -234,7 +234,7 @@ func basicInAccountOut(t *testing.T, numAccounts int, staking bool) (float64, []
 			if staking {
 				opts = append(opts, mock.WithStakingFeature(10000, 421, 0, 10))
 			}
-			blockIssuanceResp := ts.DefaultWallet().LatestBlockIssuanceResponse()
+			blockIssuanceResp := ts.DefaultWallet().GetNewBlockIssuanceResponse()
 			tx1 := ts.DefaultWallet().CreateAccountsFromInput(
 				"tx1",
 				"Genesis:0",
