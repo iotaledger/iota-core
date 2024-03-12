@@ -376,32 +376,19 @@ func (d *DockerTestFramework) CreateTaggedDataBlock(issuerID iotago.AccountID, t
 	}, issuerID, congestionResp, issuerResp)
 }
 
-func (d *DockerTestFramework) CreateValueBlock(issuerAccountID iotago.AccountID) (*iotago.Block, *iotago.SignedTransaction, *OutputData, iotago.Output) {
+func (d *DockerTestFramework) CreateBasicOutputBlock(issuerAccountID iotago.AccountID) (*iotago.Block, *iotago.SignedTransaction, *OutputData) {
 	clt := d.wallet.DefaultClient()
 	ctx := context.Background()
-	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
-	apiForSlot := clt.APIForSlot(currentSlot)
+
 	fundsOutputID := d.RequestFaucetFunds(ctx, iotago.AddressEd25519)
 
-	_, ed25519Addr := d.wallet.Address()
 	input := d.wallet.Output(fundsOutputID)
-	basicOutput := builder.NewBasicOutputBuilder(ed25519Addr, input.Output.BaseTokenAmount()).MustBuild()
-	signedTx, err := builder.NewTransactionBuilder(apiForSlot, d.wallet.AddressSigner(input.AddressIndex)).
-		AddInput(&builder.TxInput{
-			UnlockTarget: input.Address,
-			InputID:      input.ID,
-			Input:        input.Output,
-		}).
-		AddOutput(basicOutput).
-		SetCreationSlot(currentSlot).
-		AllotAllMana(currentSlot, issuerAccountID, 0).
-		Build()
-	require.NoError(d.wallet.Testing, err)
+	signedTx := d.wallet.CreateBasicOutputFromInput(input, issuerAccountID)
 
 	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, issuerAccountID.ToAddress().(*iotago.AccountAddress))
 	block := d.CreateBlock(signedTx, issuerAccountID, congestionResp, issuerResp)
 
-	return block, signedTx, input, basicOutput
+	return block, signedTx, input
 }
 
 // CreateDelegationBlockFromInput consumes the given basic output, then build a block of a transaction that includes a delegation output, in order to delegate the given validator.
@@ -438,13 +425,13 @@ func (d *DockerTestFramework) CreateFoundryBlockFromInput(issuerID iotago.Accoun
 }
 
 // CreateNFTBlockFromInput consumes the given basic output, then build a block of a transaction that includes a NFT output with the given NFT output options.
-func (d *DockerTestFramework) CreateNFTBlockFromInput(issuerID iotago.AccountID, inputId iotago.OutputID, opts ...options.Option[builder.NFTOutputBuilder]) (iotago.NFTID, iotago.OutputID, *iotago.Block) {
+func (d *DockerTestFramework) CreateNFTBlockFromInput(issuerID iotago.AccountID, inputID iotago.OutputID, opts ...options.Option[builder.NFTOutputBuilder]) (iotago.NFTID, iotago.OutputID, *iotago.Block) {
 	issuer := d.wallet.Account(issuerID)
 	ctx := context.TODO()
 	clt := d.wallet.DefaultClient()
 
 	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, issuer.Address)
-	signedTx := d.wallet.CreateNFTFromInput(issuerID, inputId, issuerResp, opts...)
+	signedTx := d.wallet.CreateNFTFromInput(issuerID, inputID, issuerResp, opts...)
 	outputID := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0)
 
 	return iotago.NFTIDFromOutputID(outputID),
@@ -666,7 +653,7 @@ func (d *DockerTestFramework) Stop() {
 	defer fmt.Println("Stop the network.....done")
 
 	_ = exec.Command("docker", "compose", "down").Run()
-	_ = exec.Command("rm", d.snapshotPath).Run()
+	_ = exec.Command("rm", d.snapshotPath).Run() //nolint:gosec
 }
 
 func (d *DockerTestFramework) StopContainer(containerName ...string) error {

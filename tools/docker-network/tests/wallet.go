@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -466,6 +467,26 @@ func (w *DockerWallet) CreateNFTFromInput(issuerID iotago.AccountID, inputID iot
 		Address:      nftAddress,
 		AddressIndex: nftAddressIndex,
 	})
+
+	return signedTx
+}
+
+func (w *DockerWallet) CreateBasicOutputFromInput(input *OutputData, issuerAccountID iotago.AccountID) *iotago.SignedTransaction {
+	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	apiForSlot := w.DefaultClient().APIForSlot(currentSlot)
+	_, ed25519Addr := w.Address()
+	basicOutput := builder.NewBasicOutputBuilder(ed25519Addr, input.Output.BaseTokenAmount()).MustBuild()
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot, w.AddressSigner(input.AddressIndex)).
+		AddInput(&builder.TxInput{
+			UnlockTarget: input.Address,
+			InputID:      input.ID,
+			Input:        input.Output,
+		}).
+		AddOutput(basicOutput).
+		SetCreationSlot(currentSlot).
+		AllotAllMana(currentSlot, issuerAccountID, 0).
+		Build()
+	require.NoError(w.Testing, err)
 
 	return signedTx
 }

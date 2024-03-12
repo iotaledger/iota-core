@@ -282,6 +282,7 @@ func test_AccountTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 			assertion()
 		}
 
+		// TODO test transactioMetadataTopics
 		// d.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID(), finish)
 		// d.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID(), finish)
 
