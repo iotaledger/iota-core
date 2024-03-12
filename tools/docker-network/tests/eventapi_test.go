@@ -14,7 +14,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
-var eventAPITests = map[string]func(t *testing.T, d *DockerTestFramework){
+var eventAPITests = map[string]func(t *testing.T, e *EventAPIDockerTestFramework){
 	"Test_Commitments":                 test_Commitments,
 	"Test_ValidationBlocks":            test_ValidationBlocks,
 	"Test_BasicTaggedDataBlocks":       test_BasicTaggedDataBlocks,
@@ -43,26 +43,23 @@ func Test_MQTTTopics(t *testing.T) {
 
 	d.WaitUntilNetworkReady()
 
+	e := NewEventAPIDockerTestFramework(t, d)
+
 	for name, test := range eventAPITests {
 		t.Run(name, func(t *testing.T) {
-			test(t, d)
+			test(t, e)
 		})
 	}
 }
 
-func test_Commitments(t *testing.T, d *DockerTestFramework) {
-	finish := make(chan struct{})
+func test_Commitments(t *testing.T, e *EventAPIDockerTestFramework) {
 
 	// get event API client ready
-	clt := d.wallet.DefaultClient()
 	ctx, cancel := context.WithCancel(context.Background())
-	eventClt, err := clt.EventAPI(ctx)
-	require.NoError(t, err)
-	err = eventClt.Connect(ctx)
-	require.NoError(t, err)
+	eventClt := e.ConnectEventAPIClient(ctx)
 	defer eventClt.Close()
 
-	infoResp, err := clt.Info(ctx)
+	infoResp, err := e.DefaultClient.Info(ctx)
 	require.NoError(t, err)
 
 	// prepare the expected commitments to be received
@@ -77,8 +74,8 @@ func test_Commitments(t *testing.T, d *DockerTestFramework) {
 	}
 
 	assertions := []func(){
-		func() { d.AssertLatestCommitments(ctx, eventClt, expectedLatestSlots, finish) },
-		func() { d.AssertFinalizedCommitments(ctx, eventClt, expectedFinalizedSlots, finish) },
+		func() { e.AssertLatestCommitments(ctx, eventClt, expectedLatestSlots) },
+		func() { e.AssertFinalizedCommitments(ctx, eventClt, expectedFinalizedSlots) },
 	}
 
 	totalTopics := len(assertions)
@@ -87,32 +84,27 @@ func test_Commitments(t *testing.T, d *DockerTestFramework) {
 	}
 
 	// wait until all topics receives all expected objects
-	err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+	err = e.AwaitEventAPITopics(t, cancel, totalTopics)
 	require.NoError(t, err)
 }
 
-func test_ValidationBlocks(t *testing.T, d *DockerTestFramework) {
-	finish := make(chan struct{})
+func test_ValidationBlocks(t *testing.T, e *EventAPIDockerTestFramework) {
 
 	// get event API client ready
-	clt := d.wallet.DefaultClient()
 	ctx, cancel := context.WithCancel(context.Background())
-	eventClt, err := clt.EventAPI(ctx)
-	require.NoError(t, err)
-	err = eventClt.Connect(ctx)
-	require.NoError(t, err)
+	eventClt := e.ConnectEventAPIClient(ctx)
 	defer eventClt.Close()
 
 	// prepare the expected commitments to be received
 	validators := make(map[string]struct{}, 0)
-	nodes := d.Nodes("V1", "V2", "V3", "V4")
+	nodes := e.dockerFramework.Nodes("V1", "V2", "V3", "V4")
 	for _, node := range nodes {
 		validators[node.AccountAddressBech32] = struct{}{}
 	}
 
 	assertions := []func(){
 		func() {
-			d.AssertValidationBlocks(ctx, eventClt, clt.CommittedAPI().ProtocolParameters().Bech32HRP(), validators, finish)
+			e.AssertValidationBlocks(ctx, eventClt, e.DefaultClient.CommittedAPI().ProtocolParameters().Bech32HRP(), validators)
 		},
 	}
 
@@ -122,38 +114,33 @@ func test_ValidationBlocks(t *testing.T, d *DockerTestFramework) {
 	}
 
 	// wait until all topics receives all expected objects
-	err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+	err := e.AwaitEventAPITopics(t, cancel, totalTopics)
 	require.NoError(t, err)
 }
 
-func test_BasicTaggedDataBlocks(t *testing.T, d *DockerTestFramework) {
+func test_BasicTaggedDataBlocks(t *testing.T, e *EventAPIDockerTestFramework) {
 	// get event API client ready
-	clt := d.wallet.DefaultClient()
 	ctx, cancel := context.WithCancel(context.Background())
-	eventClt, err := clt.EventAPI(ctx)
-	require.NoError(t, err)
-	err = eventClt.Connect(ctx)
-	require.NoError(t, err)
+	eventClt := e.ConnectEventAPIClient(ctx)
 	defer eventClt.Close()
 
 	// create an account to issue blocks
-	account := d.CreateAccount()
+	account := e.dockerFramework.CreateAccount()
 
 	// prepare data blocks to send
 	expectedBlocks := make(map[string]*iotago.Block, 0)
 	for i := 0; i < 10; i++ {
-		blk := d.CreateTaggedDataBlock(account.ID, []byte("tag"))
+		blk := e.dockerFramework.CreateTaggedDataBlock(account.ID, []byte("tag"))
 		expectedBlocks[blk.MustID().ToHex()] = blk
 	}
-	finish := make(chan struct{})
 
 	assertions := []func(){
-		func() { d.AssertBlocks(ctx, eventClt, expectedBlocks, finish) },
-		func() { d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish) },
-		func() { d.AssertTaggedDataBlocks(ctx, eventClt, expectedBlocks, finish) },
-		func() { d.AssertTaggedDataBlocksByTag(ctx, eventClt, expectedBlocks, []byte("tag"), finish) },
-		func() { d.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks, finish) },
-		func() { d.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks, finish) },
+		func() { e.AssertBlocks(ctx, eventClt, expectedBlocks) },
+		func() { e.AssertBasicBlocks(ctx, eventClt, expectedBlocks) },
+		func() { e.AssertTaggedDataBlocks(ctx, eventClt, expectedBlocks) },
+		func() { e.AssertTaggedDataBlocksByTag(ctx, eventClt, expectedBlocks, []byte("tag")) },
+		func() { e.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks) },
+		func() { e.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks) },
 	}
 
 	totalTopics := len(assertions)
@@ -162,56 +149,51 @@ func test_BasicTaggedDataBlocks(t *testing.T, d *DockerTestFramework) {
 	}
 
 	// wait until all topics starts listening
-	err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+	err := e.AwaitEventAPITopics(t, cancel, totalTopics)
 	require.NoError(t, err)
 
 	// issue blocks
 	go func() {
 		for _, blk := range expectedBlocks {
 			fmt.Println("submitting a block")
-			d.SubmitBlock(context.Background(), blk)
+			e.dockerFramework.SubmitBlock(context.Background(), blk)
 		}
 	}()
 
 	// wait until all topics receives all expected objects
-	err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+	err = e.AwaitEventAPITopics(t, cancel, totalTopics)
 	require.NoError(t, err)
 }
 
-func test_DelegationTransactionBlocks(t *testing.T, d *DockerTestFramework) {
+func test_DelegationTransactionBlocks(t *testing.T, e *EventAPIDockerTestFramework) {
 	// get event API client ready
-	clt := d.wallet.DefaultClient()
 	ctx, cancel := context.WithCancel(context.Background())
-	eventClt, err := clt.EventAPI(ctx)
-	require.NoError(t, err)
-	err = eventClt.Connect(ctx)
-	require.NoError(t, err)
+	eventClt := e.ConnectEventAPIClient(ctx)
 	defer eventClt.Close()
 
 	// create an account to issue blocks
-	account := d.CreateAccount()
-	fundsOutputID := d.RequestFaucetFunds(ctx, iotago.AddressEd25519)
+	account := e.dockerFramework.CreateAccount()
+	fundsOutputID := e.dockerFramework.RequestFaucetFunds(ctx, iotago.AddressEd25519)
 
 	// prepare data blocks to send
-	delegationId, outputId, blk := d.CreateDelegationBlockFromInput(account.ID, d.Node("V2"), fundsOutputID)
+	delegationId, outputId, blk := e.dockerFramework.CreateDelegationBlockFromInput(account.ID, e.dockerFramework.Node("V2"), fundsOutputID)
 	expectedBlocks := map[string]*iotago.Block{
 		blk.MustID().ToHex(): blk,
 	}
-	finish := make(chan struct{})
-	delegationOutput := d.wallet.Output(outputId)
+	delegationOutput := e.dockerFramework.wallet.Output(outputId)
 
 	asserts := []func(){
-		func() { d.AssertTransactionBlocks(ctx, eventClt, expectedBlocks, finish) },
-		func() { d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish) },
-		func() { d.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks, finish) },
-		func() { d.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks, finish) },
-		func() { d.AssertDelegationOutput(ctx, eventClt, delegationId, finish) },
-		func() { d.AssertOutput(ctx, eventClt, outputId, finish) },
+		func() { e.AssertTransactionBlocks(ctx, eventClt, expectedBlocks) },
+		func() { e.AssertBasicBlocks(ctx, eventClt, expectedBlocks) },
+		func() { e.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks) },
+		func() { e.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks) },
+		func() { e.AssertDelegationOutput(ctx, eventClt, delegationId) },
+		func() { e.AssertOutput(ctx, eventClt, outputId) },
 		func() {
-			d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAny, delegationOutput.Address, finish)
+			e.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAny, delegationOutput.Address)
 		},
 		func() {
-			d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAddress, delegationOutput.Address, finish)
+			e.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAddress, delegationOutput.Address)
 		},
 	}
 
@@ -220,60 +202,55 @@ func test_DelegationTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 		assert()
 	}
 
-	// d.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID(), finish)
-	// d.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID(), finish)
+	// e.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID())
+	// e.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID())
 
 	// wait until all topics starts listening
-	err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+	err := e.AwaitEventAPITopics(t, cancel, totalTopics)
 	require.NoError(t, err)
 
 	// issue blocks
 	go func() {
 		for _, blk := range expectedBlocks {
 			fmt.Println("submitting a block: ", blk.MustID().ToHex())
-			d.SubmitBlock(context.Background(), blk)
+			e.dockerFramework.SubmitBlock(context.Background(), blk)
 		}
 	}()
 
 	// wait until all topics receives all expected objects
-	err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+	err = e.AwaitEventAPITopics(t, cancel, totalTopics)
 	require.NoError(t, err)
 }
 
-func test_AccountTransactionBlocks(t *testing.T, d *DockerTestFramework) {
+func test_AccountTransactionBlocks(t *testing.T, e *EventAPIDockerTestFramework) {
 	// get event API client ready
-	clt := d.wallet.DefaultClient()
 	ctx, cancel := context.WithCancel(context.Background())
-	eventClt, err := clt.EventAPI(ctx)
-	require.NoError(t, err)
-	err = eventClt.Connect(ctx)
-	require.NoError(t, err)
+	eventClt := e.ConnectEventAPIClient(ctx)
 	defer eventClt.Close()
 
 	// implicit account transition
 	{
-		implicitAccount := d.CreateImplicitAccount(ctx)
+		implicitAccount := e.dockerFramework.CreateImplicitAccount(ctx)
 
 		// prepare fullAccount transaction block to send
-		fullAccount, outputId, blk := d.CreateAccountBlockFromInput(implicitAccount.OutputID)
+		fullAccount, outputId, blk := e.dockerFramework.CreateAccountBlockFromInput(implicitAccount.OutputID)
 		expectedBlocks := map[string]*iotago.Block{
 			blk.MustID().ToHex(): blk,
 		}
-		finish := make(chan struct{})
-		accountOutput := d.wallet.Output(outputId)
+		accountOutput := e.dockerFramework.wallet.Output(outputId)
 
 		assertions := []func(){
-			func() { d.AssertTransactionBlocks(ctx, eventClt, expectedBlocks, finish) },
-			func() { d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish) },
-			func() { d.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks, finish) },
-			func() { d.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks, finish) },
-			func() { d.AssertAccountOutput(ctx, eventClt, fullAccount.ID, finish) },
-			func() { d.AssertOutput(ctx, eventClt, outputId, finish) },
+			func() { e.AssertTransactionBlocks(ctx, eventClt, expectedBlocks) },
+			func() { e.AssertBasicBlocks(ctx, eventClt, expectedBlocks) },
+			func() { e.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks) },
+			func() { e.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks) },
+			func() { e.AssertAccountOutput(ctx, eventClt, fullAccount.ID) },
+			func() { e.AssertOutput(ctx, eventClt, outputId) },
 			func() {
-				d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAny, accountOutput.Address, finish)
+				e.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAny, accountOutput.Address)
 			},
 			func() {
-				d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAddress, accountOutput.Address, finish)
+				e.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAddress, accountOutput.Address)
 			},
 		}
 
@@ -282,66 +259,61 @@ func test_AccountTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 			assertion()
 		}
 
-		// d.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID(), finish)
-		// d.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID(), finish)
+		// e.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID())
+		// e.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID())
 
 		// wait until all topics starts listening
-		err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+		err := e.AwaitEventAPITopics(t, cancel, totalTopics)
 		require.NoError(t, err)
 
 		// issue blocks
 		go func() {
 			for _, blk := range expectedBlocks {
 				fmt.Println("submitting a block: ", blk.MustID().ToHex())
-				d.SubmitBlock(context.Background(), blk)
+				e.dockerFramework.SubmitBlock(context.Background(), blk)
 			}
 		}()
 
 		// update full account information
-		d.wallet.AddAccount(fullAccount.ID, fullAccount)
+		e.dockerFramework.wallet.AddAccount(fullAccount.ID, fullAccount)
 
 		// wait until all topics receives all expected objects
-		err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+		err = e.AwaitEventAPITopics(t, cancel, totalTopics)
 		require.NoError(t, err)
 	}
 }
 
-func test_FoundryTransactionBlocks(t *testing.T, d *DockerTestFramework) {
+func test_FoundryTransactionBlocks(t *testing.T, e *EventAPIDockerTestFramework) {
 	// get event API client ready
-	clt := d.wallet.DefaultClient()
 	ctx, cancel := context.WithCancel(context.Background())
-	eventClt, err := clt.EventAPI(ctx)
-	require.NoError(t, err)
-	err = eventClt.Connect(ctx)
-	require.NoError(t, err)
+	eventClt := e.ConnectEventAPIClient(ctx)
 	defer eventClt.Close()
 
 	{
-		account := d.CreateAccount()
-		fundsOutputID := d.RequestFaucetFunds(ctx, iotago.AddressEd25519)
+		account := e.dockerFramework.CreateAccount()
+		fundsOutputID := e.dockerFramework.RequestFaucetFunds(ctx, iotago.AddressEd25519)
 
 		// prepare foundry output block
-		foundryId, outputId, blk := d.CreateFoundryBlockFromInput(account.ID, fundsOutputID, 5_000_000, 10_000_000_000)
+		foundryId, outputId, blk := e.dockerFramework.CreateFoundryBlockFromInput(account.ID, fundsOutputID, 5_000_000, 10_000_000_000)
 		expectedBlocks := map[string]*iotago.Block{
 			blk.MustID().ToHex(): blk,
 		}
-		finish := make(chan struct{})
-		foundryOutput := d.wallet.Output(outputId)
+		foundryOutput := e.dockerFramework.wallet.Output(outputId)
 
 		assertions := []func(){
-			func() { d.AssertTransactionBlocks(ctx, eventClt, expectedBlocks, finish) },
-			func() { d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish) },
-			func() { d.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks, finish) },
-			func() { d.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks, finish) },
-			func() { d.AssertAccountOutput(ctx, eventClt, account.ID, finish) },
-			func() { d.AssertFoundryOutput(ctx, eventClt, foundryId, finish) },
-			func() { d.AssertOutput(ctx, eventClt, outputId, finish) },
-			func() { d.AssertOutput(ctx, eventClt, account.OutputID, finish) },
+			func() { e.AssertTransactionBlocks(ctx, eventClt, expectedBlocks) },
+			func() { e.AssertBasicBlocks(ctx, eventClt, expectedBlocks) },
+			func() { e.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks) },
+			func() { e.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks) },
+			func() { e.AssertAccountOutput(ctx, eventClt, account.ID) },
+			func() { e.AssertFoundryOutput(ctx, eventClt, foundryId) },
+			func() { e.AssertOutput(ctx, eventClt, outputId) },
+			func() { e.AssertOutput(ctx, eventClt, account.OutputID) },
 			func() {
-				d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAny, foundryOutput.Address, finish)
+				e.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAny, foundryOutput.Address)
 			},
 			func() {
-				d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionImmutableAccount, foundryOutput.Address, finish)
+				e.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionImmutableAccount, foundryOutput.Address)
 			},
 		}
 
@@ -350,61 +322,56 @@ func test_FoundryTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 			assertion()
 		}
 
-		// d.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID(), finish)
-		// d.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID(), finish)
+		// e.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID())
+		// e.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID())
 
 		// wait until all topics starts listening
-		err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+		err := e.AwaitEventAPITopics(t, cancel, totalTopics)
 		require.NoError(t, err)
 
 		// issue blocks
 		go func() {
 			for _, blk := range expectedBlocks {
 				fmt.Println("submitting a block: ", blk.MustID().ToHex())
-				d.SubmitBlock(context.Background(), blk)
+				e.dockerFramework.SubmitBlock(context.Background(), blk)
 			}
 		}()
 
 		// wait until all topics receives all expected objects
-		err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+		err = e.AwaitEventAPITopics(t, cancel, totalTopics)
 		require.NoError(t, err)
 	}
 }
 
-func test_NFTTransactionBlocks(t *testing.T, d *DockerTestFramework) {
+func test_NFTTransactionBlocks(t *testing.T, e *EventAPIDockerTestFramework) {
 	// get event API client ready
-	clt := d.wallet.DefaultClient()
 	ctx, cancel := context.WithCancel(context.Background())
-	eventClt, err := clt.EventAPI(ctx)
-	require.NoError(t, err)
-	err = eventClt.Connect(ctx)
-	require.NoError(t, err)
+	eventClt := e.ConnectEventAPIClient(ctx)
 	defer eventClt.Close()
 
 	{
-		account := d.CreateAccount()
-		fundsOutputID := d.RequestFaucetFunds(ctx, iotago.AddressEd25519)
+		account := e.dockerFramework.CreateAccount()
+		fundsOutputID := e.dockerFramework.RequestFaucetFunds(ctx, iotago.AddressEd25519)
 
 		// prepare foundry output block
-		nftId, outputId, blk := d.CreateNFTBlockFromInput(account.ID, fundsOutputID)
+		nftId, outputId, blk := e.dockerFramework.CreateNFTBlockFromInput(account.ID, fundsOutputID)
 		expectedBlocks := map[string]*iotago.Block{
 			blk.MustID().ToHex(): blk,
 		}
-		finish := make(chan struct{})
-		nftOutput := d.wallet.Output(outputId)
+		nftOutput := e.dockerFramework.wallet.Output(outputId)
 
 		assertions := []func(){
-			func() { d.AssertTransactionBlocks(ctx, eventClt, expectedBlocks, finish) },
-			func() { d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish) },
-			func() { d.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks, finish) },
-			func() { d.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks, finish) },
-			func() { d.AssertNFTOutput(ctx, eventClt, nftId, finish) },
-			func() { d.AssertOutput(ctx, eventClt, outputId, finish) },
+			func() { e.AssertTransactionBlocks(ctx, eventClt, expectedBlocks) },
+			func() { e.AssertBasicBlocks(ctx, eventClt, expectedBlocks) },
+			func() { e.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks) },
+			func() { e.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks) },
+			func() { e.AssertNFTOutput(ctx, eventClt, nftId) },
+			func() { e.AssertOutput(ctx, eventClt, outputId) },
 			func() {
-				d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAny, nftOutput.Address, finish)
+				e.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAny, nftOutput.Address)
 			},
 			func() {
-				d.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAddress, nftOutput.Address, finish)
+				e.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAddress, nftOutput.Address)
 			},
 		}
 
@@ -413,23 +380,23 @@ func test_NFTTransactionBlocks(t *testing.T, d *DockerTestFramework) {
 			assertion()
 		}
 
-		// d.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID(), finish)
-		// d.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID(), finish)
+		// e.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID())
+		// e.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID())
 
 		// wait until all topics starts listening
-		err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+		err := e.AwaitEventAPITopics(t, cancel, totalTopics)
 		require.NoError(t, err)
 
 		// issue blocks
 		go func() {
 			for _, blk := range expectedBlocks {
 				fmt.Println("submitting a block ", blk.MustID().ToHex())
-				d.SubmitBlock(context.Background(), blk)
+				e.dockerFramework.SubmitBlock(context.Background(), blk)
 			}
 		}()
 
 		// wait until all topics receives all expected objects
-		err = AwaitEventAPITopics(t, d.optsWaitFor, cancel, finish, totalTopics)
+		err = e.AwaitEventAPITopics(t, cancel, totalTopics)
 		require.NoError(t, err)
 	}
 }
