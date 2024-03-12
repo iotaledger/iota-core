@@ -167,6 +167,7 @@ func (a *coreAPISlotAssets) assertCommitments(t *testing.T) {
 		}
 
 		require.Equal(t, commitmentID, prevCommitment)
+		prevCommitment = commitmentID
 	}
 }
 
@@ -174,6 +175,7 @@ func (a *coreAPISlotAssets) assertBICs(t *testing.T) {
 	prevBIC := a.bicPerNode["V1"]
 	for _, bic := range a.bicPerNode {
 		require.Equal(t, bic, prevBIC)
+		prevBIC = bic
 	}
 }
 
