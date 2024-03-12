@@ -192,6 +192,7 @@ func (d *DockerTestFramework) AssertTransactionMetadataByTransactionID(ctx conte
 				if txID.Compare(metadata.TransactionID) == 0 {
 					fmt.Println(metadata.TransactionState)
 					finishChan <- struct{}{}
+
 					return
 				}
 
@@ -222,17 +223,14 @@ func (d *DockerTestFramework) AssertBlockMetadataConfirmedBlocks(ctx context.Con
 	}()
 }
 
-func (d *DockerTestFramework) AssertOutput(ctx context.Context, eventClt *nodeclient.EventAPIClient, outputId iotago.OutputID, finishChan chan struct{}) {
-	outputMetadataChan, subInfo := eventClt.OutputWithMetadataByOutputID(outputId)
+func (d *DockerTestFramework) AssertOutput(ctx context.Context, eventClt *nodeclient.EventAPIClient, outputID iotago.OutputID, finishChan chan struct{}) {
+	outputMetadataChan, subInfo := eventClt.OutputWithMetadataByOutputID(outputID)
 	require.Nil(d.Testing, subInfo.Error())
 
 	go func() {
 		defer subInfo.Close()
 		d.assertOutputMetadataTopics(ctx, "AssertOutput", outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
-			if outputId.Compare(resp.Metadata.OutputID) == 0 {
-				return true
-			}
-			return false
+			return outputID.Compare(resp.Metadata.OutputID) == 0
 		}, finishChan)
 	}()
 }
@@ -273,90 +271,102 @@ func (d *DockerTestFramework) AssertOutputsWithMetadataByUnlockConditionAndAddre
 					return true
 				}
 			}
+
 			return false
 		}, finishChan)
 	}()
 }
 
-func (d *DockerTestFramework) AssertDelegationOutput(ctx context.Context, eventClt *nodeclient.EventAPIClient, delegationId iotago.DelegationID, finishChan chan struct{}) {
-	outputMetadataChan, subInfo := eventClt.OutputsWithMetadataByDelegationID(delegationId)
+func (d *DockerTestFramework) AssertDelegationOutput(ctx context.Context, eventClt *nodeclient.EventAPIClient, delegationID iotago.DelegationID, finishChan chan struct{}) {
+	outputMetadataChan, subInfo := eventClt.OutputsWithMetadataByDelegationID(delegationID)
 	require.Nil(d.Testing, subInfo.Error())
 
 	go func() {
 		defer subInfo.Close()
 		d.assertOutputMetadataTopics(ctx, "AssertDelegationOutput", outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
 			if resp.Output.Type() == iotago.OutputDelegation {
-				o := resp.Output.(*iotago.DelegationOutput)
+				o, ok := resp.Output.(*iotago.DelegationOutput)
+				require.True(d.Testing, ok)
 				actualDelegationID := o.DelegationID
 				if actualDelegationID.Empty() {
 					actualDelegationID = iotago.DelegationIDFromOutputID(resp.Metadata.OutputID)
 				}
 
-				return delegationId.Matches(actualDelegationID)
+				return delegationID.Matches(actualDelegationID)
 			}
+
 			return false
 		}, finishChan)
 	}()
 }
 
-func (d *DockerTestFramework) AssertFoundryOutput(ctx context.Context, eventClt *nodeclient.EventAPIClient, foundryId iotago.FoundryID, finishChan chan struct{}) {
-	outputMetadataChan, subInfo := eventClt.OutputsWithMetadataByFoundryID(foundryId)
+func (d *DockerTestFramework) AssertFoundryOutput(ctx context.Context, eventClt *nodeclient.EventAPIClient, foundryID iotago.FoundryID, finishChan chan struct{}) {
+	outputMetadataChan, subInfo := eventClt.OutputsWithMetadataByFoundryID(foundryID)
 	require.Nil(d.Testing, subInfo.Error())
 
 	go func() {
 		defer subInfo.Close()
 		d.assertOutputMetadataTopics(ctx, "AssertFoundryOutput", outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
 			if resp.Output.Type() == iotago.OutputFoundry {
-				o := resp.Output.(*iotago.FoundryOutput)
-				return foundryId.Matches(o.MustFoundryID())
+				o, ok := resp.Output.(*iotago.FoundryOutput)
+				require.True(d.Testing, ok)
+
+				return foundryID.Matches(o.MustFoundryID())
 			}
+
 			return false
 		}, finishChan)
 	}()
 }
 
-func (d *DockerTestFramework) AssertAccountOutput(ctx context.Context, eventClt *nodeclient.EventAPIClient, accountId iotago.AccountID, finishChan chan struct{}) {
-	outputMetadataChan, subInfo := eventClt.OutputsWithMetadataByAccountID(accountId)
+func (d *DockerTestFramework) AssertAccountOutput(ctx context.Context, eventClt *nodeclient.EventAPIClient, accountID iotago.AccountID, finishChan chan struct{}) {
+	outputMetadataChan, subInfo := eventClt.OutputsWithMetadataByAccountID(accountID)
 	require.Nil(d.Testing, subInfo.Error())
 
 	go func() {
 		defer subInfo.Close()
 		d.assertOutputMetadataTopics(ctx, "AssertAccountOutput", outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
 			if resp.Output.Type() == iotago.OutputAccount {
-				o := resp.Output.(*iotago.AccountOutput)
+				o, ok := resp.Output.(*iotago.AccountOutput)
+				require.True(d.Testing, ok)
 				actualAccountID := o.AccountID
 				if actualAccountID.Empty() {
 					actualAccountID = iotago.AccountIDFromOutputID(resp.Metadata.OutputID)
 				}
-				return accountId.Matches(o.AccountID)
+
+				return accountID.Matches(actualAccountID)
 			}
+
 			return false
 		}, finishChan)
 	}()
 }
 
-func (d *DockerTestFramework) AssertAnchorOutput(ctx context.Context, eventClt *nodeclient.EventAPIClient, anchorId iotago.AnchorID, finishChan chan struct{}) {
-	outputMetadataChan, subInfo := eventClt.OutputsWithMetadataByAnchorID(anchorId)
+func (d *DockerTestFramework) AssertAnchorOutput(ctx context.Context, eventClt *nodeclient.EventAPIClient, anchorID iotago.AnchorID, finishChan chan struct{}) {
+	outputMetadataChan, subInfo := eventClt.OutputsWithMetadataByAnchorID(anchorID)
 	require.Nil(d.Testing, subInfo.Error())
 
 	go func() {
 		defer subInfo.Close()
 		d.assertOutputMetadataTopics(ctx, "AssertNFTOutput", outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
 			if resp.Output.Type() == iotago.OutputAnchor {
-				o := resp.Output.(*iotago.AnchorOutput)
+				o, ok := resp.Output.(*iotago.AnchorOutput)
+				require.True(d.Testing, ok)
 				actualAnchorID := o.AnchorID
 				if actualAnchorID.Empty() {
 					actualAnchorID = iotago.AnchorIDFromOutputID(resp.Metadata.OutputID)
 				}
-				return anchorId.Matches(o.AnchorID)
+
+				return anchorID.Matches(actualAnchorID)
 			}
+
 			return false
 		}, finishChan)
 	}()
 }
 
-func (d *DockerTestFramework) AssertNFTOutput(ctx context.Context, eventClt *nodeclient.EventAPIClient, nftId iotago.NFTID, finishChan chan struct{}) {
-	outputMetadataChan, subInfo := eventClt.OutputsWithMetadataByNFTID(nftId)
+func (d *DockerTestFramework) AssertNFTOutput(ctx context.Context, eventClt *nodeclient.EventAPIClient, nftID iotago.NFTID, finishChan chan struct{}) {
+	outputMetadataChan, subInfo := eventClt.OutputsWithMetadataByNFTID(nftID)
 	require.Nil(d.Testing, subInfo.Error())
 
 	go func() {
@@ -368,8 +378,10 @@ func (d *DockerTestFramework) AssertNFTOutput(ctx context.Context, eventClt *nod
 				if actualNFTID.Empty() {
 					actualNFTID = iotago.NFTIDFromOutputID(resp.Metadata.OutputID)
 				}
-				return nftId.Matches(actualNFTID)
+
+				return nftID.Matches(actualNFTID)
 			}
+
 			return false
 		}, finishChan)
 	}()
@@ -391,10 +403,12 @@ func (d *DockerTestFramework) assertCommitmentsTopics(ctx context.Context, calle
 
 				require.ElementsMatch(d.Testing, expectedSlots, slots)
 				finishChan <- struct{}{}
+
 				return
 			}
 		case <-ctx.Done():
-			fmt.Println("topic", callerName, "does not get expected commitments, recieved slots:", slots)
+			fmt.Println("topic", callerName, "does not get expected commitments, received slots:", slots)
+
 			return
 		}
 	}
@@ -417,11 +431,13 @@ func (d *DockerTestFramework) assertBlocksTopics(ctx context.Context, callerName
 				if len(blkIDs) == len(expectedBlocks) {
 					require.ElementsMatch(d.Testing, expectedBlockIDsSlice, blkIDs)
 					finishChan <- struct{}{}
+
 					return
 				}
 			}
 		case <-ctx.Done():
 			fmt.Println("topic", callerName, "does not get expected Blocks, received blocks:", blkIDs)
+
 			return
 		}
 	}
@@ -445,11 +461,13 @@ func (d *DockerTestFramework) assertBlockMetadataTopics(ctx context.Context, cal
 				if len(blkIDs) == len(expectedBlocks) {
 					require.ElementsMatch(d.Testing, expectedBlockIDsSlice, blkIDs)
 					finishChan <- struct{}{}
+
 					return
 				}
 			}
 		case <-ctx.Done():
 			fmt.Println("topic", callerName, "does not get expected BlockMetadata, received blocks:", blkIDs)
+
 			return
 		}
 	}
@@ -464,10 +482,12 @@ func (d *DockerTestFramework) assertOutputMetadataTopics(ctx context.Context, ca
 		case outputMetadata := <-receivedChan:
 			if matchFunc(outputMetadata) {
 				finishChan <- struct{}{}
+
 				return
 			}
 		case <-ctx.Done():
 			fmt.Println("topic", callerName, "does not get expected outputs")
+
 			return
 		}
 	}
