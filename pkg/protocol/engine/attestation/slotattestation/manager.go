@@ -82,15 +82,15 @@ func NewProvider() module.Provider[*engine.Engine, attestation.Attestations] {
 }
 
 func NewManager(
-	module module.Module,
+	subModule module.Module,
 	lastCommittedSlot iotago.SlotIndex,
 	lastCumulativeWeight uint64,
 	bucketedStorage func(slot iotago.SlotIndex) (kvstore.KVStore, error),
 	committeeFunc func(slot iotago.SlotIndex) (*account.SeatedAccounts, bool),
 	apiProvider iotago.APIProvider,
 ) *Manager {
-	m := &Manager{
-		Module:               module,
+	return module.InitSimpleLifecycle(&Manager{
+		Module:               subModule,
 		lastCommittedSlot:    lastCommittedSlot,
 		lastCumulativeWeight: lastCumulativeWeight,
 		committeeFunc:        committeeFunc,
@@ -98,19 +98,7 @@ func NewManager(
 		futureAttestations:   memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation](),
 		pendingAttestations:  memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation](),
 		apiProvider:          apiProvider,
-	}
-
-	m.ConstructedEvent().Trigger()
-
-	m.ShutdownEvent().OnTrigger(func() {
-		if err := m.writeToDisk(); err != nil {
-			panic(err)
-		}
-
-		m.StoppedEvent().Trigger()
-	})
-
-	return m
+	}, (*Manager).shutdown)
 }
 
 // Get returns the attestations that are included in the commitment of the given slot as list.
@@ -355,4 +343,12 @@ func (m *Manager) computeAttestationCommitmentOffset(slot iotago.SlotIndex) (cut
 	}
 
 	return slot - m.apiProvider.APIForSlot(slot).ProtocolParameters().MaxCommittableAge(), true
+}
+
+func (m *Manager) shutdown() {
+	if err := m.writeToDisk(); err != nil {
+		panic(err)
+	}
+
+	m.StoppedEvent().Trigger()
 }
