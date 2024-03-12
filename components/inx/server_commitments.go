@@ -40,7 +40,7 @@ func (s *Server) ListenToCommitments(req *inx.SlotRangeRequest, srv inx.INX_List
 		}
 
 		if err := srv.Send(inxCommitment(commitment)); err != nil {
-			return ierrors.Errorf("send error: %w", err)
+			return ierrors.Wrap(err, "send error")
 		}
 
 		return nil
@@ -108,7 +108,7 @@ func (s *Server) ListenToCommitments(req *inx.SlotRangeRequest, srv inx.INX_List
 	catchUpFunc := func(start iotago.SlotIndex, end iotago.SlotIndex) error {
 		err := sendSlotsRange(start, end)
 		if err != nil {
-			err := ierrors.Errorf("sendSlotsRange error: %w", err)
+			err := ierrors.Wrap(err, "sendSlotsRange error")
 			Component.LogError(err.Error())
 
 			return err
@@ -119,7 +119,7 @@ func (s *Server) ListenToCommitments(req *inx.SlotRangeRequest, srv inx.INX_List
 
 	sendFunc := func(_ iotago.SlotIndex, payload *inx.Commitment) error {
 		if err := srv.Send(payload); err != nil {
-			err := ierrors.Errorf("send error: %w", err)
+			err := ierrors.Wrap(err, "send error")
 			Component.LogError(err.Error())
 
 			return err
