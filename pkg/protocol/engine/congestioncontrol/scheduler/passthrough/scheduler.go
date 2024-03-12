@@ -30,21 +30,11 @@ func NewProvider() module.Provider[*engine.Engine, scheduler.Scheduler] {
 	})
 }
 
-func New(module module.Module) *Scheduler {
-	s := &Scheduler{
-		Module: module,
+func New(subModule module.Module) *Scheduler {
+	return module.InitSimpleLifecycle(&Scheduler{
+		Module: subModule,
 		events: scheduler.NewEvents(),
-	}
-
-	s.ConstructedEvent().Trigger()
-
-	s.ShutdownEvent().OnTrigger(func() {
-		s.StoppedEvent().Trigger()
 	})
-
-	s.InitializedEvent().Trigger()
-
-	return s
 }
 
 func (s *Scheduler) IsBlockIssuerReady(_ iotago.AccountID, _ ...iotago.WorkScore) bool {
