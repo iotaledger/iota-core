@@ -59,8 +59,6 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 			b.latestCommitmentFunc = e.SyncManager.LatestCommitment
 
 			e.Events.BlockDAG.LinkTo(b.events)
-
-			b.InitializedEvent().Trigger()
 		})
 
 		return b
@@ -96,29 +94,17 @@ func (b *BlockDAG) setupBlock(block *blocks.Block) {
 }
 
 // New is the constructor for the BlockDAG and creates a new BlockDAG instance.
-func New(module module.Module, workers *workerpool.Group, unsolidCommitmentBufferSize int, evictionState *eviction.State, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
-	return options.Apply(&BlockDAG{
-		Module:                module,
+func New(subModule module.Module, workers *workerpool.Group, unsolidCommitmentBufferSize int, evictionState *eviction.State, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
+	return module.InitSimpleLifecycle(options.Apply(&BlockDAG{
+		Module:                subModule,
 		events:                blockdag.NewEvents(),
 		evictionState:         evictionState,
 		blockCache:            blockCache,
 		workers:               workers,
 		errorHandler:          errorHandler,
 		uncommittedSlotBlocks: buffer.NewUnsolidCommitmentBuffer[*blocks.Block](unsolidCommitmentBufferSize),
-	}, opts, func(b *BlockDAG) {
-		b.ConstructedEvent().Trigger()
-
-		b.ShutdownEvent().OnTrigger(func() {
-			b.workers.Shutdown()
-
-			b.StoppedEvent().Trigger()
-		})
-
-		b.InitializedEvent().Trigger()
-	})
+	}, opts), (*BlockDAG).shutdown)
 }
-
-var _ blockdag.BlockDAG = new(BlockDAG)
 
 // Append is used to append new Blocks to the BlockDAG. It is the main function of the BlockDAG that triggers Events.
 func (b *BlockDAG) Append(modelBlock *model.Block) (block *blocks.Block, wasAppended bool, err error) {
@@ -238,4 +224,10 @@ func (b *BlockDAG) registerChild(child *blocks.Block, parent iotago.Parent) {
 	if parentBlock, _ := b.GetOrRequestBlock(parent.ID); parentBlock != nil {
 		parentBlock.AppendChild(child, parent.Type)
 	}
+}
+
+func (b *BlockDAG) shutdown() {
+	b.workers.Shutdown()
+
+	b.StoppedEvent().Trigger()
 }
