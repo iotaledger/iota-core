@@ -47,9 +47,9 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(module module.Module, blockCache *blocks.Blocks, seatManager seatmanager.SeatManager, errorHandler func(error), opts ...options.Option[Gadget]) *Gadget {
-	return options.Apply(&Gadget{
-		Module:       module,
+func New(subModule module.Module, blockCache *blocks.Blocks, seatManager seatmanager.SeatManager, errorHandler func(error), opts ...options.Option[Gadget]) *Gadget {
+	return module.InitSimpleLifecycle(options.Apply(&Gadget{
+		Module:       subModule,
 		events:       blockgadget.NewEvents(),
 		seatManager:  seatManager,
 		blockCache:   blockCache,
@@ -58,14 +58,7 @@ func New(module module.Module, blockCache *blocks.Blocks, seatManager seatmanage
 		optsAcceptanceThreshold:               0.67,
 		optsConfirmationThreshold:             0.67,
 		optsConfirmationRatificationThreshold: 2,
-	}, opts, func(g *Gadget) {
-		g.ShutdownEvent().OnTrigger(func() {
-			g.StoppedEvent().Trigger()
-		})
-
-		g.ConstructedEvent().Trigger()
-		g.InitializedEvent().Trigger()
-	})
+	}, opts))
 }
 
 func (g *Gadget) Events() *blockgadget.Events {
