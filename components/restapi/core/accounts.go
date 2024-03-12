@@ -38,7 +38,7 @@ func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error)
 		}
 	}
 
-	commitment, err := deps.RequestHandler.GetCommitmentByID(queryCommitmentID)
+	queryCommittment, err := deps.RequestHandler.GetCommitmentByID(queryCommitmentID)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error)
 		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "address %s is not an account address", c.Param(api.ParameterBech32Address))
 	}
 
-	return deps.RequestHandler.CongestionByAccountAddress(accountAddress, commitment, workScores...)
+	return deps.RequestHandler.CongestionByAccountAddress(accountAddress, queryCommittment, workScores...)
 }
 
 func validators(c echo.Context) (*api.ValidatorsResponse, error) {
