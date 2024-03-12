@@ -34,11 +34,11 @@ func NewProvider(opts ...options.Option[PreSolidBlockFilter]) module.Provider[*e
 		f := New(e.NewSubModule("PreSolidBlockFilter"), e, opts...)
 
 		e.ConstructedEvent().OnTrigger(func() {
-			e.Events.PreSolidFilter.LinkTo(f.events)
-
 			e.SybilProtection.InitializedEvent().OnTrigger(func() {
-				f.init(e.SybilProtection.SeatManager().CommitteeInSlot)
+				f.Init(e.SybilProtection.SeatManager().CommitteeInSlot)
 			})
+
+			e.Events.PreSolidFilter.LinkTo(f.events)
 		})
 
 		return f
@@ -60,6 +60,13 @@ func New(module module.Module, apiProvider iotago.APIProvider, opts ...options.O
 
 		p.ConstructedEvent().Trigger()
 	})
+}
+
+// Init initializes the PreSolidBlockFilter.
+func (f *PreSolidBlockFilter) Init(committeeFunc func(iotago.SlotIndex) (*account.SeatedAccounts, bool)) {
+	f.committeeFunc = committeeFunc
+
+	f.InitializedEvent().Trigger()
 }
 
 // ProcessReceivedBlock processes block from the given source.
@@ -105,10 +112,3 @@ func (f *PreSolidBlockFilter) ProcessReceivedBlock(block *model.Block, source pe
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (f *PreSolidBlockFilter) Reset() { /* nothing to reset but comply with interface */ }
-
-// init initializes the PreSolidBlockFilter.
-func (f *PreSolidBlockFilter) init(committeeFunc func(iotago.SlotIndex) (*account.SeatedAccounts, bool)) {
-	f.committeeFunc = committeeFunc
-
-	f.InitializedEvent().Trigger()
-}
