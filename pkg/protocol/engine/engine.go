@@ -570,56 +570,54 @@ func (e *Engine) initLatestCommitment() {
 }
 
 func (e *Engine) initReactiveModule(parentLogger log.Logger) (reactiveModule module.Module) {
-	logger := parentLogger.NewChildLogger("Engine", true)
-	reactiveModule = module.New(logger)
+	reactiveModule = module.New(parentLogger.NewChildLogger("Engine", true))
 
-	e.RootCommitment.LogUpdates(logger, log.LevelTrace, "RootCommitment")
-	e.LatestCommitment.LogUpdates(logger, log.LevelTrace, "LatestCommitment")
+	e.RootCommitment.LogUpdates(reactiveModule, log.LevelTrace, "RootCommitment")
+	e.LatestCommitment.LogUpdates(reactiveModule, log.LevelTrace, "LatestCommitment")
 
 	reactiveModule.ShutdownEvent().OnTrigger(func() {
-		subModules := []module.Module{
-			e.Scheduler,
-			e.TipSelection,
-			e.TipManager,
-			e.Attestations,
-			e.SyncManager,
-			e.Notarization,
-			e.Clock,
-			e.SlotGadget,
-			e.BlockGadget,
-			e.UpgradeOrchestrator,
-			e.SybilProtection,
-			e.Booker,
-			e.Ledger,
-			e.PostSolidFilter,
-			e.BlockDAG,
-			e.PreSolidFilter,
-			e.BlockRetainer,
-			e.TxRetainer,
-		}
-
 		reactiveModule.LogDebug("shutting down")
 
-		logger.UnsubscribeFromParentLogger()
-
-		// Shutdown should be performed in the reverse dataflow order.
 		e.BlockRequester.Shutdown()
 
-		module.TriggerAll(module.Module.ShutdownEvent, subModules...)
+		e.shutdownSubModules()
 
 		e.Workers.Shutdown()
 		e.Storage.Shutdown()
 
-		wg := module.WaitAll(module.Module.StoppedEvent, subModules...)
-		wg.Debug(module.Module.LogName)
-		wg.Wait()
+		e.StoppedEvent().Trigger()
 
 		reactiveModule.LogDebug("stopped")
-
-		e.StoppedEvent().Trigger()
 	})
 
 	return reactiveModule
+}
+
+func (e *Engine) shutdownSubModules() {
+	// shutdown should be performed in the reverse dataflow order.
+	shutdownOrder := []module.Module{
+		e.Scheduler,
+		e.TipSelection,
+		e.TipManager,
+		e.Attestations,
+		e.SyncManager,
+		e.Notarization,
+		e.Clock,
+		e.SlotGadget,
+		e.BlockGadget,
+		e.UpgradeOrchestrator,
+		e.SybilProtection,
+		e.Booker,
+		e.Ledger,
+		e.PostSolidFilter,
+		e.BlockDAG,
+		e.PreSolidFilter,
+		e.BlockRetainer,
+		e.TxRetainer,
+	}
+
+	module.TriggerAll(module.Module.ShutdownEvent, shutdownOrder...)
+	module.WaitAll(module.Module.StoppedEvent, shutdownOrder...).Wait()
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
