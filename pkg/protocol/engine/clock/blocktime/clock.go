@@ -48,18 +48,12 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 				latestFinalizedSlotIndex := e.Storage.Settings().LatestFinalizedSlot()
 				c.confirmedTime.Set(e.APIForSlot(latestFinalizedSlotIndex).TimeProvider().SlotEndTime(latestFinalizedSlotIndex))
 
-				c.InitializedEvent().Trigger()
-
 				e.Events.Clock.AcceptedTimeUpdated.LinkTo(c.acceptedTime.OnUpdated)
 				e.Events.Clock.ConfirmedTimeUpdated.LinkTo(c.confirmedTime.OnUpdated)
 
 				asyncOpt := event.WithWorkerPool(c.workerPool)
 
-				c.ShutdownEvent().OnTrigger(lo.BatchReverse(
-					func() {
-						c.StoppedEvent().Trigger()
-					},
-
+				c.ShutdownEvent().OnTrigger(lo.Batch(
 					e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 						c.acceptedTime.Advance(block.IssuingTime())
 					}, asyncOpt).Unhook,
@@ -75,7 +69,15 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 						c.acceptedTime.Advance(slotEndTime)
 						c.confirmedTime.Advance(slotEndTime)
 					}, asyncOpt).Unhook,
+
+					func() {
+						c.workerPool.Shutdown()
+
+						c.StoppedEvent().Trigger()
+					},
 				))
+
+				c.InitializedEvent().Trigger()
 			})
 
 			c.ConstructedEvent().Trigger()
