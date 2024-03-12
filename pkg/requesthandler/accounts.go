@@ -104,6 +104,7 @@ func (r *RequestHandler) RewardsByOutputID(outputID iotago.OutputID, slot iotago
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
 			return nil, ierrors.Wrapf(echo.ErrNotFound, "output %s not found", outputID.ToHex())
 		}
+
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from ledger: %s", outputID.ToHex(), err)
 	}
 

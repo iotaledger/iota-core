@@ -16,6 +16,7 @@ func (r *RequestHandler) OutputFromOutputID(outputID iotago.OutputID) (*api.Outp
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
 			return nil, ierrors.Wrapf(echo.ErrNotFound, "output %s not found in the Ledger", outputID.ToHex())
 		}
+
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %s", outputID.ToHex(), err)
 	}
 
@@ -31,6 +32,7 @@ func (r *RequestHandler) OutputMetadataFromOutputID(outputID iotago.OutputID) (*
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
 			return nil, ierrors.Wrapf(echo.ErrNotFound, "output %s not found in the Ledger", outputID.ToHex())
 		}
+
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %s", outputID.ToHex(), err)
 	}
 
@@ -47,6 +49,7 @@ func (r *RequestHandler) OutputWithMetadataFromOutputID(outputID iotago.OutputID
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
 			return nil, ierrors.Wrapf(echo.ErrNotFound, "output %s not found in the Ledger", outputID.ToHex())
 		}
+
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %s", outputID.ToHex(), err)
 	}
 
