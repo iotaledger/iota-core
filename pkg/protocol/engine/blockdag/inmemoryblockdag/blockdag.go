@@ -41,6 +41,8 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 		b := New(e.NewSubModule("BlockDAG"), e.Workers.CreateGroup("BlockDAG"), int(e.Storage.Settings().APIProvider().CommittedAPI().ProtocolParameters().MaxCommittableAge())*2, e.EvictionState, e.BlockCache, e.ErrorHandler("blockdag"), opts...)
 
 		e.ConstructedEvent().OnTrigger(func() {
+			b.Init(e.SyncManager.LatestCommitment)
+
 			wp := b.workers.CreatePool("BlockDAG.Append", workerpool.WithWorkerCount(2))
 
 			e.Events.PreSolidFilter.BlockPreAllowed.Hook(func(block *model.Block) {
@@ -56,8 +58,6 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 				}
 			}, event.WithWorkerPool(wp))
 
-			b.latestCommitmentFunc = e.SyncManager.LatestCommitment
-
 			e.Events.BlockDAG.LinkTo(b.events)
 		})
 
@@ -65,37 +65,9 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 	})
 }
 
-func (b *BlockDAG) setupBlock(block *blocks.Block) {
-	var unsolidParentsCount atomic.Int32
-	unsolidParentsCount.Store(int32(len(block.Parents())))
-
-	block.ForEachParent(func(parent iotago.Parent) {
-		parentBlock, exists := b.blockCache.Block(parent.ID)
-		if !exists {
-			b.errorHandler(ierrors.Errorf("failed to setup block %s, parent %s is missing", block.ID(), parent.ID))
-
-			return
-		}
-
-		parentBlock.Solid().OnUpdateOnce(func(_ bool, _ bool) {
-			if unsolidParentsCount.Add(-1) == 0 {
-				if block.SetSolid() {
-					b.events.BlockSolid.Trigger(block)
-				}
-			}
-		})
-
-		parentBlock.Invalid().OnUpdateOnce(func(_ bool, _ bool) {
-			if block.SetInvalid() {
-				b.events.BlockInvalid.Trigger(block, ierrors.Errorf("parent block %s is marked as invalid", parent.ID))
-			}
-		})
-	})
-}
-
 // New is the constructor for the BlockDAG and creates a new BlockDAG instance.
 func New(subModule module.Module, workers *workerpool.Group, unsolidCommitmentBufferSize int, evictionState *eviction.State, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
-	return module.InitSimpleLifecycle(options.Apply(&BlockDAG{
+	return options.Apply(&BlockDAG{
 		Module:                subModule,
 		events:                blockdag.NewEvents(),
 		evictionState:         evictionState,
@@ -103,7 +75,17 @@ func New(subModule module.Module, workers *workerpool.Group, unsolidCommitmentBu
 		workers:               workers,
 		errorHandler:          errorHandler,
 		uncommittedSlotBlocks: buffer.NewUnsolidCommitmentBuffer[*blocks.Block](unsolidCommitmentBufferSize),
-	}, opts), (*BlockDAG).shutdown)
+	}, opts, func(b *BlockDAG) {
+		b.ShutdownEvent().OnTrigger(b.shutdown)
+
+		b.ConstructedEvent().Trigger()
+	})
+}
+
+func (b *BlockDAG) Init(latestCommitmentFunc func() *model.Commitment) {
+	b.latestCommitmentFunc = latestCommitmentFunc
+
+	b.InitializedEvent().Trigger()
 }
 
 // Append is used to append new Blocks to the BlockDAG. It is the main function of the BlockDAG that triggers Events.
@@ -149,6 +131,34 @@ func (b *BlockDAG) GetOrRequestBlock(blockID iotago.BlockID) (block *blocks.Bloc
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (b *BlockDAG) Reset() {
 	b.uncommittedSlotBlocks.Reset()
+}
+
+func (b *BlockDAG) setupBlock(block *blocks.Block) {
+	var unsolidParentsCount atomic.Int32
+	unsolidParentsCount.Store(int32(len(block.Parents())))
+
+	block.ForEachParent(func(parent iotago.Parent) {
+		parentBlock, exists := b.blockCache.Block(parent.ID)
+		if !exists {
+			b.errorHandler(ierrors.Errorf("failed to setup block %s, parent %s is missing", block.ID(), parent.ID))
+
+			return
+		}
+
+		parentBlock.Solid().OnUpdateOnce(func(_ bool, _ bool) {
+			if unsolidParentsCount.Add(-1) == 0 {
+				if block.SetSolid() {
+					b.events.BlockSolid.Trigger(block)
+				}
+			}
+		})
+
+		parentBlock.Invalid().OnUpdateOnce(func(_ bool, _ bool) {
+			if block.SetInvalid() {
+				b.events.BlockInvalid.Trigger(block, ierrors.Errorf("parent block %s is marked as invalid", parent.ID))
+			}
+		})
+	})
 }
 
 // append tries to append the given Block to the BlockDAG.
