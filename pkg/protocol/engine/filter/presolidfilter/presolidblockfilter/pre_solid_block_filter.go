@@ -31,15 +31,14 @@ type PreSolidBlockFilter struct {
 
 func NewProvider(opts ...options.Option[PreSolidBlockFilter]) module.Provider[*engine.Engine, presolidfilter.PreSolidFilter] {
 	return module.Provide(func(e *engine.Engine) presolidfilter.PreSolidFilter {
-		f := New(e, opts...)
-		f.TriggerConstructed()
+		f := New(e.NewSubModule("PreSolidBlockFilter"), e, opts...)
 
 		e.ConstructedEvent().OnTrigger(func() {
 			e.Events.PreSolidFilter.LinkTo(f.events)
-			e.SybilProtection.HookInitialized(func() {
-				f.committeeFunc = e.SybilProtection.SeatManager().CommitteeInSlot
+
+			e.SybilProtection.InitializedEvent().OnTrigger(func() {
+				f.init(e.SybilProtection.SeatManager().CommitteeInSlot)
 			})
-			f.TriggerInitialized()
 		})
 
 		return f
@@ -49,14 +48,18 @@ func NewProvider(opts ...options.Option[PreSolidBlockFilter]) module.Provider[*e
 var _ presolidfilter.PreSolidFilter = new(PreSolidBlockFilter)
 
 // New creates a new PreSolidBlockFilter.
-func New(apiProvider iotago.APIProvider, opts ...options.Option[PreSolidBlockFilter]) *PreSolidBlockFilter {
+func New(module module.Module, apiProvider iotago.APIProvider, opts ...options.Option[PreSolidBlockFilter]) *PreSolidBlockFilter {
 	return options.Apply(&PreSolidBlockFilter{
+		Module:      module,
 		events:      presolidfilter.NewEvents(),
 		apiProvider: apiProvider,
-	}, opts,
-		(*PreSolidBlockFilter).TriggerConstructed,
-		(*PreSolidBlockFilter).TriggerInitialized,
-	)
+	}, opts, func(p *PreSolidBlockFilter) {
+		p.ShutdownEvent().OnTrigger(func() {
+			p.StoppedEvent().Trigger()
+		})
+
+		p.ConstructedEvent().Trigger()
+	})
 }
 
 // ProcessReceivedBlock processes block from the given source.
@@ -103,6 +106,9 @@ func (f *PreSolidBlockFilter) ProcessReceivedBlock(block *model.Block, source pe
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (f *PreSolidBlockFilter) Reset() { /* nothing to reset but comply with interface */ }
 
-func (f *PreSolidBlockFilter) Shutdown() {
-	f.TriggerStopped()
+// init initializes the PreSolidBlockFilter.
+func (f *PreSolidBlockFilter) init(committeeFunc func(iotago.SlotIndex) (*account.SeatedAccounts, bool)) {
+	f.committeeFunc = committeeFunc
+
+	f.InitializedEvent().Trigger()
 }

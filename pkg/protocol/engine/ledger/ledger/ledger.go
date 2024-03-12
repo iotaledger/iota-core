@@ -51,6 +51,7 @@ type Ledger struct {
 func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 	return module.Provide(func(e *engine.Engine) ledger.Ledger {
 		l := New(
+			e.NewSubModule("Ledger"),
 			e.Storage.Ledger(),
 			e.Storage.Accounts(),
 			e.Storage.Commitments().Load,
@@ -82,8 +83,11 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			//	l.memPool.PublishRequestedState(scd.Commitment.Commitment())
 			// })
 
-			l.TriggerConstructed()
-			l.TriggerInitialized()
+			l.ConstructedEvent().Trigger()
+
+			l.ShutdownEvent().OnTrigger(l.shutdown)
+
+			l.InitializedEvent().Trigger()
 		})
 
 		return l
@@ -91,6 +95,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 }
 
 func New(
+	module module.Module,
 	utxoLedger *utxoledger.Manager,
 	accountsStore kvstore.KVStore,
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error),
@@ -101,6 +106,7 @@ func New(
 	errorHandler func(error),
 ) *Ledger {
 	return &Ledger{
+		Module:           module,
 		events:           ledger.NewEvents(),
 		apiProvider:      apiProvider,
 		accountsLedger:   accountsledger.New(apiProvider, blocksFunc, slotDiffFunc, accountsStore),
@@ -361,9 +367,10 @@ func (l *Ledger) Reset() {
 	l.rmcManager.Reset()
 }
 
-func (l *Ledger) Shutdown() {
-	l.TriggerStopped()
+func (l *Ledger) shutdown() {
 	l.spendDAG.Shutdown()
+
+	l.StoppedEvent().Trigger()
 }
 
 // Process the collected account changes. The consumedAccounts and createdAccounts maps only contain outputs with a

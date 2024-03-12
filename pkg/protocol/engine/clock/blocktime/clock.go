@@ -28,7 +28,7 @@ type Clock struct {
 
 	syncutils.RWMutex
 
-	// Module embeds the required methods of the module.Interface.
+	// Module embeds the required methods of the modular framework.
 	module.Module
 }
 
@@ -36,6 +36,7 @@ type Clock struct {
 func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, clock.Clock] {
 	return module.Provide(func(e *engine.Engine) clock.Clock {
 		return options.Apply(&Clock{
+			Module:        e.NewSubModule("Clock"),
 			acceptedTime:  NewRelativeTime(),
 			confirmedTime: NewRelativeTime(),
 			workerPool:    e.Workers.CreatePool("Clock", workerpool.WithWorkerCount(1), workerpool.WithCancelPendingTasksOnShutdown(true), workerpool.WithPanicOnSubmitAfterShutdown(true)),
@@ -47,13 +48,18 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 				latestFinalizedSlotIndex := e.Storage.Settings().LatestFinalizedSlot()
 				c.confirmedTime.Set(e.APIForSlot(latestFinalizedSlotIndex).TimeProvider().SlotEndTime(latestFinalizedSlotIndex))
 
-				c.TriggerInitialized()
+				c.InitializedEvent().Trigger()
 
 				e.Events.Clock.AcceptedTimeUpdated.LinkTo(c.acceptedTime.OnUpdated)
 				e.Events.Clock.ConfirmedTimeUpdated.LinkTo(c.confirmedTime.OnUpdated)
 
 				asyncOpt := event.WithWorkerPool(c.workerPool)
-				c.HookStopped(lo.Batch(
+
+				c.ShutdownEvent().OnTrigger(lo.BatchReverse(
+					func() {
+						c.StoppedEvent().Trigger()
+					},
+
 					e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 						c.acceptedTime.Advance(block.IssuingTime())
 					}, asyncOpt).Unhook,
@@ -72,8 +78,8 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 				))
 			})
 
-			e.StoppedEvent().OnTrigger(c.TriggerStopped)
-		}, (*Clock).TriggerConstructed)
+			c.ConstructedEvent().Trigger()
+		})
 	})
 }
 
@@ -103,9 +109,4 @@ func (c *Clock) Snapshot() *clock.Snapshot {
 func (c *Clock) Reset(newTime time.Time) {
 	c.acceptedTime.Reset(newTime)
 	c.confirmedTime.Reset(newTime)
-}
-
-func (c *Clock) Shutdown() {
-	c.workerPool.Shutdown()
-	c.TriggerStopped()
 }

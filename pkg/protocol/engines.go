@@ -38,17 +38,17 @@ type Engines struct {
 	directory *utils.Directory
 
 	// ReactiveModule embeds a reactive module that provides default API for logging and lifecycle management.
-	module.ReactiveModule
+	module.Module
 }
 
 // newEngines creates a new Engines instance.
 func newEngines(protocol *Protocol) *Engines {
 	e := &Engines{
-		Main:           reactive.NewVariable[*engine.Engine](),
-		ReactiveModule: protocol.NewSubModule("Engines"),
-		protocol:       protocol,
-		worker:         protocol.Workers.CreatePool("Engines", workerpool.WithWorkerCount(1)),
-		directory:      utils.NewDirectory(protocol.Options.BaseDirectory),
+		Main:      reactive.NewVariable[*engine.Engine](),
+		Module:    protocol.NewSubModule("Engines"),
+		protocol:  protocol,
+		worker:    protocol.Workers.CreatePool("Engines", workerpool.WithWorkerCount(1)),
+		directory: utils.NewDirectory(protocol.Options.BaseDirectory),
 	}
 
 	protocol.ConstructedEvent().OnTrigger(func() {

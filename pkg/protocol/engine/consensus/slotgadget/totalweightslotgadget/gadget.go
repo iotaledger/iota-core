@@ -38,18 +38,18 @@ type Gadget struct {
 func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine, slotgadget.Gadget] {
 	return module.Provide(func(e *engine.Engine) slotgadget.Gadget {
 		return options.Apply(&Gadget{
+			Module:                        e.NewSubModule("TotalWeightSlotGadget"),
 			events:                        slotgadget.NewEvents(),
+			slotTrackers:                  shrinkingmap.New[iotago.SlotIndex, *slottracker.SlotTracker](),
 			optsSlotFinalizationThreshold: 0.67,
 			errorHandler:                  e.ErrorHandler("slotgadget"),
 		}, opts, func(g *Gadget) {
-
-			g.slotTrackers = shrinkingmap.New[iotago.SlotIndex, *slottracker.SlotTracker]()
-
 			e.Events.SlotGadget.LinkTo(g.events)
 
 			e.ConstructedEvent().OnTrigger(func() {
 				g.seatManager = e.SybilProtection.SeatManager()
-				g.TriggerConstructed()
+
+				g.ConstructedEvent().Trigger()
 
 				e.Events.BlockGadget.BlockConfirmed.Hook(g.trackVotes)
 			})
@@ -69,11 +69,13 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 					g.lastFinalizedSlot = e.Storage.Settings().LatestFinalizedSlot()
 				}()
 
-				g.TriggerInitialized()
+				g.InitializedEvent().Trigger()
 			})
-		},
-			(*Gadget).TriggerConstructed,
-		)
+
+			g.ShutdownEvent().OnTrigger(func() {
+				g.StoppedEvent().Trigger()
+			})
+		})
 	})
 }
 
@@ -89,10 +91,6 @@ func (g *Gadget) Reset(targetSlot iotago.SlotIndex) {
 
 		return true
 	})
-}
-
-func (g *Gadget) Shutdown() {
-	g.TriggerStopped()
 }
 
 func (g *Gadget) setLastFinalizedSlot(i iotago.SlotIndex) {

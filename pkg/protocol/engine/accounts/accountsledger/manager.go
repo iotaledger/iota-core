@@ -73,7 +73,7 @@ func New(
 }
 
 func (m *Manager) Shutdown() {
-	m.TriggerStopped()
+	m.StoppedEvent().Trigger()
 }
 
 func (m *Manager) SetLatestCommittedSlot(slot iotago.SlotIndex) {

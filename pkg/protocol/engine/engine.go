@@ -89,7 +89,7 @@ type Engine struct {
 	optsSnapshotDepth    int
 	optsBlockRequester   []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]]
 
-	module.ReactiveModule
+	module.Module
 }
 
 func New(
@@ -132,7 +132,7 @@ func New(
 			optsSnapshotPath:  "snapshot.bin",
 			optsSnapshotDepth: 5,
 		}, opts, func(e *Engine) {
-			e.ReactiveModule = e.initReactiveModule(logger)
+			e.Module = e.initReactiveModule(logger)
 
 			e.errorHandler = func(err error) {
 				e.LogError("engine error", "err", err)
@@ -569,40 +569,50 @@ func (e *Engine) initLatestCommitment() {
 	})
 }
 
-func (e *Engine) initReactiveModule(parentLogger log.Logger) (reactiveModule module.ReactiveModule) {
+func (e *Engine) initReactiveModule(parentLogger log.Logger) (reactiveModule module.Module) {
 	logger := parentLogger.NewChildLogger("Engine", true)
-	reactiveModule = module.NewReactiveModule(logger)
+	reactiveModule = module.New(logger)
 
 	e.RootCommitment.LogUpdates(logger, log.LevelTrace, "RootCommitment")
 	e.LatestCommitment.LogUpdates(logger, log.LevelTrace, "LatestCommitment")
 
 	reactiveModule.ShutdownEvent().OnTrigger(func() {
+		subModules := []module.Module{
+			e.Scheduler,
+			e.TipSelection,
+			e.TipManager,
+			e.Attestations,
+			e.SyncManager,
+			e.Notarization,
+			e.Clock,
+			e.SlotGadget,
+			e.BlockGadget,
+			e.UpgradeOrchestrator,
+			e.SybilProtection,
+			e.Booker,
+			e.Ledger,
+			e.PostSolidFilter,
+			e.BlockDAG,
+			e.PreSolidFilter,
+			e.BlockRetainer,
+			e.TxRetainer,
+		}
+
 		reactiveModule.LogDebug("shutting down")
 
 		logger.UnsubscribeFromParentLogger()
 
 		// Shutdown should be performed in the reverse dataflow order.
 		e.BlockRequester.Shutdown()
-		e.Scheduler.Shutdown()
-		e.TipSelection.Shutdown()
-		e.TipManager.Shutdown()
-		e.Attestations.Shutdown()
-		e.SyncManager.Shutdown()
-		e.Notarization.Shutdown()
-		e.Clock.Shutdown()
-		e.SlotGadget.Shutdown()
-		e.BlockGadget.Shutdown()
-		e.UpgradeOrchestrator.Shutdown()
-		e.SybilProtection.Shutdown()
-		e.Booker.Shutdown()
-		e.Ledger.Shutdown()
-		e.PostSolidFilter.Shutdown()
-		e.BlockDAG.Shutdown()
-		e.PreSolidFilter.Shutdown()
-		e.BlockRetainer.Shutdown()
-		e.TxRetainer.Shutdown()
+
+		module.TriggerAll(module.Module.ShutdownEvent, subModules...)
+
 		e.Workers.Shutdown()
 		e.Storage.Shutdown()
+
+		wg := module.WaitAll(module.Module.StoppedEvent, subModules...)
+		wg.Debug(module.Module.LogName)
+		wg.Wait()
 
 		reactiveModule.LogDebug("stopped")
 

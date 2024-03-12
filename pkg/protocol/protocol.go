@@ -56,17 +56,17 @@ type Protocol struct {
 	reactive.EvictionState[iotago.SlotIndex]
 
 	// ReactiveModule embeds the reactive module logic of the protocol.
-	module.ReactiveModule
+	module.Module
 }
 
 // New creates a new protocol instance from the given parameters.
 func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.Endpoint, opts ...options.Option[Protocol]) *Protocol {
 	return options.Apply(&Protocol{
-		Events:         NewEvents(),
-		Workers:        workers,
-		Options:        NewDefaultOptions(),
-		ReactiveModule: module.NewReactiveModule(logger),
-		EvictionState:  reactive.NewEvictionState[iotago.SlotIndex](),
+		Events:        NewEvents(),
+		Workers:       workers,
+		Options:       NewDefaultOptions(),
+		Module:        module.New(logger),
+		EvictionState: reactive.NewEvictionState[iotago.SlotIndex](),
 	}, opts, func(p *Protocol) {
 		shutdownSubComponents := p.initSubcomponents(networkEndpoint)
 

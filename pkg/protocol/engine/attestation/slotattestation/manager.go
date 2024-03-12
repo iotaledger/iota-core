@@ -6,7 +6,6 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -65,8 +64,6 @@ type Manager struct {
 	apiProvider iotago.APIProvider
 
 	module.Module
-
-	log.Logger
 }
 
 func NewProvider() module.Provider[*engine.Engine, attestation.Attestations] {
@@ -74,7 +71,7 @@ func NewProvider() module.Provider[*engine.Engine, attestation.Attestations] {
 		latestCommitment := e.Storage.Settings().LatestCommitment()
 
 		return NewManager(
-			e.NewChildLogger("AttestationManager"),
+			e.NewSubModule("AttestationManager"),
 			latestCommitment.Slot(),
 			latestCommitment.CumulativeWeight(),
 			e.Storage.Attestations,
@@ -85,7 +82,7 @@ func NewProvider() module.Provider[*engine.Engine, attestation.Attestations] {
 }
 
 func NewManager(
-	logger log.Logger,
+	module module.Module,
 	lastCommittedSlot iotago.SlotIndex,
 	lastCumulativeWeight uint64,
 	bucketedStorage func(slot iotago.SlotIndex) (kvstore.KVStore, error),
@@ -93,7 +90,7 @@ func NewManager(
 	apiProvider iotago.APIProvider,
 ) *Manager {
 	m := &Manager{
-		Logger:               logger,
+		Module:               module,
 		lastCommittedSlot:    lastCommittedSlot,
 		lastCumulativeWeight: lastCumulativeWeight,
 		committeeFunc:        committeeFunc,
@@ -102,16 +99,18 @@ func NewManager(
 		pendingAttestations:  memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation](),
 		apiProvider:          apiProvider,
 	}
-	m.TriggerConstructed()
+
+	m.ConstructedEvent().Trigger()
+
+	m.ShutdownEvent().OnTrigger(func() {
+		if err := m.writeToDisk(); err != nil {
+			panic(err)
+		}
+
+		m.StoppedEvent().Trigger()
+	})
 
 	return m
-}
-
-func (m *Manager) Shutdown() {
-	if err := m.writeToDisk(); err != nil {
-		panic(err)
-	}
-	m.TriggerStopped()
 }
 
 // Get returns the attestations that are included in the commitment of the given slot as list.

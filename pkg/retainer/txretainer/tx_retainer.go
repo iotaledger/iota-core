@@ -110,24 +110,31 @@ func WithDebugStoreErrorMessages(store bool) options.Option[TransactionRetainer]
 	}
 }
 
-func New(workersGroup *workerpool.Group, dbExecFunc storage.SQLDatabaseExecFunc, latestCommittedSlotFunc SlotFunc, finalizedSlotFunc SlotFunc, errorHandler func(error), opts ...options.Option[TransactionRetainer]) *TransactionRetainer {
+func New(module module.Module, workersGroup *workerpool.Group, dbExecFunc storage.SQLDatabaseExecFunc, latestCommittedSlotFunc SlotFunc, finalizedSlotFunc SlotFunc, errorHandler func(error), opts ...options.Option[TransactionRetainer]) *TransactionRetainer {
 	return options.Apply(&TransactionRetainer{
+		Module:                  module,
 		workerPool:              workersGroup.CreatePool("TxRetainer", workerpool.WithWorkerCount(1)),
 		txRetainerCache:         NewTransactionRetainerCache(),
 		txRetainerDatabase:      NewTransactionRetainerDB(dbExecFunc),
 		latestCommittedSlotFunc: latestCommittedSlotFunc,
 		finalizedSlotFunc:       finalizedSlotFunc,
 		errorHandler:            errorHandler,
-	}, opts,
-		(*TransactionRetainer).TriggerConstructed,
-		(*TransactionRetainer).TriggerInitialized,
-	)
+	}, opts, func(t *TransactionRetainer) {
+		t.ShutdownEvent().OnTrigger(func() {
+			t.workerPool.Shutdown()
+
+			t.StoppedEvent().Trigger()
+		})
+
+		t.ConstructedEvent().Trigger()
+		t.InitializedEvent().Trigger()
+	})
 }
 
 // NewProvider creates a new TransactionRetainer provider.
 func NewProvider(opts ...options.Option[TransactionRetainer]) module.Provider[*engine.Engine, retainer.TransactionRetainer] {
 	return module.Provide(func(e *engine.Engine) retainer.TransactionRetainer {
-		r := New(e.Workers.CreateGroup("TransactionRetainer"),
+		r := New(e.NewSubModule("TransactionRetainer"), e.Workers.CreateGroup("TransactionRetainer"),
 			e.Storage.TransactionRetainerDatabaseExecFunc(),
 			func() iotago.SlotIndex {
 				return e.SyncManager.LatestCommitment().Slot()
@@ -245,35 +252,30 @@ func NewProvider(opts ...options.Option[TransactionRetainer]) module.Provider[*e
 			}, asyncOpt)
 		})
 
-		r.TriggerInitialized()
+		r.InitializedEvent().Trigger()
 
 		return r
 	})
 }
 
-// Shutdown shuts down the TransactionRetainer.
-func (r *TransactionRetainer) Shutdown() {
-	r.workerPool.Shutdown()
-}
-
 // Reset resets the component to a clean state as if it was created at the last commitment.
-func (r *TransactionRetainer) Reset(targetSlot iotago.SlotIndex) {
+func (t *TransactionRetainer) Reset(targetSlot iotago.SlotIndex) {
 	// we need to rollback the transaction retainer to the target slot
 	// to delete all transactions that were committed after the target slot.
-	if err := r.txRetainerDatabase.Rollback(targetSlot); err != nil {
+	if err := t.txRetainerDatabase.Rollback(targetSlot); err != nil {
 		panic(ierrors.Wrap(err, "failed to rollback transaction retainer"))
 	}
 
 	// reset the cache
-	r.txRetainerCache.Reset()
+	t.txRetainerCache.Reset()
 }
 
 // Prune prunes the component state as if the last pruned slot was targetSlot.
-func (r *TransactionRetainer) Prune(targetSlot iotago.SlotIndex) error {
+func (t *TransactionRetainer) Prune(targetSlot iotago.SlotIndex) error {
 	// we do not prune the data from the cache, because it was not committed yet.
 	// it will be committed and written to the database eventually, and then it can be pruned.
 
-	if err := r.txRetainerDatabase.Prune(targetSlot); err != nil {
+	if err := t.txRetainerDatabase.Prune(targetSlot); err != nil {
 		return ierrors.Wrap(err, "failed to prune transaction retainer")
 	}
 
@@ -281,13 +283,13 @@ func (r *TransactionRetainer) Prune(targetSlot iotago.SlotIndex) error {
 }
 
 // CommitSlot applies all uncommitted changes of a slot from the cache to the database and deletes them from the cache.
-func (r *TransactionRetainer) CommitSlot(slot iotago.SlotIndex) error {
-	uncommitedChanges := r.txRetainerCache.DeleteAndReturnTxMetadataChangesBySlot(slot)
+func (t *TransactionRetainer) CommitSlot(slot iotago.SlotIndex) error {
+	uncommitedChanges := t.txRetainerCache.DeleteAndReturnTxMetadataChangesBySlot(slot)
 	if len(uncommitedChanges) == 0 {
 		return nil
 	}
 
-	if err := r.txRetainerDatabase.ApplyTxMetadataChanges(uncommitedChanges); err != nil {
+	if err := t.txRetainerDatabase.ApplyTxMetadataChanges(uncommitedChanges); err != nil {
 		return ierrors.Wrapf(err, "failed to commit slot: %d", slot)
 	}
 
@@ -296,13 +298,13 @@ func (r *TransactionRetainer) CommitSlot(slot iotago.SlotIndex) error {
 
 // UpdateTransactionMetadata updates the metadata of a transaction.
 // The changes will be applied to the cache and later to the database by "CommitSlot".
-func (r *TransactionRetainer) UpdateTransactionMetadata(txID iotago.TransactionID, validSignature bool, earliestAttachmentSlot iotago.SlotIndex, state api.TransactionState, txErr error) {
+func (t *TransactionRetainer) UpdateTransactionMetadata(txID iotago.TransactionID, validSignature bool, earliestAttachmentSlot iotago.SlotIndex, state api.TransactionState, txErr error) {
 	txFailureReason := api.TxFailureNone
 	var txErrorMsg *string
 	if txErr != nil {
 		txFailureReason = api.DetermineTransactionFailureReason(txErr)
 
-		if r.storeDebugErrorMessages {
+		if t.storeDebugErrorMessages {
 			errorMsg := txErr.Error()
 			txErrorMsg = &errorMsg
 		}
@@ -317,18 +319,18 @@ func (r *TransactionRetainer) UpdateTransactionMetadata(txID iotago.TransactionI
 		ErrorMsg:               txErrorMsg,
 	}
 
-	if err := r.txRetainerCache.UpdateTxMetadata(txMeta); err != nil {
-		r.errorHandler(err)
+	if err := t.txRetainerCache.UpdateTxMetadata(txMeta); err != nil {
+		t.errorHandler(err)
 	}
 }
 
 // TransactionMetadata returns the metadata of a transaction.
-func (r *TransactionRetainer) TransactionMetadata(txID iotago.TransactionID) (*api.TransactionMetadataResponse, error) {
+func (t *TransactionRetainer) TransactionMetadata(txID iotago.TransactionID) (*api.TransactionMetadataResponse, error) {
 	// first check the cache, if there is an entry and it is accepted, we can return it without checking the database
-	txMeta, cacheHit := r.txRetainerCache.TransactionMetadataByID(txID)
+	txMeta, cacheHit := t.txRetainerCache.TransactionMetadataByID(txID)
 	if !cacheHit || txMeta.State != byte(api.TransactionStateAccepted) {
 		// if the transaction is not in the cache or is not accepted, we need to check the database as well
-		txMetaDatabase, err := r.txRetainerDatabase.TransactionMetadataByID(txID)
+		txMetaDatabase, err := t.txRetainerDatabase.TransactionMetadataByID(txID)
 		if err != nil {
 			return nil, err
 		}
@@ -366,9 +368,9 @@ func (r *TransactionRetainer) TransactionMetadata(txID iotago.TransactionID) (*a
 	// the slot of the earliest attachment is already confirmed or finalized
 	if response.TransactionState == api.TransactionStateAccepted {
 		switch {
-		case response.EarliestAttachmentSlot <= r.finalizedSlotFunc():
+		case response.EarliestAttachmentSlot <= t.finalizedSlotFunc():
 			response.TransactionState = api.TransactionStateFinalized
-		case response.EarliestAttachmentSlot <= r.latestCommittedSlotFunc():
+		case response.EarliestAttachmentSlot <= t.latestCommittedSlotFunc():
 			response.TransactionState = api.TransactionStateCommitted
 		}
 	}

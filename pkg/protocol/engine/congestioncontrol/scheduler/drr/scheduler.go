@@ -53,7 +53,7 @@ type Scheduler struct {
 
 func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engine, scheduler.Scheduler] {
 	return module.Provide(func(e *engine.Engine) scheduler.Scheduler {
-		s := New(e, opts...)
+		s := New(e.NewSubModule("Scheduler"), e, opts...)
 		s.errorHandler = e.ErrorHandler("scheduler")
 		s.basicBuffer = NewBufferQueue()
 
@@ -63,7 +63,7 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 			}
 			s.blockCache = e.BlockCache
 			e.Events.Scheduler.LinkTo(s.events)
-			e.SybilProtection.HookInitialized(func() {
+			e.SybilProtection.InitializedEvent().OnTrigger(func() {
 				s.seatManager = e.SybilProtection.SeatManager()
 			})
 			e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
@@ -90,7 +90,7 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 					s.validatorBuffer.Clear()
 				}
 			})
-			e.Ledger.HookInitialized(func() {
+			e.Ledger.InitializedEvent().OnTrigger(func() {
 				// quantum retrieve function gets the account's Mana and returns the quantum for that account
 				s.quantumFunc = func(accountID iotago.AccountID, manaSlot iotago.SlotIndex) (Deficit, error) {
 					mana, err := e.Ledger.ManaManager().GetManaOnAccount(accountID, manaSlot)
@@ -103,7 +103,7 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 					return 1 + Deficit(mana), nil
 				}
 			})
-			s.TriggerConstructed()
+			s.ConstructedEvent().Trigger()
 			e.Events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 				s.AddBlock(block)
 				s.selectBlockToScheduleWithLocking()
@@ -128,22 +128,23 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 	})
 }
 
-func New(apiProvider iotago.APIProvider, opts ...options.Option[Scheduler]) *Scheduler {
+func New(module module.Module, apiProvider iotago.APIProvider, opts ...options.Option[Scheduler]) *Scheduler {
 	return options.Apply(
 		&Scheduler{
+			Module:          module,
 			events:          scheduler.NewEvents(),
 			deficits:        shrinkingmap.New[iotago.AccountID, Deficit](),
 			apiProvider:     apiProvider,
 			validatorBuffer: NewValidatorBuffer(),
-		}, opts,
+		}, opts, func(s *Scheduler) {
+			s.ShutdownEvent().OnTrigger(s.shutdown)
+		},
 	)
 }
 
-func (s *Scheduler) Shutdown() {
+func (s *Scheduler) shutdown() {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
-
-	s.TriggerShutdown()
 
 	// validator workers need to be shut down first, otherwise they will hang on the shutdown channel.
 	s.validatorBuffer.buffer.ForEach(func(_ iotago.AccountID, validatorQueue *ValidatorQueue) bool {
@@ -157,7 +158,7 @@ func (s *Scheduler) Shutdown() {
 
 	s.workersWg.Wait()
 
-	s.TriggerStopped()
+	s.StoppedEvent().Trigger()
 }
 
 // Start starts the scheduler.
@@ -166,7 +167,7 @@ func (s *Scheduler) Start() {
 	s.workersWg.Add(1)
 	go s.basicBlockLoop()
 
-	s.TriggerInitialized()
+	s.InitializedEvent().Trigger()
 }
 
 // IssuerQueueBlockCount returns the number of blocks in the queue of the given issuer.

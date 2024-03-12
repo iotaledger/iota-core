@@ -4,7 +4,6 @@ import (
 	"sync/atomic"
 
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -35,13 +34,11 @@ type BlockDAG struct {
 	errorHandler func(error)
 
 	module.Module
-
-	log.Logger
 }
 
 func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engine, blockdag.BlockDAG] {
 	return module.Provide(func(e *engine.Engine) blockdag.BlockDAG {
-		b := New(e.NewChildLogger("BlockDAG"), e.Workers.CreateGroup("BlockDAG"), int(e.Storage.Settings().APIProvider().CommittedAPI().ProtocolParameters().MaxCommittableAge())*2, e.EvictionState, e.BlockCache, e.ErrorHandler("blockdag"), opts...)
+		b := New(e.NewSubModule("BlockDAG"), e.Workers.CreateGroup("BlockDAG"), int(e.Storage.Settings().APIProvider().CommittedAPI().ProtocolParameters().MaxCommittableAge())*2, e.EvictionState, e.BlockCache, e.ErrorHandler("blockdag"), opts...)
 
 		e.ConstructedEvent().OnTrigger(func() {
 			wp := b.workers.CreatePool("BlockDAG.Append", workerpool.WithWorkerCount(2))
@@ -63,7 +60,7 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 
 			e.Events.BlockDAG.LinkTo(b.events)
 
-			b.TriggerInitialized()
+			b.InitializedEvent().Trigger()
 		})
 
 		return b
@@ -99,16 +96,26 @@ func (b *BlockDAG) setupBlock(block *blocks.Block) {
 }
 
 // New is the constructor for the BlockDAG and creates a new BlockDAG instance.
-func New(logger log.Logger, workers *workerpool.Group, unsolidCommitmentBufferSize int, evictionState *eviction.State, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
+func New(module module.Module, workers *workerpool.Group, unsolidCommitmentBufferSize int, evictionState *eviction.State, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
 	return options.Apply(&BlockDAG{
-		Logger:                logger,
+		Module:                module,
 		events:                blockdag.NewEvents(),
 		evictionState:         evictionState,
 		blockCache:            blockCache,
 		workers:               workers,
 		errorHandler:          errorHandler,
 		uncommittedSlotBlocks: buffer.NewUnsolidCommitmentBuffer[*blocks.Block](unsolidCommitmentBufferSize),
-	}, opts, (*BlockDAG).TriggerConstructed, (*BlockDAG).TriggerInitialized)
+	}, opts, func(b *BlockDAG) {
+		b.ConstructedEvent().Trigger()
+
+		b.ShutdownEvent().OnTrigger(func() {
+			b.workers.Shutdown()
+
+			b.StoppedEvent().Trigger()
+		})
+
+		b.InitializedEvent().Trigger()
+	})
 }
 
 var _ blockdag.BlockDAG = new(BlockDAG)
@@ -156,11 +163,6 @@ func (b *BlockDAG) GetOrRequestBlock(blockID iotago.BlockID) (block *blocks.Bloc
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (b *BlockDAG) Reset() {
 	b.uncommittedSlotBlocks.Reset()
-}
-
-func (b *BlockDAG) Shutdown() {
-	b.TriggerStopped()
-	b.workers.Shutdown()
 }
 
 // append tries to append the given Block to the BlockDAG.

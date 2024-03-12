@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -45,8 +44,6 @@ type Manager struct {
 
 	commitmentMutex syncutils.RWMutex
 
-	log.Logger
-
 	module.Module
 }
 
@@ -54,8 +51,8 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 	return module.Provide(func(e *engine.Engine) notarization.Notarization {
 		logger := e.NewChildLogger("NotarizationManager")
 
-		m := NewManager(logger, e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
-		m.HookShutdown(logger.UnsubscribeFromParentLogger)
+		m := NewManager(e.NewSubModule("NotarizationManager"), e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
+		m.ShutdownEvent().OnTrigger(logger.UnsubscribeFromParentLogger)
 
 		m.apiProvider = e
 
@@ -82,20 +79,20 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 
 			e.Events.Notarization.LinkTo(m.events)
 
-			m.TriggerInitialized()
+			m.ConstructedEvent().Trigger()
 			m.slotMutations = NewSlotMutations(e.Storage.Settings().LatestCommitment().Slot())
-			m.TriggerConstructed()
+			m.InitializedEvent().Trigger()
 		})
 
-		e.ShutdownEvent().OnTrigger(m.Shutdown)
+		m.ShutdownEvent().OnTrigger(m.Shutdown)
 
 		return m
 	})
 }
 
-func NewManager(logger log.Logger, workers *workerpool.Group, errorHandler func(error)) *Manager {
+func NewManager(module module.Module, workers *workerpool.Group, errorHandler func(error)) *Manager {
 	return &Manager{
-		Logger:       logger,
+		Module:       module,
 		events:       notarization.NewEvents(),
 		workers:      workers,
 		errorHandler: errorHandler,
@@ -103,15 +100,13 @@ func NewManager(logger log.Logger, workers *workerpool.Group, errorHandler func(
 }
 
 func (m *Manager) Shutdown() {
-	m.TriggerShutdown()
-
 	// Alternative 2
 	if m.acceptedBlockProcessedDetach != nil {
 		m.acceptedBlockProcessedDetach()
 	}
 	m.workers.Shutdown()
 
-	m.TriggerStopped()
+	m.StoppedEvent().Trigger()
 }
 
 // tryCommitUntil tries to create slot commitments until the new provided acceptance time.
@@ -124,7 +119,7 @@ func (m *Manager) tryCommitUntil(commitUntilSlot iotago.SlotIndex) {
 func (m *Manager) ForceCommit(slot iotago.SlotIndex) (*model.Commitment, error) {
 	m.LogInfof("Force commit slot %d", slot)
 
-	if m.WasStopped() {
+	if m.ShutdownEvent().WasTriggered() {
 		return nil, ierrors.New("notarization manager was stopped")
 	}
 
@@ -184,7 +179,7 @@ func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
 
 func (m *Manager) tryCommitSlotUntil(acceptedBlockIndex iotago.SlotIndex) {
 	for i := m.storage.Settings().LatestCommitment().Slot() + 1; i <= acceptedBlockIndex; i++ {
-		if m.WasStopped() {
+		if m.ShutdownEvent().WasTriggered() {
 			break
 		}
 

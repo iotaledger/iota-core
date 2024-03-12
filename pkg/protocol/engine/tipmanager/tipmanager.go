@@ -49,6 +49,6 @@ type TipManager interface {
 	// Reset resets the component to a clean state as if it was created at the last commitment.
 	Reset()
 
-	// Interface embeds the required methods of the module.Interface.
-	module.Interface
+	// Interface embeds the required methods of the module.Module.
+	module.Module
 }

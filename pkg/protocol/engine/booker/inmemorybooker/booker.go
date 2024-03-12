@@ -36,10 +36,10 @@ type Booker struct {
 
 func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine, booker.Booker] {
 	return module.Provide(func(e *engine.Engine) booker.Booker {
-		b := New(e, e.BlockCache, e.ErrorHandler("booker"), opts...)
+		b := New(e.NewSubModule("Booker"), e, e.BlockCache, e.ErrorHandler("booker"), opts...)
 		e.ConstructedEvent().OnTrigger(func() {
 			b.ledger = e.Ledger
-			b.ledger.HookConstructed(func() {
+			b.ledger.ConstructedEvent().OnTrigger(func() {
 				b.spendDAG = b.ledger.SpendDAG()
 				b.loadBlockFromStorage = e.Block
 				b.ledger.MemPool().OnTransactionAttached(func(transaction mempool.TransactionMetadata) {
@@ -60,24 +60,30 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 
 			e.Events.Booker.LinkTo(b.events)
 
-			b.TriggerInitialized()
+			b.InitializedEvent().Trigger()
 		})
 
 		return b
 	})
 }
 
-func New(apiProvider iotago.APIProvider, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
+func New(module module.Module, apiProvider iotago.APIProvider, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
 	return options.Apply(&Booker{
+		Module:      module,
 		events:      booker.NewEvents(),
 		apiProvider: apiProvider,
 
 		blockCache:   blockCache,
 		errorHandler: errorHandler,
-	}, opts, (*Booker).TriggerConstructed)
-}
+	}, opts, func(b *Booker) {
+		b.ShutdownEvent().OnTrigger(func() {
+			b.StoppedEvent().Trigger()
+		})
 
-var _ booker.Booker = new(Booker)
+		b.ConstructedEvent().Trigger()
+		b.InitializedEvent().Trigger()
+	})
+}
 
 // Queue checks if payload is solid and then sets up the block to react to its parents.
 func (b *Booker) Queue(block *blocks.Block) error {
@@ -121,10 +127,6 @@ func (b *Booker) Queue(block *blocks.Block) error {
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (b *Booker) Reset() { /* nothing to reset but comply with interface */ }
-
-func (b *Booker) Shutdown() {
-	b.TriggerStopped()
-}
 
 func (b *Booker) setupBlock(block *blocks.Block) {
 	var unbookedParentsCount atomic.Int32

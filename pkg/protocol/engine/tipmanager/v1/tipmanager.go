@@ -54,10 +54,12 @@ type TipManager struct {
 
 // New creates a new TipManager.
 func New(
+	module module.Module,
 	blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool),
 	retrieveCommitteeInSlot func(slot iotago.SlotIndex) (*account.SeatedAccounts, bool),
 ) *TipManager {
 	t := &TipManager{
+		Module:                  module,
 		retrieveBlock:           blockRetriever,
 		retrieveCommitteeInSlot: retrieveCommitteeInSlot,
 		tipMetadataStorage:      shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]](),
@@ -68,8 +70,13 @@ func New(
 		blockAdded:              event.New1[tipmanager.TipMetadata](),
 	}
 
-	t.TriggerConstructed()
-	t.TriggerInitialized()
+	t.ConstructedEvent().Trigger()
+
+	t.ShutdownEvent().OnTrigger(func() {
+		t.StoppedEvent().Trigger()
+	})
+
+	t.InitializedEvent().Trigger()
 
 	return t
 }
@@ -155,12 +162,6 @@ func (t *TipManager) Reset() {
 	lo.ForEach(t.validationTipSet.Keys(), func(id iotago.BlockID) { t.validationTipSet.Delete(id) })
 	lo.ForEach(t.strongTipSet.Keys(), func(id iotago.BlockID) { t.strongTipSet.Delete(id) })
 	lo.ForEach(t.weakTipSet.Keys(), func(id iotago.BlockID) { t.weakTipSet.Delete(id) })
-}
-
-// Shutdown marks the TipManager as shutdown.
-func (t *TipManager) Shutdown() {
-	t.TriggerShutdown()
-	t.TriggerStopped()
 }
 
 // setupBlockMetadata sets up the behavior of the given Block.
