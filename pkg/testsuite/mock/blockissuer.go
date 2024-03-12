@@ -44,7 +44,7 @@ type BlockIssuer struct {
 	Validator bool
 
 	keyManager *wallet.KeyManager
-	client     Client
+	Client     Client
 	// LatestBlockIssuanceResp is the cached response from the latest query to the block issuance endpoint.
 	latestBlockIssuanceResp   *api.IssuanceBlockHeaderResponse
 	blockIssuanceResponseUsed bool
@@ -66,7 +66,7 @@ func NewBlockIssuer(t *testing.T, name string, keyManager *wallet.KeyManager, cl
 		Name:                      name,
 		Validator:                 validator,
 		keyManager:                keyManager,
-		client:                    client,
+		Client:                    client,
 		blockIssuanceResponseUsed: true,
 		AccountData: AccountData{
 			ID:           accountID,
@@ -99,12 +99,15 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, n
 
 	apiForBlock := i.retrieveAPI(blockParams.BlockHeader)
 	protoParams := apiForBlock.ProtocolParameters()
-	blockIssuanceInfo := i.client.BlockIssuance(ctx)
+	blockIssuanceInfo := i.Client.BlockIssuance(ctx)
 	if blockParams.BlockHeader.SlotCommitment == nil {
 		commitment := blockIssuanceInfo.LatestCommitment
 		blockSlot := apiForBlock.TimeProvider().SlotFromTime(*blockParams.BlockHeader.IssuingTime)
 		if blockSlot > commitment.Slot+protoParams.MaxCommittableAge() {
-			commitment, parentID, err := i.reviveChain(*blockParams.BlockHeader.IssuingTime, node)
+			var parentID iotago.BlockID
+			var err error
+			commitment, parentID, err = i.reviveChain(*blockParams.BlockHeader.IssuingTime, node)
+			fmt.Printf("revive chain commitment: slot %d, parentID %s\n", commitment.Slot, parentID)
 			if err != nil {
 				return nil, ierrors.Wrap(err, "failed to revive chain")
 			}
@@ -119,7 +122,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, n
 
 			commitmentSlot := commitment.Slot - protoParams.MinCommittableAge()
 			var err error
-			commitment, err = i.client.CommitmentByIndex(ctx, commitmentSlot)
+			commitment, err = i.Client.CommitmentByIndex(ctx, commitmentSlot)
 			if err != nil {
 				return nil, ierrors.Errorf("can't issue block: failed to get commitment at slot %d", commitmentSlot)
 			}
@@ -129,7 +132,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, n
 	}
 
 	if blockParams.BlockHeader.References == nil {
-		blockParams.BlockHeader.References = referencesFromBlockIssuanceResponse(blockIssuanceInfo)
+		blockParams.BlockHeader.References = referencesFromBlockIssuanceResponse(i.LatestBlockIssuanceResponse())
 	}
 
 	err := i.setDefaultBlockParams(ctx, blockParams.BlockHeader)
@@ -137,7 +140,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, n
 
 	if blockParams.HighestSupportedVersion == nil {
 		// We use the latest supported version and not the current one.
-		version := i.client.LatestAPI().Version()
+		version := i.Client.LatestAPI().Version()
 		blockParams.HighestSupportedVersion = &version
 	}
 
@@ -210,7 +213,7 @@ func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, opts .
 		issuingTime := time.Now().UTC()
 		blockParams.BlockHeader.IssuingTime = &issuingTime
 	}
-	blockIssuanceInfo := i.client.BlockIssuance(ctx)
+	blockIssuanceInfo := i.Client.BlockIssuance(ctx)
 
 	if blockParams.BlockHeader.References == nil {
 		blockParams.BlockHeader.References = referencesFromBlockIssuanceResponse(blockIssuanceInfo)
@@ -219,7 +222,7 @@ func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, opts .
 	err := i.setDefaultBlockParams(ctx, blockParams.BlockHeader)
 	require.NoError(i.Testing, err)
 
-	api := i.client.APIForTime(*blockParams.BlockHeader.IssuingTime)
+	api := i.Client.APIForTime(*blockParams.BlockHeader.IssuingTime)
 	blockBuilder := builder.NewBasicBlockBuilder(api)
 
 	blockBuilder.SlotCommitmentID(blockParams.BlockHeader.SlotCommitment.MustID())
@@ -304,7 +307,7 @@ func (i *BlockIssuer) setDefaultBlockParams(ctx context.Context, blockParams *Bl
 		blockParams.IssuingTime = &issuingTime
 	}
 
-	issuanceInfo := i.client.BlockIssuance(ctx)
+	issuanceInfo := i.Client.BlockIssuance(ctx)
 
 	if blockParams.SlotCommitment == nil {
 		blockParams.SlotCommitment = issuanceInfo.LatestCommitment
@@ -332,7 +335,7 @@ func (i *BlockIssuer) setDefaultBlockParams(ctx context.Context, blockParams *Bl
 
 func (i *BlockIssuer) validateReferences(ctx context.Context, issuingTime time.Time, slotCommitmentIndex iotago.SlotIndex, references model.ParentReferences) error {
 	for _, parent := range lo.Flatten(lo.Map(lo.Values(references), func(ds iotago.BlockIDs) []iotago.BlockID { return ds })) {
-		b, err := i.client.BlockByBlockID(ctx, parent)
+		b, err := i.Client.BlockByBlockID(ctx, parent)
 		if err != nil {
 			return ierrors.Wrapf(err, "cannot issue block if parent %s does not exist", parent)
 		}
@@ -353,8 +356,10 @@ func (i *BlockIssuer) SubmitBlock(ctx context.Context, block *model.Block) error
 	i.mutex.Lock()
 	// mark the response as used so that the next time we query the node for the latest block issuance.
 	i.blockIssuanceResponseUsed = true
-	
-	return lo.Return2(i.client.SubmitBlock(ctx, block.ProtocolBlock()))
+
+	fmt.Printf("Submitting block %s via client %s\n", block.ID(), i.Client.Name())
+
+	return lo.Return2(i.Client.SubmitBlock(ctx, block.ProtocolBlock()))
 }
 
 func (i *BlockIssuer) SubmitBlockWithoutAwaitingBooking(block *model.Block, node *Node) error {
@@ -377,11 +382,11 @@ func (i *BlockIssuer) CopyIdentityFromBlockIssuer(otherBlockIssuer *BlockIssuer)
 
 func (i *BlockIssuer) retrieveAPI(blockParams *BlockHeaderParams) iotago.API {
 	if blockParams.ProtocolVersion != nil {
-		return i.client.APIForVersion(*blockParams.ProtocolVersion)
+		return i.Client.APIForVersion(*blockParams.ProtocolVersion)
 	}
 
 	// It is crucial to get the API from the issuing time/slot as that defines the version with which the block should be issued.
-	return i.client.APIForTime(*blockParams.IssuingTime)
+	return i.Client.APIForTime(*blockParams.IssuingTime)
 }
 
 func (i *BlockIssuer) GetNewBlockIssuanceResponse() *api.IssuanceBlockHeaderResponse {
@@ -389,7 +394,7 @@ func (i *BlockIssuer) GetNewBlockIssuanceResponse() *api.IssuanceBlockHeaderResp
 	i.mutex.Lock()
 
 	i.blockIssuanceResponseUsed = false
-	i.latestBlockIssuanceResp = i.client.BlockIssuance(context.Background())
+	i.latestBlockIssuanceResp = i.Client.BlockIssuance(context.Background())
 
 	return i.latestBlockIssuanceResp
 }
@@ -400,7 +405,7 @@ func (i *BlockIssuer) LatestBlockIssuanceResponse() *api.IssuanceBlockHeaderResp
 
 	if i.blockIssuanceResponseUsed {
 		i.blockIssuanceResponseUsed = false
-		i.latestBlockIssuanceResp = i.client.BlockIssuance(context.Background())
+		i.latestBlockIssuanceResp = i.Client.BlockIssuance(context.Background())
 	}
 
 	return i.latestBlockIssuanceResp

@@ -55,11 +55,26 @@ func (r *RequestHandler) BlockIssuance() (*api.IssuanceBlockHeaderResponse, erro
 	var latestParentBlockIssuingTime time.Time
 	for _, parentType := range []iotago.ParentsType{iotago.StrongParentType, iotago.WeakParentType, iotago.ShallowLikeParentType} {
 		for _, blockID := range references[parentType] {
-			if blockID == r.CommittedAPI().ProtocolParameters().GenesisBlockID() {
-				continue
-			}
+
 			block, exists := r.protocol.Engines.Main.Get().Block(blockID)
 			if !exists {
+				// check if this is genesis block
+				if blockID == r.CommittedAPI().ProtocolParameters().GenesisBlockID() {
+					continue
+				}
+				// or root block
+				rootBlocks, err := r.protocol.Engines.Main.Get().Storage.RootBlocks(blockID.Slot())
+				if err != nil {
+					return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get root blocks for slot %d: %s", blockID.Slot(), err)
+				}
+				isRootBlock, err := rootBlocks.Has(blockID)
+				if err != nil {
+					return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to check if block %s is root block: %s", blockID.ToHex(), err)
+				}
+				if isRootBlock {
+					continue
+				}
+
 				return nil, ierrors.Wrapf(echo.ErrNotFound, "no block found for parent, block ID: %s", blockID.ToHex())
 			}
 

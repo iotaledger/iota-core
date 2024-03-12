@@ -97,7 +97,7 @@ func (w *Wallet) SetBlockIssuer(accountData *AccountData) {
 
 func (w *Wallet) SetDefaultNode(node *Node) {
 	w.Client = &TestSuiteClient{node}
-	w.BlockIssuer.client = w.Client
+	w.BlockIssuer.Client = w.Client
 }
 
 func (w *Wallet) SetCurrentSlot(slot iotago.SlotIndex) {

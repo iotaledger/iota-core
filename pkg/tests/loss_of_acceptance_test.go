@@ -145,11 +145,12 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 		require.NoError(t, ts.Node("node0").Protocol.Engines.Main.Get().WriteSnapshot(snapshotPath))
 
 		node0restarted = ts.AddNode("node0-restarted")
-		node0restarted.Validator = node0.Validator
 		node0restarted.Initialize(true,
 			protocol.WithSnapshotPath(snapshotPath),
 			protocol.WithBaseDirectory(ts.Directory.PathWithCreate(node0restarted.Name)),
 		)
+		node0restarted.Validator = node0.Validator
+		node0restarted.Validator.Client = node0restarted.Client
 		ts.Wait()
 	}
 
