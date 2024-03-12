@@ -216,7 +216,7 @@ func (p *Protocol) onBlock(blockData []byte, id peer.ID) {
 
 func (p *Protocol) onBlockRequest(idBytes []byte, id peer.ID) {
 	if len(idBytes) != iotago.BlockIDLength {
-		p.Events.Error.Trigger(ierrors.Wrap(iotago.ErrInvalidIdentifierLength, "failed to deserialize block request"), id)
+		p.Events.Error.Trigger(ierrors.Errorf("failed to deserialize block request: invalid block id length"), id)
 
 		return
 	}
@@ -237,7 +237,7 @@ func (p *Protocol) onSlotCommitment(commitmentBytes []byte, id peer.ID) {
 
 func (p *Protocol) onSlotCommitmentRequest(idBytes []byte, id peer.ID) {
 	if len(idBytes) != iotago.CommitmentIDLength {
-		p.Events.Error.Trigger(ierrors.Wrap(iotago.ErrInvalidIdentifierLength, "failed to deserialize slot commitment request"), id)
+		p.Events.Error.Trigger(ierrors.Errorf("failed to deserialize slot commitment request: invalid commitment id length"), id)
 
 		return
 	}
@@ -294,7 +294,7 @@ func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []by
 
 func (p *Protocol) onAttestationsRequest(commitmentIDBytes []byte, id peer.ID) {
 	if len(commitmentIDBytes) != iotago.CommitmentIDLength {
-		p.Events.Error.Trigger(ierrors.Wrap(iotago.ErrInvalidIdentifierLength, "failed to deserialize commitmentID in attestations request"), id)
+		p.Events.Error.Trigger(ierrors.Errorf("failed to deserialize commitmentID in attestations request: invalid commitment id length"), id)
 
 		return
 	}
