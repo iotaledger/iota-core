@@ -109,7 +109,7 @@ func New(
 		Module:           module,
 		events:           ledger.NewEvents(),
 		apiProvider:      apiProvider,
-		accountsLedger:   accountsledger.New(apiProvider, blocksFunc, slotDiffFunc, accountsStore),
+		accountsLedger:   accountsledger.New(module.NewSubModule("AccountsLedger"), apiProvider, blocksFunc, slotDiffFunc, accountsStore),
 		rmcManager:       rmc.NewManager(apiProvider, commitmentLoader),
 		utxoLedger:       utxoLedger,
 		commitmentLoader: commitmentLoader,

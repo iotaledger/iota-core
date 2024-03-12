@@ -50,12 +50,14 @@ type Manager struct {
 }
 
 func New(
+	module module.Module,
 	apiProvider iotago.APIProvider,
 	blockFunc func(id iotago.BlockID) (*blocks.Block, bool),
 	slotDiffFunc func(iotago.SlotIndex) (*slotstore.AccountDiffs, error),
 	accountsStore kvstore.KVStore,
 ) *Manager {
-	return &Manager{
+	m := &Manager{
+		Module:                        module,
 		apiProvider:                   apiProvider,
 		blockBurns:                    shrinkingmap.New[iotago.SlotIndex, ds.Set[iotago.BlockID]](),
 		latestSupportedVersionSignals: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *model.SignaledBlock](),
@@ -70,10 +72,15 @@ func New(
 		block:    blockFunc,
 		slotDiff: slotDiffFunc,
 	}
-}
 
-func (m *Manager) Shutdown() {
-	m.StoppedEvent().Trigger()
+	m.ShutdownEvent().OnTrigger(func() {
+		m.StoppedEvent().Trigger()
+	})
+
+	m.ConstructedEvent().Trigger()
+	m.InitializedEvent().Trigger()
+
+	return m
 }
 
 func (m *Manager) SetLatestCommittedSlot(slot iotago.SlotIndex) {
