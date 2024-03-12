@@ -61,7 +61,13 @@ func New(subModule module.Module, apiProvider iotago.APIProvider, blockCache *bl
 		apiProvider:  apiProvider,
 		blockCache:   blockCache,
 		errorHandler: errorHandler,
-	}, opts)
+	}, opts, func(b *Booker) {
+		b.ShutdownEvent().OnTrigger(func() {
+			b.StoppedEvent().Trigger()
+		})
+
+		b.ConstructedEvent().Trigger()
+	})
 }
 
 func (b *Booker) Init(ledger ledger.Ledger, loadBlockFromStorage func(iotago.BlockID) (*model.Block, bool)) {
@@ -81,7 +87,7 @@ func (b *Booker) Init(ledger ledger.Ledger, loadBlockFromStorage func(iotago.Blo
 			})
 		})
 
-		module.InitSimpleLifecycle(b)
+		b.InitializedEvent().Trigger()
 	})
 }
 
