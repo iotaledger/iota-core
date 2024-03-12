@@ -26,6 +26,17 @@ func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error)
 	if workScore != 0 {
 		workScores = append(workScores, workScore)
 	}
+	maxCommittableAge := deps.RequestHandler.CommittedAPI().ProtocolParameters().MaxCommittableAge()
+	latestCommittedSlot := deps.RequestHandler.GetLatestCommitment().Slot()
+	if queryCommitmentID != iotago.EmptyCommitmentID {
+		if latestCommittedSlot >= maxCommittableAge && queryCommitmentID.Slot()+maxCommittableAge < latestCommittedSlot {
+			return nil, ierrors.Wrapf(echo.ErrBadRequest, "invalid commitmentID, target slot index older than allowed (%d<%d)", queryCommitmentID.Slot(), latestCommittedSlot-maxCommittableAge)
+		}
+
+		if queryCommitmentID.Slot() > latestCommittedSlot {
+			return nil, ierrors.Wrapf(echo.ErrBadRequest, "invalid commitmentID, slot %d is not committed yet, latest committed slot: %d", queryCommitmentID.Slot(), latestCommittedSlot)
+		}
+	}
 
 	commitment, err := deps.RequestHandler.GetCommitmentByID(queryCommitmentID)
 	if err != nil {
@@ -41,16 +52,6 @@ func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error)
 	accountAddress, ok := address.(*iotago.AccountAddress)
 	if !ok {
 		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "address %s is not an account address", c.Param(api.ParameterBech32Address))
-	}
-
-	maxCommittableAge := deps.RequestHandler.CommittedAPI().ProtocolParameters().MaxCommittableAge()
-	latestCommittedSlot := deps.RequestHandler.GetLatestCommitment().Slot()
-	if latestCommittedSlot >= maxCommittableAge && commitment.Slot()+maxCommittableAge < latestCommittedSlot && queryCommitmentID != iotago.EmptyCommitmentID {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "invalid commitmentID, target slot index older than allowed (%d<%d)", commitment.Slot(), latestCommittedSlot-maxCommittableAge)
-	}
-
-	if commitment.Slot() > latestCommittedSlot && queryCommitmentID != iotago.EmptyCommitmentID {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "invalid commitmentID, slot %d is not committed yet, latest committed slot: %d", commitment.Slot(), latestCommittedSlot)
 	}
 
 	return deps.RequestHandler.CongestionByAccountAddress(accountAddress, commitment, workScores...)
