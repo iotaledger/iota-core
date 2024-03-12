@@ -37,20 +37,9 @@ type Booker struct {
 func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine, booker.Booker] {
 	return module.Provide(func(e *engine.Engine) booker.Booker {
 		b := New(e.NewSubModule("Booker"), e, e.BlockCache, e.ErrorHandler("booker"), opts...)
+
 		e.ConstructedEvent().OnTrigger(func() {
-			b.ledger = e.Ledger
-			b.ledger.ConstructedEvent().OnTrigger(func() {
-				b.spendDAG = b.ledger.SpendDAG()
-				b.loadBlockFromStorage = e.Block
-				b.ledger.MemPool().OnTransactionAttached(func(transaction mempool.TransactionMetadata) {
-					transaction.OnAccepted(func() {
-						b.events.TransactionAccepted.Trigger(transaction)
-					})
-					transaction.OnInvalid(func(err error) {
-						b.events.TransactionInvalid.Trigger(transaction, err)
-					})
-				})
-			})
+			b.Init(e.Ledger, e.Block)
 
 			e.Events.SeatManager.BlockProcessed.Hook(func(block *blocks.Block) {
 				if err := b.Queue(block); err != nil {
@@ -59,29 +48,40 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 			})
 
 			e.Events.Booker.LinkTo(b.events)
-
-			b.InitializedEvent().Trigger()
 		})
 
 		return b
 	})
 }
 
-func New(module module.Module, apiProvider iotago.APIProvider, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
+func New(subModule module.Module, apiProvider iotago.APIProvider, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
 	return options.Apply(&Booker{
-		Module:      module,
-		events:      booker.NewEvents(),
-		apiProvider: apiProvider,
-
+		Module:       subModule,
+		events:       booker.NewEvents(),
+		apiProvider:  apiProvider,
 		blockCache:   blockCache,
 		errorHandler: errorHandler,
-	}, opts, func(b *Booker) {
-		b.ShutdownEvent().OnTrigger(func() {
-			b.StoppedEvent().Trigger()
+	}, opts)
+}
+
+func (b *Booker) Init(ledger ledger.Ledger, loadBlockFromStorage func(iotago.BlockID) (*model.Block, bool)) {
+	b.ledger = ledger
+	b.loadBlockFromStorage = loadBlockFromStorage
+
+	ledger.ConstructedEvent().OnTrigger(func() {
+		b.spendDAG = ledger.SpendDAG()
+
+		ledger.MemPool().OnTransactionAttached(func(transaction mempool.TransactionMetadata) {
+			transaction.OnAccepted(func() {
+				b.events.TransactionAccepted.Trigger(transaction)
+			})
+
+			transaction.OnInvalid(func(err error) {
+				b.events.TransactionInvalid.Trigger(transaction, err)
+			})
 		})
 
-		b.ConstructedEvent().Trigger()
-		b.InitializedEvent().Trigger()
+		module.InitSimpleLifecycle(b)
 	})
 }
 
