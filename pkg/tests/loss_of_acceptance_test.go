@@ -242,10 +242,11 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 	var node0restarted *mock.Node
 	{
 		node0restarted = ts.AddNode("node0-restarted")
-		node0restarted.Validator = node0.Validator
 		node0restarted.Initialize(true,
 			protocol.WithBaseDirectory(ts.Directory.PathWithCreate(node0.Name)),
 		)
+		node0restarted.Validator = node0.Validator
+		node0restarted.Validator.Client = node0restarted.Client
 		ts.Wait()
 	}
 
