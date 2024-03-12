@@ -382,7 +382,7 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 				blockID := tpkg.RandBlockID()
 				resp, err := d.wallet.Clients[nodeAlias].BlockMetadataByBlockID(context.Background(), blockID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusInternalServerError))
+				require.True(t, isStatusCode(err, http.StatusNotFound))
 				require.Nil(t, resp)
 			},
 		},
@@ -464,7 +464,7 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 				outputID := tpkg.RandOutputID(0)
 				resp, err := d.wallet.Clients[nodeAlias].OutputByID(context.Background(), outputID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusInternalServerError))
+				require.True(t, isStatusCode(err, http.StatusNotFound))
 				require.Nil(t, resp)
 			},
 		},
@@ -475,8 +475,20 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 
 				resp, err := d.wallet.Clients[nodeAlias].OutputMetadataByID(context.Background(), outputID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusInternalServerError))
+				require.True(t, isStatusCode(err, http.StatusNotFound))
 				require.Nil(t, resp)
+			},
+		},
+		{
+			name: "Test_OutputWithMetadata_Failure",
+			testFunc: func(t *testing.T, nodeAlias string) {
+				outputID := tpkg.RandOutputID(0)
+
+				out, outMetadata, err := d.wallet.Clients[nodeAlias].OutputWithMetadataByID(context.Background(), outputID)
+				require.Error(t, err)
+				require.Nil(t, out)
+				require.Nil(t, outMetadata)
+				require.True(t, isStatusCode(err, http.StatusNotFound))
 			},
 		},
 		{
@@ -528,7 +540,7 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 				outputID := tpkg.RandOutputID(0)
 				resp, err := d.wallet.Clients[nodeAlias].Rewards(context.Background(), outputID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusInternalServerError))
+				require.True(t, isStatusCode(err, http.StatusNotFound))
 				require.Nil(t, resp)
 			},
 		},

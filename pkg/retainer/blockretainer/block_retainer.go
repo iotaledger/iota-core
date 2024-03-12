@@ -105,18 +105,18 @@ func (r *BlockRetainer) getBlockMetadata(blockID iotago.BlockID) (*slotstore.Blo
 		return nil, err
 	}
 
-	data, found := store.BlockMetadata(blockID)
-	if !found {
-		return nil, ierrors.Errorf("block %s not found", blockID.String())
+	data, err := store.BlockMetadata(blockID)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "block %s not found", blockID.String())
 	}
 
 	return data, nil
 }
 
 func (r *BlockRetainer) BlockMetadata(blockID iotago.BlockID) (*api.BlockMetadataResponse, error) {
-	blockStatus := r.blockState(blockID)
-	if blockStatus == api.BlockStateUnknown {
-		return nil, ierrors.Errorf("block %s not found", blockID.ToHex())
+	blockStatus, err := r.blockState(blockID)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "block %s not found", blockID.ToHex())
 	}
 
 	// we do not expose accepted flag
@@ -130,25 +130,24 @@ func (r *BlockRetainer) BlockMetadata(blockID iotago.BlockID) (*api.BlockMetadat
 	}, nil
 }
 
-func (r *BlockRetainer) blockState(blockID iotago.BlockID) api.BlockState {
+func (r *BlockRetainer) blockState(blockID iotago.BlockID) (api.BlockState, error) {
 	blockMetadata, err := r.getBlockMetadata(blockID)
 	if err != nil {
-		r.errorHandler(ierrors.Wrapf(err, "could not get block data for slot %d", blockID.Slot()))
-		return api.BlockStateUnknown
+		return api.BlockStateUnknown, err
 	}
 
 	switch blockMetadata.State {
 	case api.BlockStatePending, api.BlockStateDropped:
 		if blockID.Slot() <= r.latestCommittedSlotFunc() {
-			return api.BlockStateOrphaned
+			return api.BlockStateOrphaned, nil
 		}
 	case api.BlockStateAccepted, api.BlockStateConfirmed:
 		if blockID.Slot() <= r.finalizedSlotFunc() {
-			return api.BlockStateFinalized
+			return api.BlockStateFinalized, nil
 		}
 	}
 
-	return blockMetadata.State
+	return blockMetadata.State, nil
 }
 
 // OnBlockBooked triggers storing block in the retainer on block booked event.

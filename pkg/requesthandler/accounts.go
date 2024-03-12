@@ -7,6 +7,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -100,6 +101,9 @@ func (r *RequestHandler) ValidatorByAccountAddress(accountAddress *iotago.Accoun
 func (r *RequestHandler) RewardsByOutputID(outputID iotago.OutputID, slot iotago.SlotIndex) (*api.ManaRewardsResponse, error) {
 	utxoOutput, err := r.protocol.Engines.Main.Get().Ledger.Output(outputID)
 	if err != nil {
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+			return nil, ierrors.Wrapf(echo.ErrNotFound, "output %s not found", outputID.ToHex())
+		}
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from ledger: %s", outputID.ToHex(), err)
 	}
 
