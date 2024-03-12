@@ -49,8 +49,6 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 			e.ConstructedEvent().OnTrigger(func() {
 				g.seatManager = e.SybilProtection.SeatManager()
 
-				g.ConstructedEvent().Trigger()
-
 				e.Events.BlockGadget.BlockConfirmed.Hook(g.trackVotes)
 			})
 
@@ -62,12 +60,9 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 
 			e.InitializedEvent().OnTrigger(func() {
 				// Can't use setter here as it has a side effect.
-				func() {
-					g.mutex.Lock()
-					defer g.mutex.Unlock()
-
-					g.lastFinalizedSlot = e.Storage.Settings().LatestFinalizedSlot()
-				}()
+				g.mutex.Lock()
+				g.lastFinalizedSlot = e.Storage.Settings().LatestFinalizedSlot()
+				g.mutex.Unlock()
 
 				g.InitializedEvent().Trigger()
 			})
@@ -75,6 +70,8 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 			g.ShutdownEvent().OnTrigger(func() {
 				g.StoppedEvent().Trigger()
 			})
+
+			g.ConstructedEvent().Trigger()
 		})
 	})
 }
