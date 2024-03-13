@@ -11,7 +11,7 @@ import (
 )
 
 func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error) {
-	queryCommitmentID, err := httpserver.ParseCommitmentIDQueryParam(c, api.ParameterCommitmentID)
+	commitmentID, err := httpserver.ParseCommitmentIDQueryParam(c, api.ParameterCommitmentID)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 
 	var slot []iotago.SlotIndex
 	if len(c.QueryParam(api.ParameterSlot)) > 0 {
-		slot, err = httpserver.ParseSlotQueryParam(c, api.ParameterSlot)
+		slotParam, err := httpserver.ParseSlotQueryParam(c, api.ParameterSlot)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to parse slot index %s", c.Param(api.ParameterSlot))
 		}
