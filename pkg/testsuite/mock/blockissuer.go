@@ -61,6 +61,9 @@ func NewBlockIssuer(t *testing.T, name string, keyManager *wallet.KeyManager, cl
 	}
 	accountID.RegisterAlias(name)
 
+	accountAddress, ok := accountID.ToAddress().(*iotago.AccountAddress)
+	require.True(t, ok)
+
 	return options.Apply(&BlockIssuer{
 		Testing:                   t,
 		Name:                      name,
@@ -69,8 +72,9 @@ func NewBlockIssuer(t *testing.T, name string, keyManager *wallet.KeyManager, cl
 		Client:                    client,
 		blockIssuanceResponseUsed: true,
 		AccountData: AccountData{
-			ID:           accountID,
-			AddressIndex: addressIndex,
+			ID:             accountID,
+			AddressIndex:   addressIndex,
+			AccountAddress: accountAddress,
 		},
 	}, opts)
 }
@@ -132,7 +136,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, n
 	}
 
 	if blockParams.BlockHeader.References == nil {
-		blockParams.BlockHeader.References = referencesFromBlockIssuanceResponse(i.LatestBlockIssuanceResponse())
+		blockParams.BlockHeader.References = referencesFromBlockIssuanceResponse(i.LatestBlockIssuanceResponse(ctx))
 	}
 
 	err := i.setDefaultBlockParams(ctx, blockParams.BlockHeader)
@@ -213,7 +217,7 @@ func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, opts .
 		issuingTime := time.Now().UTC()
 		blockParams.BlockHeader.IssuingTime = &issuingTime
 	}
-	blockIssuanceInfo := i.Client.BlockIssuance(ctx)
+	blockIssuanceInfo := i.LatestBlockIssuanceResponse(ctx)
 
 	if blockParams.BlockHeader.References == nil {
 		blockParams.BlockHeader.References = referencesFromBlockIssuanceResponse(blockIssuanceInfo)
@@ -357,8 +361,6 @@ func (i *BlockIssuer) SubmitBlock(ctx context.Context, block *model.Block) error
 	// mark the response as used so that the next time we query the node for the latest block issuance.
 	i.blockIssuanceResponseUsed = true
 
-	fmt.Printf("Submitting block %s via client %s\n", block.ID(), i.Client.Name())
-
 	return lo.Return2(i.Client.SubmitBlock(ctx, block.ProtocolBlock()))
 }
 
@@ -399,13 +401,13 @@ func (i *BlockIssuer) GetNewBlockIssuanceResponse() *api.IssuanceBlockHeaderResp
 	return i.latestBlockIssuanceResp
 }
 
-func (i *BlockIssuer) LatestBlockIssuanceResponse() *api.IssuanceBlockHeaderResponse {
+func (i *BlockIssuer) LatestBlockIssuanceResponse(context context.Context) *api.IssuanceBlockHeaderResponse {
 	defer i.mutex.Unlock()
 	i.mutex.Lock()
 
 	if i.blockIssuanceResponseUsed {
 		i.blockIssuanceResponseUsed = false
-		i.latestBlockIssuanceResp = i.Client.BlockIssuance(context.Background())
+		i.latestBlockIssuanceResp = i.Client.BlockIssuance(context)
 	}
 
 	return i.latestBlockIssuanceResp

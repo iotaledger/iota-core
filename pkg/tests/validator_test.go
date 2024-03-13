@@ -250,7 +250,7 @@ func Test_Validator_FixedCostExceedsRewards(t *testing.T) {
 func validatorTest(t *testing.T, test ValidatorTest) {
 	ts := test.ts
 
-	blockIssuanceInfo := ts.DefaultWallet().Client.BlockIssuance(context.TODO())
+	blockIssuanceInfo := ts.DefaultWallet().Client.BlockIssuance(context.Background())
 	tip := blockIssuanceInfo.StrongParents[0]
 	startEpoch := iotago.EpochIndex(0)
 	endEpoch := iotago.EpochIndex(len(test.epochPerformanceFactors) - 1)
@@ -294,25 +294,26 @@ func validatorTest(t *testing.T, test ValidatorTest) {
 	var totalStake iotago.BaseToken = 0
 	var totalValidatorStake iotago.BaseToken = 0
 	lo.ForEach(ts.Validators(), func(n *mock.Node) {
-		accountData := ts.DefaultWallet().Client.StakingAccount(context.TODO(), n.Validator.AccountData.AccountAddress)
+		accountData := ts.DefaultWallet().Client.StakingAccount(context.Background(), n.Validator.AccountData.AccountAddress)
 
 		totalStake += accountData.PoolStake
 		totalValidatorStake += accountData.ValidatorStake
 	})
 
 	// Determine the rewards the validators actually got.
-	actualRewards := make(map[iotago.OutputID]iotago.Mana, len(ts.Validators()))
+	actualRewards := make(map[iotago.AccountID]iotago.Mana, len(ts.Validators()))
 	claimingEpoch := ts.API.TimeProvider().EpochFromSlot(ts.CurrentSlot())
 	retentionPeriod := iotago.EpochIndex(ts.API.ProtocolParameters().RewardsParameters().RetentionPeriod)
 
 	for _, validatorAccount := range []string{"Genesis:1", "Genesis:2"} {
 		output := ts.DefaultWallet().OutputData(validatorAccount)
-		rewardresp := ts.DefaultWallet().Client.Rewards(context.TODO(), output.ID)
+		accountID := output.Output.(*iotago.AccountOutput).AccountID
+		rewardresp := ts.DefaultWallet().Client.Rewards(context.Background(), output.ID)
 
-		actualRewards[output.ID] = rewardresp.Rewards
+		actualRewards[accountID] = rewardresp.Rewards
 	}
 
-	for outputID, actualReward := range actualRewards {
+	for accountID, actualReward := range actualRewards {
 		lastRewardEpoch := iotago.EpochIndex(len(test.epochPerformanceFactors))
 		rewards := make([]epochReward, 0, lastRewardEpoch)
 
@@ -325,13 +326,13 @@ func validatorTest(t *testing.T, test ValidatorTest) {
 
 		for epoch := firstRewardEpoch; epoch < lastRewardEpoch; epoch++ {
 			epochPerformanceFactor := test.epochPerformanceFactors[epoch]
-			epochReward := calculateEpochReward(ts, outputID, epoch, epochPerformanceFactor, totalStake, totalValidatorStake)
+			epochReward := calculateEpochReward(ts, accountID, epoch, epochPerformanceFactor, totalStake, totalValidatorStake)
 			rewards = append(rewards, epochReward)
 		}
 
-		expectedReward := calculateValidatorReward(ts, outputID, rewards, firstRewardEpoch, claimingEpoch)
+		expectedReward := calculateValidatorReward(ts, accountID, rewards, firstRewardEpoch, claimingEpoch)
 
-		require.Equal(t, expectedReward, actualReward, "expected reward for account %s to be %d, was %d", outputID, expectedReward, actualReward)
+		require.Equal(t, expectedReward, actualReward, "expected reward for account %s to be %d, was %d", accountID, expectedReward, actualReward)
 	}
 }
 
@@ -345,9 +346,13 @@ type epochReward struct {
 //
 // For testing purposes, assumes that the account's staking data is the same in the latest committed slot
 // as in the epoch for which to calculate rewards.
-func calculateEpochReward(ts *testsuite.TestSuite, outputID iotago.OutputID, epoch iotago.EpochIndex, epochPerformanceFactor uint64, totalStake iotago.BaseToken, totalValidatorStake iotago.BaseToken) epochReward {
+func calculateEpochReward(ts *testsuite.TestSuite, accountID iotago.AccountID, epoch iotago.EpochIndex, epochPerformanceFactor uint64, totalStake iotago.BaseToken, totalValidatorStake iotago.BaseToken) epochReward {
 	targetReward := lo.PanicOnErr(ts.API.ProtocolParameters().RewardsParameters().TargetReward(epoch, ts.API))
-	stakingResp := ts.DefaultWallet().Client.StakingAccount(context.TODO(), iotago.AccountAddressFromOutputID(outputID))
+	accountAddress, ok := accountID.ToAddress().(*iotago.AccountAddress)
+	if !ok {
+		panic(fmt.Sprintf("accountID %s cannot be cast to account address", accountID))
+	}
+	stakingResp := ts.DefaultWallet().Client.StakingAccount(context.Background(), accountAddress)
 
 	poolStake := stakingResp.PoolStake
 	poolCoefficientExp := iotago.BaseToken(ts.API.ProtocolParameters().RewardsParameters().PoolCoefficientExponent)
@@ -368,8 +373,12 @@ func calculateEpochReward(ts *testsuite.TestSuite, outputID iotago.OutputID, epo
 //
 // For testing purposes, assumes that the account's staking data is the same in the latest committed slot
 // as in the epoch for which to calculate rewards.
-func calculateValidatorReward(ts *testsuite.TestSuite, outputID iotago.OutputID, epochRewards []epochReward, startEpoch iotago.EpochIndex, claimingEpoch iotago.EpochIndex) iotago.Mana {
-	stakingResp := ts.DefaultWallet().Client.StakingAccount(context.TODO(), iotago.AccountAddressFromOutputID(outputID))
+func calculateValidatorReward(ts *testsuite.TestSuite, accountID iotago.AccountID, epochRewards []epochReward, startEpoch iotago.EpochIndex, claimingEpoch iotago.EpochIndex) iotago.Mana {
+	accountAddress, ok := accountID.ToAddress().(*iotago.AccountAddress)
+	if !ok {
+		panic(fmt.Sprintf("accountID %s cannot be cast to account address", accountID))
+	}
+	stakingResp := ts.DefaultWallet().Client.StakingAccount(context.Background(), accountAddress)
 
 	profitMarginExponent := ts.API.ProtocolParameters().RewardsParameters().ProfitMarginExponent
 	stakedAmount := stakingResp.ValidatorStake
