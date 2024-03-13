@@ -469,9 +469,12 @@ func (m *MemPool[VoteRank]) requestState(stateRef mempool.StateReference, waitIf
 		request := m.resolveState(stateRef)
 
 		request.OnSuccess(func(state mempool.State) {
+			inclusionSlot := state.SlotBooked()
+
 			// The output was resolved from the ledger, meaning it was actually persisted as it was accepted and
 			// committed: otherwise we would have found it in cache or the request would have never resolved.
 			stateMetadata := NewStateMetadata(state)
+			stateMetadata.inclusionSlot.Set(&inclusionSlot)
 			stateMetadata.accepted.Set(true)
 
 			p.Resolve(stateMetadata)

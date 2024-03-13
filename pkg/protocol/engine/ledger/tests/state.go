@@ -10,6 +10,7 @@ type MockedState struct {
 	id           iotago.OutputID
 	output       *MockedOutput
 	creationSlot iotago.SlotIndex
+	slotBooked   iotago.SlotIndex
 }
 
 func NewMockedState(transactionID iotago.TransactionID, index uint16) *MockedState {
@@ -17,6 +18,7 @@ func NewMockedState(transactionID iotago.TransactionID, index uint16) *MockedSta
 		id:           iotago.OutputIDFromTransactionIDAndIndex(transactionID, index),
 		output:       &MockedOutput{},
 		creationSlot: iotago.SlotIndex(0),
+		slotBooked:   iotago.SlotIndex(0),
 	}
 }
 
@@ -42,6 +44,10 @@ func (m *MockedState) Output() iotago.Output {
 
 func (m *MockedState) SlotCreated() iotago.SlotIndex {
 	return m.creationSlot
+}
+
+func (m *MockedState) SlotBooked() iotago.SlotIndex {
+	return m.slotBooked
 }
 
 func (m *MockedState) String() string {

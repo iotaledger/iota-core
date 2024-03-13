@@ -712,6 +712,12 @@ func (b *Block) WorkScore() iotago.WorkScore {
 }
 
 func (b *Block) WaitForUnreferencedOutputs(unreferencedOutputs ds.Set[mempool.StateMetadata]) {
+	if unreferencedOutputs == nil || unreferencedOutputs.Size() == 0 {
+		b.AllDependenciesReady.Trigger()
+
+		return
+	}
+
 	var unreferencedOutputCount atomic.Int32
 	unreferencedOutputCount.Store(int32(unreferencedOutputs.Size()))
 
@@ -719,8 +725,8 @@ func (b *Block) WaitForUnreferencedOutputs(unreferencedOutputs ds.Set[mempool.St
 		dependencyReady := false
 
 		unreferencedOutput.OnAccepted(func() {
-			unreferencedOutput.OnEarliestIncludedAttachmentUpdated(func(_, earliestIncludedAttachment iotago.BlockID) {
-				if !dependencyReady && earliestIncludedAttachment.Slot() <= b.ID().Slot() {
+			unreferencedOutput.OnInclusionSlotUpdated(func(_ iotago.SlotIndex, inclusionSlot iotago.SlotIndex) {
+				if !dependencyReady && inclusionSlot <= b.ID().Slot() {
 					dependencyReady = true
 
 					if unreferencedOutputCount.Add(-1) == 0 {

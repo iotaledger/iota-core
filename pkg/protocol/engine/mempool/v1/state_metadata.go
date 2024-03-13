@@ -15,13 +15,13 @@ type StateMetadata struct {
 	state mempool.State
 
 	// lifecycle
-	spenderCount                    uint64
-	spent                           *promise.Event
-	doubleSpent                     *promise.Event
-	spendAccepted                   reactive.Variable[*TransactionMetadata]
-	spendCommitted                  reactive.Variable[*TransactionMetadata]
-	earliestIncludedValidAttachment reactive.Variable[iotago.BlockID]
-	allSpendersRemoved              *event.Event
+	spenderCount       uint64
+	spent              *promise.Event
+	doubleSpent        *promise.Event
+	spendAccepted      reactive.Variable[*TransactionMetadata]
+	spendCommitted     reactive.Variable[*TransactionMetadata]
+	inclusionSlot      reactive.Variable[*iotago.SlotIndex]
+	allSpendersRemoved *event.Event
 
 	spenderIDs reactive.DerivedSet[iotago.TransactionID]
 
@@ -32,12 +32,12 @@ func NewStateMetadata(state mempool.State, optSource ...*TransactionMetadata) *S
 	return (&StateMetadata{
 		state: state,
 
-		spent:                           promise.NewEvent(),
-		doubleSpent:                     promise.NewEvent(),
-		spendAccepted:                   reactive.NewVariable[*TransactionMetadata](),
-		spendCommitted:                  reactive.NewVariable[*TransactionMetadata](),
-		earliestIncludedValidAttachment: reactive.NewVariable[iotago.BlockID](),
-		allSpendersRemoved:              event.New(),
+		spent:              promise.NewEvent(),
+		doubleSpent:        promise.NewEvent(),
+		spendAccepted:      reactive.NewVariable[*TransactionMetadata](),
+		spendCommitted:     reactive.NewVariable[*TransactionMetadata](),
+		inclusionSlot:      reactive.NewVariable[*iotago.SlotIndex](),
+		allSpendersRemoved: event.New(),
 
 		spenderIDs: reactive.NewDerivedSet[iotago.TransactionID](),
 
@@ -52,7 +52,16 @@ func (s *StateMetadata) setup(optSource ...*TransactionMetadata) *StateMetadata 
 	source := optSource[0]
 
 	s.spenderIDs.InheritFrom(source.spenderIDs)
-	s.earliestIncludedValidAttachment.InheritFrom(source.earliestIncludedValidAttachment)
+
+	source.earliestIncludedValidAttachment.OnUpdate(func(_, newValue iotago.BlockID) {
+		s.inclusionSlot.Compute(func(currentValue *iotago.SlotIndex) *iotago.SlotIndex {
+			if newSlot := newValue.Slot(); currentValue == nil || newSlot < *currentValue {
+				return &newSlot
+			}
+
+			return currentValue
+		})
+	})
 
 	source.OnPending(func() { s.accepted.Set(false) })
 	source.OnAccepted(func() { s.accepted.Set(true) })
@@ -117,12 +126,20 @@ func (s *StateMetadata) HasNoSpenders() bool {
 	return atomic.LoadUint64(&s.spenderCount) == 0
 }
 
-func (s *StateMetadata) EarliestIncludedAttachment() iotago.BlockID {
-	return s.earliestIncludedValidAttachment.Get()
+func (s *StateMetadata) InclusionSlot() iotago.SlotIndex {
+	return *s.inclusionSlot.Get()
 }
 
-func (s *StateMetadata) OnEarliestIncludedAttachmentUpdated(callback func(prevID iotago.BlockID, newID iotago.BlockID)) {
-	s.earliestIncludedValidAttachment.OnUpdate(callback)
+func (s *StateMetadata) OnInclusionSlotUpdated(callback func(prevID iotago.SlotIndex, newID iotago.SlotIndex)) {
+	s.inclusionSlot.OnUpdate(func(oldValue *iotago.SlotIndex, newValue *iotago.SlotIndex) {
+		if oldValue == nil {
+			callback(iotago.SlotIndex(0), *newValue)
+		} else if newValue == nil {
+			callback(*oldValue, iotago.SlotIndex(0))
+		} else {
+			callback(*oldValue, *newValue)
+		}
+	})
 }
 
 func (s *StateMetadata) increaseSpenderCount() {

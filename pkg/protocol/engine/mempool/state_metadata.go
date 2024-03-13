@@ -16,9 +16,9 @@ type StateMetadata interface {
 
 	OnAcceptedSpenderUpdated(callback func(spender TransactionMetadata))
 
-	EarliestIncludedAttachment() iotago.BlockID
+	InclusionSlot() iotago.SlotIndex
 
-	OnEarliestIncludedAttachmentUpdated(func(prevID, newID iotago.BlockID))
+	OnInclusionSlotUpdated(func(prevSlot iotago.SlotIndex, newSlot iotago.SlotIndex))
 
 	inclusionFlags
 }

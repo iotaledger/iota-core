@@ -1,7 +1,6 @@
 package inmemorybooker
 
 import (
-	"fmt"
 	"sync/atomic"
 
 	"github.com/iotaledger/hive.go/ds"
@@ -129,11 +128,9 @@ func (b *Booker) Queue(block *blocks.Block) error {
 func (b *Booker) Reset() { /* nothing to reset but comply with interface */ }
 
 func (b *Booker) setupBlock(block *blocks.Block) {
-	signedTransactionMetadata := block.SignedTransactionMetadata.Get()
-	waitForDependencies := signedTransactionMetadata != nil && signedTransactionMetadata.SignaturesInvalid() == nil && !signedTransactionMetadata.TransactionMetadata().IsInvalid()
-
-	var referencedOutputs ds.Set[mempool.StateMetadata]
-	if waitForDependencies {
+	var referencedOutputs, unreferencedOutputs ds.Set[mempool.StateMetadata]
+	if signedTransactionMetadata := block.SignedTransactionMetadata.Get(); signedTransactionMetadata != nil && signedTransactionMetadata.SignaturesInvalid() == nil && !signedTransactionMetadata.TransactionMetadata().IsInvalid() {
+		unreferencedOutputs = signedTransactionMetadata.TransactionMetadata().Outputs()
 		referencedOutputs = ds.NewSet[mempool.StateMetadata]()
 	}
 
@@ -149,7 +146,7 @@ func (b *Booker) setupBlock(block *blocks.Block) {
 		}
 
 		parentBlock.Booked().OnUpdateOnce(func(_ bool, _ bool) {
-			if waitForDependencies {
+			if referencedOutputs != nil {
 				if parentTransactionMetadata := parentBlock.SignedTransactionMetadata.Get(); parentTransactionMetadata != nil {
 					referencedOutputs.AddAll(parentTransactionMetadata.TransactionMetadata().Outputs())
 				}
@@ -168,13 +165,11 @@ func (b *Booker) setupBlock(block *blocks.Block) {
 	})
 
 	block.AllParentsBooked.OnTrigger(func() {
-		if waitForDependencies {
-			fmt.Println("WAITING FOR DEPENDENCIES OF", signedTransactionMetadata.ID(), "IN", block.ID(), "TO BECOME READY")
-
-			block.WaitForUnreferencedOutputs(signedTransactionMetadata.TransactionMetadata().Inputs().DeleteAll(referencedOutputs))
-		} else {
-			block.AllDependenciesReady.Trigger()
+		if unreferencedOutputs != nil {
+			unreferencedOutputs.DeleteAll(referencedOutputs)
 		}
+
+		block.WaitForUnreferencedOutputs(unreferencedOutputs)
 	})
 
 	block.AllDependenciesReady.OnTrigger(func() {
