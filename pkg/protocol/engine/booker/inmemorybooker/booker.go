@@ -1,6 +1,7 @@
 package inmemorybooker
 
 import (
+	"fmt"
 	"sync/atomic"
 
 	"github.com/iotaledger/hive.go/ds"
@@ -128,7 +129,13 @@ func (b *Booker) Queue(block *blocks.Block) error {
 func (b *Booker) Reset() { /* nothing to reset but comply with interface */ }
 
 func (b *Booker) setupBlock(block *blocks.Block) {
-	referencedOutputs := ds.NewSet[mempool.StateMetadata]()
+	signedTransactionMetadata := block.SignedTransactionMetadata.Get()
+	waitForDependencies := signedTransactionMetadata != nil && signedTransactionMetadata.SignaturesInvalid() == nil && !signedTransactionMetadata.TransactionMetadata().IsInvalid()
+
+	var referencedOutputs ds.Set[mempool.StateMetadata]
+	if waitForDependencies {
+		referencedOutputs = ds.NewSet[mempool.StateMetadata]()
+	}
 
 	var unbookedParentsCount atomic.Int32
 	unbookedParentsCount.Store(int32(len(block.Parents())))
@@ -142,8 +149,10 @@ func (b *Booker) setupBlock(block *blocks.Block) {
 		}
 
 		parentBlock.Booked().OnUpdateOnce(func(_ bool, _ bool) {
-			if parentTransactionMetadata := parentBlock.SignedTransactionMetadata.Get(); parentTransactionMetadata != nil {
-				referencedOutputs.AddAll(parentTransactionMetadata.TransactionMetadata().Outputs())
+			if waitForDependencies {
+				if parentTransactionMetadata := parentBlock.SignedTransactionMetadata.Get(); parentTransactionMetadata != nil {
+					referencedOutputs.AddAll(parentTransactionMetadata.TransactionMetadata().Outputs())
+				}
 			}
 
 			if unbookedParentsCount.Add(-1) == 0 {
@@ -159,15 +168,12 @@ func (b *Booker) setupBlock(block *blocks.Block) {
 	})
 
 	block.AllParentsBooked.OnTrigger(func() {
-		if signedTransactionMetadata := block.SignedTransactionMetadata.Get(); signedTransactionMetadata == nil || signedTransactionMetadata.SignaturesInvalid() != nil {
-			block.AllDependenciesReady.Trigger()
-		} else {
-
-			block.ForEachParent(func(parent iotago.Parent) {
-
-			})
+		if waitForDependencies {
+			fmt.Println("WAITING FOR DEPENDENCIES OF", signedTransactionMetadata.ID(), "IN", block.ID(), "TO BECOME READY")
 
 			block.WaitForUnreferencedOutputs(signedTransactionMetadata.TransactionMetadata().Inputs().DeleteAll(referencedOutputs))
+		} else {
+			block.AllDependenciesReady.Trigger()
 		}
 	})
 
