@@ -54,8 +54,6 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 				e.Events.SeatManager.LinkTo(s.events)
 
 				e.ConstructedEvent().OnTrigger(func() {
-					s.ConstructedEvent().Trigger()
-
 					// We need to mark validators as active upon solidity of blocks as otherwise we would not be able to
 					// recover if no node was part of the online committee anymore.
 					e.Events.PostSolidFilter.BlockAllowed.Hook(func(block *blocks.Block) {
@@ -72,7 +70,15 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 
 						s.events.BlockProcessed.Trigger(block)
 					})
+
+					s.ShutdownEvent().OnTrigger(func() {
+						s.StoppedEvent().Trigger()
+					})
+
+					s.InitializedEvent().Trigger()
 				})
+
+				s.ConstructedEvent().Trigger()
 			})
 	})
 }
