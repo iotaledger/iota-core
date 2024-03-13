@@ -322,8 +322,8 @@ github.com/iotaledger/inx/go v1.0.0-rc.2.0.20240307100839-48553e1d2022 h1:I178Sa
 github.com/iotaledger/inx/go v1.0.0-rc.2.0.20240307100839-48553e1d2022/go.mod h1:jTFxIWiMUdAwO263jlJCSWcNLqEkgYEVOFXfjp5aNJM=
 github.com/iotaledger/iota-crypto-demo v0.0.0-20240216103559-27ca8dffd1e7 h1:t6k4MqiUov0FrBb2o2JhKlOVSdlPbIQWM8ivYHL0G0g=
 github.com/iotaledger/iota-crypto-demo v0.0.0-20240216103559-27ca8dffd1e7/go.mod h1:do+N3LpeDEi9qselEC4XcjqGoRc7cWGiqBtIeBOKEMs=
-github.com/iotaledger/iota.go/v4 v4.0.0-20240307175623-0904c71fcb38 h1:NizJ3CALLCcJowtAtkNuDlpE4gd4qjaWZkp/kTZfeYk=
-github.com/iotaledger/iota.go/v4 v4.0.0-20240307175623-0904c71fcb38/go.mod h1:8UQOTI7CC5R/3TurawUFuBZbkb37RzW8m4q8Hp7ct30=
+github.com/iotaledger/iota.go/v4 v4.0.0-20240313065735-74f8cf10c361 h1:fKvfJZ4byivRRKkqF6JPj8I4pDSN0y+bgF4I4HI11Lo=
+github.com/iotaledger/iota.go/v4 v4.0.0-20240313065735-74f8cf10c361/go.mod h1:8UQOTI7CC5R/3TurawUFuBZbkb37RzW8m4q8Hp7ct30=
 github.com/ipfs/boxo v0.18.0 h1:MOL9/AgoV3e7jlVMInicaSdbgralfqSsbkc31dZ9tmw=
 github.com/ipfs/boxo v0.18.0/go.mod h1:pIZgTWdm3k3pLF9Uq6MB8JEcW07UDwNJjlXW1HELW80=
 github.com/ipfs/go-cid v0.4.1 h1:A/T3qGvxi4kpKWWcPC/PgbvDA2bjVLO7n4UeVwnbs/s=
