@@ -45,8 +45,6 @@ func NewProvider(opts ...options.Option[PreSolidBlockFilter]) module.Provider[*e
 	})
 }
 
-var _ presolidfilter.PreSolidFilter = new(PreSolidBlockFilter)
-
 // New creates a new PreSolidBlockFilter.
 func New(module module.Module, apiProvider iotago.APIProvider, opts ...options.Option[PreSolidBlockFilter]) *PreSolidBlockFilter {
 	return options.Apply(&PreSolidBlockFilter{

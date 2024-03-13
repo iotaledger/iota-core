@@ -83,10 +83,6 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			//	l.memPool.PublishRequestedState(scd.Commitment.Commitment())
 			// })
 
-			l.ConstructedEvent().Trigger()
-
-			l.ShutdownEvent().OnTrigger(l.shutdown)
-
 			l.InitializedEvent().Trigger()
 		})
 
@@ -95,7 +91,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 }
 
 func New(
-	module module.Module,
+	subModule module.Module,
 	utxoLedger *utxoledger.Manager,
 	accountsStore kvstore.KVStore,
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error),
@@ -105,11 +101,11 @@ func New(
 	sybilProtection sybilprotection.SybilProtection,
 	errorHandler func(error),
 ) *Ledger {
-	return &Ledger{
-		Module:           module,
+	l := &Ledger{
+		Module:           subModule,
 		events:           ledger.NewEvents(),
 		apiProvider:      apiProvider,
-		accountsLedger:   accountsledger.New(module.NewSubModule("AccountsLedger"), apiProvider, blocksFunc, slotDiffFunc, accountsStore),
+		accountsLedger:   accountsledger.New(subModule.NewSubModule("AccountsLedger"), apiProvider, blocksFunc, slotDiffFunc, accountsStore),
 		rmcManager:       rmc.NewManager(apiProvider, commitmentLoader),
 		utxoLedger:       utxoLedger,
 		commitmentLoader: commitmentLoader,
@@ -119,6 +115,12 @@ func New(
 			return sybilProtection.SeatManager().OnlineCommittee().Size()
 		}),
 	}
+
+	l.ShutdownEvent().OnTrigger(l.shutdown)
+
+	l.ConstructedEvent().Trigger()
+
+	return l
 }
 
 func (l *Ledger) OnTransactionAttached(handler func(transaction mempool.TransactionMetadata), opts ...event.Option) *event.Hook[func(metadata mempool.TransactionMetadata)] {
