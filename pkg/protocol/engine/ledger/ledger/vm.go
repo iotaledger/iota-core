@@ -65,11 +65,7 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 		return nil, iotago.ErrTxTypeInvalid
 	}
 
-	contextInputs, err := iotagoSignedTransaction.Transaction.ContextInputs()
-	if err != nil {
-		return nil, ierrors.Wrapf(err, "unable to retrieve context inputs from transaction")
-	}
-
+	contextInputs := iotagoSignedTransaction.Transaction.ContextInputs()
 	utxoInputSet := iotagovm.InputSet{}
 	commitmentInput := (*iotago.Commitment)(nil)
 	bicInputs := make([]*iotago.BlockIssuanceCreditInput, 0)
