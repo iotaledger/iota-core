@@ -73,8 +73,8 @@ func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 		}
 	}
 
-	if requestedEpoch > currentEpoch {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "epoch %d is larger than current epoch %d", requestedEpoch, currentEpoch)
+	if requestedEpoch > currentEpoch || requestedEpoch <= deps.RequestHandler.GetNodeStatus().PruningEpoch {
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "epoch %d is larger than current epoch or already pruned", requestedEpoch)
 	}
 
 	return deps.RequestHandler.Validators(requestedEpoch, cursorIndex, pageSize)
