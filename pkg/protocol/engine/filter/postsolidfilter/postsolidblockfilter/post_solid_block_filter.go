@@ -35,7 +35,7 @@ func NewProvider(opts ...options.Option[PostSolidBlockFilter]) module.Provider[*
 
 			e.Events.BlockDAG.BlockSolid.Hook(c.ProcessSolidBlock)
 
-			e.Ledger.ConstructedEvent().OnTrigger(func() {
+			e.Ledger.InitializedEvent().OnTrigger(func() {
 				c.Init(e.Ledger.Account, e.BlockCache.Block, e.Ledger.RMCManager().RMC)
 			})
 		})

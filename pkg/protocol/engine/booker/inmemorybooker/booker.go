@@ -74,7 +74,7 @@ func (b *Booker) Init(ledger ledger.Ledger, loadBlockFromStorage func(iotago.Blo
 	b.ledger = ledger
 	b.loadBlockFromStorage = loadBlockFromStorage
 
-	ledger.ConstructedEvent().OnTrigger(func() {
+	ledger.InitializedEvent().OnTrigger(func() {
 		b.spendDAG = ledger.SpendDAG()
 
 		ledger.MemPool().OnTransactionAttached(func(transaction mempool.TransactionMetadata) {
