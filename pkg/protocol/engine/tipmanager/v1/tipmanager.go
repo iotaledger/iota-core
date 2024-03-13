@@ -54,12 +54,12 @@ type TipManager struct {
 
 // New creates a new TipManager.
 func New(
-	module module.Module,
+	subModule module.Module,
 	blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool),
 	retrieveCommitteeInSlot func(slot iotago.SlotIndex) (*account.SeatedAccounts, bool),
 ) *TipManager {
-	t := &TipManager{
-		Module:                  module,
+	return module.InitSimpleLifecycle(&TipManager{
+		Module:                  subModule,
 		retrieveBlock:           blockRetriever,
 		retrieveCommitteeInSlot: retrieveCommitteeInSlot,
 		tipMetadataStorage:      shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]](),
@@ -68,17 +68,7 @@ func New(
 		strongTipSet:            randommap.New[iotago.BlockID, *TipMetadata](),
 		weakTipSet:              randommap.New[iotago.BlockID, *TipMetadata](),
 		blockAdded:              event.New1[tipmanager.TipMetadata](),
-	}
-
-	t.ConstructedEvent().Trigger()
-
-	t.ShutdownEvent().OnTrigger(func() {
-		t.StoppedEvent().Trigger()
 	})
-
-	t.InitializedEvent().Trigger()
-
-	return t
 }
 
 // AddBlock adds a Block to the TipManager and returns the TipMetadata if the Block was added successfully.
