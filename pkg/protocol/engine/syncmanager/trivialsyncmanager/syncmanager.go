@@ -101,9 +101,9 @@ func NewProvider(opts ...options.Option[SyncManager]) module.Provider[*engine.En
 	})
 }
 
-func New(module module.Module, e *engine.Engine, latestCommitment *model.Commitment, finalizedSlot iotago.SlotIndex, opts ...options.Option[SyncManager]) *SyncManager {
-	return options.Apply(&SyncManager{
-		Module:                 module,
+func New(subModule module.Module, e *engine.Engine, latestCommitment *model.Commitment, finalizedSlot iotago.SlotIndex, opts ...options.Option[SyncManager]) *SyncManager {
+	return module.InitSimpleLifecycle(options.Apply(&SyncManager{
+		Module:                 subModule,
 		events:                 syncmanager.NewEvents(),
 		engine:                 e,
 		syncThreshold:          10 * time.Second,
@@ -122,14 +122,7 @@ func New(module module.Module, e *engine.Engine, latestCommitment *model.Commitm
 				return time.Since(e.Clock.Accepted().RelativeTime()) < s.optsBootstrappedThreshold && e.Notarization.IsBootstrapped()
 			}
 		}
-
-		s.ShutdownEvent().OnTrigger(func() {
-			s.StoppedEvent().Trigger()
-		})
-
-		s.ConstructedEvent().Trigger()
-		s.InitializedEvent().Trigger()
-	})
+	}))
 }
 
 func (s *SyncManager) SyncStatus() *syncmanager.SyncStatus {

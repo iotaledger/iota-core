@@ -79,24 +79,27 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 
 			e.Events.Notarization.LinkTo(m.events)
 
-			m.ConstructedEvent().Trigger()
 			m.slotMutations = NewSlotMutations(e.Storage.Settings().LatestCommitment().Slot())
 			m.InitializedEvent().Trigger()
 		})
-
-		m.ShutdownEvent().OnTrigger(m.Shutdown)
 
 		return m
 	})
 }
 
-func NewManager(module module.Module, workers *workerpool.Group, errorHandler func(error)) *Manager {
-	return &Manager{
-		Module:       module,
+func NewManager(subModule module.Module, workers *workerpool.Group, errorHandler func(error)) *Manager {
+	m := &Manager{
+		Module:       subModule,
 		events:       notarization.NewEvents(),
 		workers:      workers,
 		errorHandler: errorHandler,
 	}
+
+	m.ShutdownEvent().OnTrigger(m.Shutdown)
+
+	m.ConstructedEvent().Trigger()
+
+	return m
 }
 
 func (m *Manager) Shutdown() {
