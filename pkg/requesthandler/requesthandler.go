@@ -11,8 +11,8 @@ import (
 type RequestHandler struct {
 	workerPool *workerpool.WorkerPool
 
-	registeredValidatorsCache *cache.Cache
-	protocol                  *protocol.Protocol
+	cache    *cache.Cache
+	protocol *protocol.Protocol
 
 	optsCacheMaxSize int
 }
@@ -23,7 +23,7 @@ func New(p *protocol.Protocol, opts ...options.Option[RequestHandler]) *RequestH
 		protocol:         p,
 		optsCacheMaxSize: 2 << 20, // 2MB
 	}, opts, func(r *RequestHandler) {
-		r.registeredValidatorsCache = cache.NewCache(r.optsCacheMaxSize)
+		r.cache = cache.NewCache(r.optsCacheMaxSize)
 	})
 }
 

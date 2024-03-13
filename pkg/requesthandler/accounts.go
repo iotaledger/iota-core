@@ -9,14 +9,11 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
-
-var validatorResponsesTypeSettings = serix.TypeSettings{}.WithLengthPrefixType(serix.LengthPrefixTypeAsByte)
 
 func (r *RequestHandler) CongestionByAccountAddress(accountAddress *iotago.AccountAddress, commitment *model.Commitment, workScores ...iotago.WorkScore) (*api.CongestionResponse, error) {
 	accountID := accountAddress.AccountID()
@@ -36,36 +33,6 @@ func (r *RequestHandler) CongestionByAccountAddress(accountAddress *iotago.Accou
 	}, nil
 }
 
-func (r *RequestHandler) registeredValidatorsFromCache(epochIndex iotago.EpochIndex, key []byte) ([]*api.ValidatorResponse, error) {
-	apiForEpoch := r.APIProvider().APIForEpoch(epochIndex)
-
-	registeredValidatorsBytes := r.registeredValidatorsCache.Get(key)
-	if registeredValidatorsBytes == nil {
-		// get the ordered registered validators list from engine.
-		registeredValidators, err := r.protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(epochIndex)
-		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrNotFound, " ordered registered validators list for epoch %d not found: %s", epochIndex, err)
-		}
-
-		// store validator responses in cache.
-		registeredValidatorsBytes, err := apiForEpoch.Encode(registeredValidators, serix.WithTypeSettings(validatorResponsesTypeSettings))
-		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to encode ordered registered validators list for epoch %d : %s", epochIndex, err)
-		}
-		r.registeredValidatorsCache.Set(key, registeredValidatorsBytes)
-
-		return registeredValidators, nil
-	}
-
-	validatorResp := make([]*api.ValidatorResponse, 0)
-	_, err := apiForEpoch.Decode(registeredValidatorsBytes, &validatorResp, serix.WithTypeSettings(validatorResponsesTypeSettings))
-	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to decode validator responses for epoch %d", epochIndex)
-	}
-
-	return validatorResp, nil
-}
-
 func (r *RequestHandler) Validators(epochIndex iotago.EpochIndex, cursorIndex, pageSize uint32) (*api.ValidatorsResponse, error) {
 	apiForEpoch := r.APIProvider().APIForEpoch(epochIndex)
 	currentSlot := r.protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot()
@@ -73,13 +40,16 @@ func (r *RequestHandler) Validators(epochIndex iotago.EpochIndex, cursorIndex, p
 	var registeredValidators []*api.ValidatorResponse
 	var err error
 
+	key := epochIndex.MustBytes()
+	// The key of validators cache for current epoch is the combination of current epoch and current slot. So the results is updated when new commitment is created.
 	if epochIndex == currentEpoch {
-		// The key of validators cache is the combination of current epoch and current slot. So the results is updated when new commitment is created.
-		key := append(currentEpoch.MustBytes(), currentSlot.MustBytes()...)
-		registeredValidators, err = r.registeredValidatorsFromCache(epochIndex, key)
-	} else {
-		registeredValidators, err = r.registeredValidatorsFromCache(epochIndex, epochIndex.MustBytes())
+		key = append(key, currentSlot.MustBytes()...)
 	}
+
+	// get registered validators from cache, if not found, get from engine and store in cache.
+	registeredValidators, err = r.cache.GetOrCreateRegisteredValidators(apiForEpoch, key, func() ([]*api.ValidatorResponse, error) {
+		return r.protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(epochIndex)
+	})
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get registered validators for epoch %d", epochIndex)
 	}
@@ -95,9 +65,7 @@ func (r *RequestHandler) Validators(epochIndex iotago.EpochIndex, cursorIndex, p
 		PageSize:   pageSize,
 	}
 	// this is the last page
-	if int(cursorIndex+pageSize) > len(registeredValidators) {
-		resp.Cursor = ""
-	} else {
+	if int(cursorIndex+pageSize) <= len(registeredValidators) {
 		resp.Cursor = fmt.Sprintf("%d,%d", epochIndex, cursorIndex+pageSize)
 	}
 
