@@ -165,7 +165,9 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 			}
 
 		default:
-			return nil, 0, ierrors.Errorf("only ed25519 signatures supported, got %s", att.Signature.Type())
+			// We're switching on the Go signature type here, so we can only run into the default case
+			// if we added a new signature type and have not handled it above. In this case we want to panic.
+			panic("all supported signature types should be handled above")
 		}
 
 		// 2. Verify the signature of the attestation.

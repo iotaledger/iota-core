@@ -149,7 +149,7 @@ func (e *Engines) ForkAtSlot(slot iotago.SlotIndex) (*engine.Engine, error) {
 func (e *Engines) loadMainEngine(snapshotPath string) (*engine.Engine, error) {
 	info := &engineInfo{}
 	if err := ioutils.ReadJSONFromFile(e.infoFilePath(), info); err != nil && !ierrors.Is(err, os.ErrNotExist) {
-		return nil, ierrors.Errorf("unable to read engine info file: %w", err)
+		return nil, ierrors.Wrap(err, "unable to read engine info file")
 	}
 
 	//nolint:revive
