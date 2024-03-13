@@ -183,9 +183,9 @@ func (t *TestSuite) AssertEpochRewards(epoch iotago.EpochIndex, actions map[stri
 		require.NoError(t.T, err)
 		require.Equal(t.T, expectedValidatorReward, actualValidatorReward)
 
-		for delegatedAmount := range action.Delegators {
+		for _, delegatedAmount := range action.Delegators {
 			expectedDelegatorReward := t.delegatorReward(epoch, t.epochStats[epoch].ProfitMargin, uint64(poolRewards), uint64(delegatedAmount), uint64(action.PoolStake), uint64(action.FixedCost), action)
-			actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accountID, iotago.BaseToken(delegatedAmount), epoch, epoch, epoch)
+			actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accountID, delegatedAmount, epoch, epoch, epoch)
 			require.NoError(t.T, err)
 			require.Equal(t.T, expectedDelegatorReward, actualDelegatorReward)
 		}
