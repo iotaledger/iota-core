@@ -711,21 +711,21 @@ func (b *Block) WorkScore() iotago.WorkScore {
 	return b.workScore
 }
 
-func (b *Block) WaitForUnreferencedOutputs(unreferencedOutputs ds.Set[mempool.StateMetadata]) {
-	if unreferencedOutputs == nil || unreferencedOutputs.Size() == 0 {
+func (b *Block) WaitForUTXODependencies(dependencies ds.Set[mempool.StateMetadata]) {
+	if dependencies == nil || dependencies.Size() == 0 {
 		b.AllDependenciesReady.Trigger()
 
 		return
 	}
 
 	var unreferencedOutputCount atomic.Int32
-	unreferencedOutputCount.Store(int32(unreferencedOutputs.Size()))
+	unreferencedOutputCount.Store(int32(dependencies.Size()))
 
-	unreferencedOutputs.Range(func(unreferencedOutput mempool.StateMetadata) {
+	dependencies.Range(func(dependency mempool.StateMetadata) {
 		dependencyReady := false
 
-		unreferencedOutput.OnAccepted(func() {
-			unreferencedOutput.OnInclusionSlotUpdated(func(_ iotago.SlotIndex, inclusionSlot iotago.SlotIndex) {
+		dependency.OnAccepted(func() {
+			dependency.OnInclusionSlotUpdated(func(_ iotago.SlotIndex, inclusionSlot iotago.SlotIndex) {
 				if !dependencyReady && inclusionSlot <= b.ID().Slot() {
 					dependencyReady = true
 

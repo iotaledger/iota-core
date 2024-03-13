@@ -128,10 +128,10 @@ func (b *Booker) Queue(block *blocks.Block) error {
 func (b *Booker) Reset() { /* nothing to reset but comply with interface */ }
 
 func (b *Booker) setupBlock(block *blocks.Block) {
-	var referencedOutputs, unreferencedOutputs ds.Set[mempool.StateMetadata]
+	var directlyReferencedUTXODependencies, utxoDependencies ds.Set[mempool.StateMetadata]
 	if signedTransactionMetadata := block.SignedTransactionMetadata.Get(); signedTransactionMetadata != nil && signedTransactionMetadata.SignaturesInvalid() == nil && !signedTransactionMetadata.TransactionMetadata().IsInvalid() {
-		unreferencedOutputs = signedTransactionMetadata.TransactionMetadata().Outputs()
-		referencedOutputs = ds.NewSet[mempool.StateMetadata]()
+		utxoDependencies = signedTransactionMetadata.TransactionMetadata().Inputs()
+		directlyReferencedUTXODependencies = ds.NewSet[mempool.StateMetadata]()
 	}
 
 	var unbookedParentsCount atomic.Int32
@@ -146,9 +146,9 @@ func (b *Booker) setupBlock(block *blocks.Block) {
 		}
 
 		parentBlock.Booked().OnUpdateOnce(func(_ bool, _ bool) {
-			if referencedOutputs != nil {
+			if directlyReferencedUTXODependencies != nil {
 				if parentTransactionMetadata := parentBlock.SignedTransactionMetadata.Get(); parentTransactionMetadata != nil {
-					referencedOutputs.AddAll(parentTransactionMetadata.TransactionMetadata().Outputs())
+					directlyReferencedUTXODependencies.AddAll(parentTransactionMetadata.TransactionMetadata().Outputs())
 				}
 			}
 
@@ -165,11 +165,11 @@ func (b *Booker) setupBlock(block *blocks.Block) {
 	})
 
 	block.AllParentsBooked.OnTrigger(func() {
-		if unreferencedOutputs != nil {
-			unreferencedOutputs.DeleteAll(referencedOutputs)
+		if directlyReferencedUTXODependencies != nil {
+			utxoDependencies.DeleteAll(directlyReferencedUTXODependencies)
 		}
 
-		block.WaitForUnreferencedOutputs(unreferencedOutputs)
+		block.WaitForUTXODependencies(utxoDependencies)
 	})
 
 	block.AllDependenciesReady.OnTrigger(func() {
