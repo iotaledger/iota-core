@@ -294,7 +294,7 @@ func validatorTest(t *testing.T, test ValidatorTest) {
 	var totalStake iotago.BaseToken = 0
 	var totalValidatorStake iotago.BaseToken = 0
 	lo.ForEach(ts.Validators(), func(n *mock.Node) {
-		accountData := ts.DefaultWallet().Client.StakingAccount(context.Background(), n.Validator.AccountData.AccountAddress)
+		accountData := ts.DefaultWallet().Client.StakingAccount(context.Background(), n.Validator.AccountData.Address)
 
 		totalStake += accountData.PoolStake
 		totalValidatorStake += accountData.ValidatorStake

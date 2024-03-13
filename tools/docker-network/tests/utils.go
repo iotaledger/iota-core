@@ -19,6 +19,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
@@ -56,7 +57,7 @@ func (d *DockerTestFramework) CheckAccountStatus(ctx context.Context, blkID iota
 	require.NoError(d.Testing, err)
 }
 
-func (d *DockerTestFramework) AssertIndexerAccount(account *AccountData) {
+func (d *DockerTestFramework) AssertIndexerAccount(account *mock.AccountData) {
 	d.Eventually(func() error {
 		ctx := context.TODO()
 		indexerClt, err := d.wallet.DefaultClient().Indexer(ctx)

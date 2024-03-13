@@ -36,8 +36,8 @@ type AccountData struct {
 	ID iotago.AccountID
 	// AddressIndex is the index of the address in the keyManager.
 	AddressIndex uint32
-	// AccountAddress is the AccountAddress of the account output.
-	AccountAddress *iotago.AccountAddress
+	// Address is the Address of the account output.
+	Address *iotago.AccountAddress
 	// Output is the latest iotago AccountOutput of the account.
 	Output *iotago.AccountOutput
 	// OutputID is the unique identifier of the Output.
@@ -66,14 +66,13 @@ type Wallet struct {
 	currentSlot  iotago.SlotIndex
 }
 
-func NewWallet(t *testing.T, name string, node *Node, keyManager ...*wallet.KeyManager) *Wallet {
+func NewWallet(t *testing.T, name string, client Client, keyManager ...*wallet.KeyManager) *Wallet {
 	var km *wallet.KeyManager
 	if len(keyManager) == 0 {
 		km = lo.PanicOnErr(wallet.NewKeyManagerFromRandom(wallet.DefaultIOTAPath))
 	} else {
 		km = keyManager[0]
 	}
-	client := &TestSuiteClient{node}
 	issuerAccountData := &AccountData{
 		ID:           iotago.EmptyAccountID,
 		AddressIndex: 0,
@@ -101,7 +100,21 @@ func (w *Wallet) SetDefaultNode(node *Node) {
 }
 
 func (w *Wallet) SetCurrentSlot(slot iotago.SlotIndex) {
-	w.currentSlot = slot
+	switch w.Client.(type) {
+	case *TestSuiteClient:
+		w.currentSlot = slot
+	default:
+		w.Testing.Fatalf("cannot set current slot for non-testsuite client")
+	}
+}
+
+func (w *Wallet) CurrentSlot() iotago.SlotIndex {
+	switch w.Client.(type) {
+	case *TestSuiteClient:
+		return w.currentSlot
+	default:
+		return w.Client.LatestAPI().TimeProvider().CurrentSlot()
+	}
 }
 
 func (w *Wallet) AddOutput(outputName string, output *OutputData) {

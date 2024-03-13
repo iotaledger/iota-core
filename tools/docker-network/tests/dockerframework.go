@@ -21,6 +21,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
@@ -376,7 +377,7 @@ func (d *DockerTestFramework) CreateTaggedDataBlock(issuerID iotago.AccountID, t
 	}, issuerID, congestionResp, issuerResp)
 }
 
-func (d *DockerTestFramework) CreateBasicOutputBlock(issuerAccountID iotago.AccountID) (*iotago.Block, *iotago.SignedTransaction, *OutputData) {
+func (d *DockerTestFramework) CreateBasicOutputBlock(issuerAccountID iotago.AccountID) (*iotago.Block, *iotago.SignedTransaction, *mock.OutputData) {
 	clt := d.wallet.DefaultClient()
 	ctx := context.Background()
 
@@ -457,7 +458,7 @@ func (d *DockerTestFramework) CreateFoundryTransitionBlockFromInput(issuerID iot
 }
 
 // CreateAccountBlockFromInput consumes the given output, which should be either an basic output with implicit address, then build block with the given account output options. Note that after the returned transaction is issued, remember to update the account information in the wallet with AddAccount().
-func (d *DockerTestFramework) CreateAccountBlockFromInput(inputID iotago.OutputID) (*AccountData, iotago.OutputID, *iotago.Block) {
+func (d *DockerTestFramework) CreateAccountBlockFromInput(inputID iotago.OutputID) (*mock.AccountData, iotago.OutputID, *iotago.Block) {
 	ctx := context.TODO()
 	clt := d.wallet.DefaultClient()
 	input := d.wallet.Output(inputID)
@@ -479,7 +480,7 @@ func (d *DockerTestFramework) CreateAccountBlockFromInput(inputID iotago.OutputI
 }
 
 // CreateImplicitAccount requests faucet funds and creates an implicit account. It already wait until the transaction is committed and the created account is useable.
-func (d *DockerTestFramework) CreateImplicitAccount(ctx context.Context) *AccountData {
+func (d *DockerTestFramework) CreateImplicitAccount(ctx context.Context) *mock.AccountData {
 	fundsOutputID := d.RequestFaucetFunds(ctx, iotago.AddressImplicitAccountCreation)
 
 	accountID := iotago.AccountIDFromOutputID(fundsOutputID)
@@ -487,7 +488,7 @@ func (d *DockerTestFramework) CreateImplicitAccount(ctx context.Context) *Accoun
 	require.True(d.Testing, ok)
 
 	// Note: the implicit account output is not an AccountOutput, thus we ignore the Output here.
-	accountInfo := &AccountData{
+	accountInfo := &mock.AccountData{
 		ID:           accountID,
 		Address:      accountAddress,
 		AddressIndex: d.wallet.Output(fundsOutputID).AddressIndex,
@@ -502,7 +503,7 @@ func (d *DockerTestFramework) CreateImplicitAccount(ctx context.Context) *Accoun
 }
 
 // CreateAccount creates an new account from implicit one to full one, it already wait until the transaction is committed and the created account is useable.
-func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.AccountOutputBuilder]) *AccountData {
+func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.AccountOutputBuilder]) *mock.AccountData {
 	// create an implicit account by requesting faucet funds
 	ctx := context.TODO()
 	implicitAccount := d.CreateImplicitAccount(ctx)
@@ -636,7 +637,7 @@ func (d *DockerTestFramework) RequestFaucetFunds(ctx context.Context, addressTyp
 	outputID, output, err := d.AwaitAddressUnspentOutputAccepted(ctx, address)
 	require.NoError(d.Testing, err)
 
-	d.wallet.AddOutput(outputID, &OutputData{
+	d.wallet.AddOutput(outputID, &mock.OutputData{
 		ID:           outputID,
 		Address:      address,
 		AddressIndex: addrIndex,

@@ -15,6 +15,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/builder"
@@ -33,41 +34,15 @@ type DockerWallet struct {
 
 	lastUsedIndex atomic.Uint32
 
-	outputs  map[iotago.OutputID]*OutputData
-	accounts map[iotago.AccountID]*AccountData
-}
-
-// OutputData holds the details of an output that can be used to build a transaction.
-type OutputData struct {
-	// ID is the unique identifier of the output.
-	ID iotago.OutputID
-	// Output is the iotago Output.
-	Output iotago.Output
-	// Address is the address of the output.
-	Address iotago.Address
-	// AddressIndex is the index of the address in the keyManager.
-	AddressIndex uint32
-}
-
-// AccountData holds the details of an account that can be used to issue a block or account transition.
-type AccountData struct {
-	// ID is the unique identifier of the account.
-	ID iotago.AccountID
-	// AddressIndex is the index of the address in the keyManager.
-	AddressIndex uint32
-	// Address is the address of the account.
-	Address *iotago.AccountAddress
-	// Output is the latest iotago AccountOutput of the account.
-	Output *iotago.AccountOutput
-	// OutputID is the unique identifier of the Output.
-	OutputID iotago.OutputID
+	outputs  map[iotago.OutputID]*mock.OutputData
+	accounts map[iotago.AccountID]*mock.AccountData
 }
 
 func NewDockerWallet(t *testing.T) *DockerWallet {
 	return &DockerWallet{
 		Testing:    t,
-		outputs:    make(map[iotago.OutputID]*OutputData),
-		accounts:   make(map[iotago.AccountID]*AccountData),
+		outputs:    make(map[iotago.OutputID]*mock.OutputData),
+		accounts:   make(map[iotago.AccountID]*mock.AccountData),
 		Clients:    make(map[string]*nodeclient.Client),
 		keyManager: lo.PanicOnErr(wallet.NewKeyManagerFromRandom(wallet.DefaultIOTAPath)),
 	}
@@ -77,15 +52,15 @@ func (w *DockerWallet) DefaultClient() *nodeclient.Client {
 	return w.Clients["V1"]
 }
 
-func (w *DockerWallet) AddOutput(outputID iotago.OutputID, output *OutputData) {
+func (w *DockerWallet) AddOutput(outputID iotago.OutputID, output *mock.OutputData) {
 	w.outputs[outputID] = output
 }
 
-func (w *DockerWallet) AddAccount(accountID iotago.AccountID, data *AccountData) {
+func (w *DockerWallet) AddAccount(accountID iotago.AccountID, data *mock.AccountData) {
 	w.accounts[accountID] = data
 }
 
-func (w *DockerWallet) Output(outputName iotago.OutputID) *OutputData {
+func (w *DockerWallet) Output(outputName iotago.OutputID) *mock.OutputData {
 	output, exists := w.outputs[outputName]
 	if !exists {
 		panic(ierrors.Errorf("output %s not registered in wallet", outputName))
@@ -94,7 +69,7 @@ func (w *DockerWallet) Output(outputName iotago.OutputID) *OutputData {
 	return output
 }
 
-func (w *DockerWallet) Account(accountID iotago.AccountID) *AccountData {
+func (w *DockerWallet) Account(accountID iotago.AccountID) *mock.AccountData {
 	acc, exists := w.accounts[accountID]
 	if !exists {
 		panic(ierrors.Errorf("account %s not registered in wallet", accountID.ToHex()))
@@ -166,7 +141,7 @@ func (w *DockerWallet) AllotManaFromAccount(fromID iotago.AccountID, toID iotago
 	require.NoError(w.Testing, err)
 
 	allotmentOutputID := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0)
-	w.AddOutput(allotmentOutputID, &OutputData{
+	w.AddOutput(allotmentOutputID, &mock.OutputData{
 		ID:           allotmentOutputID,
 		Output:       basicOutput,
 		Address:      input.Address,
@@ -199,7 +174,7 @@ func (w *DockerWallet) AllotManaFromInput(toID iotago.AccountID, inputID iotago.
 	require.NoError(w.Testing, err)
 
 	delegationOutputID := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0)
-	w.AddOutput(delegationOutputID, &OutputData{
+	w.AddOutput(delegationOutputID, &mock.OutputData{
 		ID:           delegationOutputID,
 		Output:       basicOutput,
 		Address:      input.Address,
@@ -209,7 +184,7 @@ func (w *DockerWallet) AllotManaFromInput(toID iotago.AccountID, inputID iotago.
 	return signedTx
 }
 
-func (w *DockerWallet) TransitionImplicitAccountToAccountOutput(inputID iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse, opts ...options.Option[builder.AccountOutputBuilder]) (*AccountData, *iotago.SignedTransaction) {
+func (w *DockerWallet) TransitionImplicitAccountToAccountOutput(inputID iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse, opts ...options.Option[builder.AccountOutputBuilder]) (*mock.AccountData, *iotago.SignedTransaction) {
 	input := w.Output(inputID)
 
 	accountID := iotago.AccountIDFromOutputID(input.ID)
@@ -245,14 +220,14 @@ func (w *DockerWallet) TransitionImplicitAccountToAccountOutput(inputID iotago.O
 	require.NoError(w.Testing, err)
 
 	accountOutputID := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0)
-	w.AddOutput(accountOutputID, &OutputData{
+	w.AddOutput(accountOutputID, &mock.OutputData{
 		ID:           accountOutputID,
 		Output:       accountOutput,
 		Address:      accEd25519Addr,
 		AddressIndex: accEd25519AddrIndex,
 	})
 
-	accountInfo := &AccountData{
+	accountInfo := &mock.AccountData{
 		ID:           accountID,
 		Address:      accountAddress,
 		AddressIndex: accEd25519AddrIndex,
@@ -288,7 +263,7 @@ func (w *DockerWallet) CreateDelegationFromInput(issuerID iotago.AccountID, vali
 	require.NoError(w.Testing, err)
 
 	delegationOutputID := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0)
-	w.AddOutput(delegationOutputID, &OutputData{
+	w.AddOutput(delegationOutputID, &mock.OutputData{
 		ID:           delegationOutputID,
 		Output:       delegationOutput,
 		Address:      input.Address,
@@ -345,14 +320,14 @@ func (w *DockerWallet) CreateFoundryAndNativeTokensFromInput(issuerID iotago.Acc
 	require.NoError(w.Testing, err)
 
 	foundryOutputID := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 1)
-	w.AddOutput(foundryOutputID, &OutputData{
+	w.AddOutput(foundryOutputID, &mock.OutputData{
 		ID:      foundryOutputID,
 		Output:  foundryOutput,
 		Address: issuer.Address,
 	})
 
 	//nolint:forcetypeassert
-	w.AddAccount(issuerID, &AccountData{
+	w.AddAccount(issuerID, &mock.AccountData{
 		ID:           issuerID,
 		Address:      issuer.Address,
 		AddressIndex: issuer.AddressIndex,
@@ -417,14 +392,14 @@ func (w *DockerWallet) TransitionFoundry(issuerID iotago.AccountID, inputID iota
 	require.NoError(w.Testing, err)
 
 	foundryOutputID := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 1)
-	w.AddOutput(foundryOutputID, &OutputData{
+	w.AddOutput(foundryOutputID, &mock.OutputData{
 		ID:      foundryOutputID,
 		Output:  outputFoundry,
 		Address: issuer.Address,
 	})
 
 	//nolint:forcetypeassert
-	w.AddAccount(issuerID, &AccountData{
+	w.AddAccount(issuerID, &mock.AccountData{
 		ID:           issuerID,
 		Address:      issuer.Address,
 		AddressIndex: issuer.AddressIndex,
@@ -461,7 +436,7 @@ func (w *DockerWallet) CreateNFTFromInput(issuerID iotago.AccountID, inputID iot
 	require.NoError(w.Testing, err)
 
 	nftOutputID := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0)
-	w.AddOutput(nftOutputID, &OutputData{
+	w.AddOutput(nftOutputID, &mock.OutputData{
 		ID:           nftOutputID,
 		Output:       nftOutput,
 		Address:      nftAddress,
@@ -471,7 +446,7 @@ func (w *DockerWallet) CreateNFTFromInput(issuerID iotago.AccountID, inputID iot
 	return signedTx
 }
 
-func (w *DockerWallet) CreateBasicOutputFromInput(input *OutputData, issuerAccountID iotago.AccountID) *iotago.SignedTransaction {
+func (w *DockerWallet) CreateBasicOutputFromInput(input *mock.OutputData, issuerAccountID iotago.AccountID) *iotago.SignedTransaction {
 	currentSlot := w.DefaultClient().LatestAPI().TimeProvider().SlotFromTime(time.Now())
 	apiForSlot := w.DefaultClient().APIForSlot(currentSlot)
 	_, ed25519Addr := w.Address()

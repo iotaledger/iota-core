@@ -72,9 +72,9 @@ func NewBlockIssuer(t *testing.T, name string, keyManager *wallet.KeyManager, cl
 		Client:                    client,
 		blockIssuanceResponseUsed: true,
 		AccountData: AccountData{
-			ID:             accountID,
-			AddressIndex:   addressIndex,
-			AccountAddress: accountAddress,
+			ID:           accountID,
+			AddressIndex: addressIndex,
+			Address:      accountAddress,
 		},
 	}, opts)
 }

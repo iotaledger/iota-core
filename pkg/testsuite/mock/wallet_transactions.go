@@ -129,7 +129,7 @@ func (w *Wallet) CreateDelegationFromInput(transactionName string, inputName str
 		}),
 		WithInputs(input),
 		WithOutputs(outputStates...),
-		WithAllotAllManaToAccount(w.currentSlot, w.BlockIssuer.AccountData.ID),
+		WithAllotAllManaToAccount(w.CurrentSlot(), w.BlockIssuer.AccountData.ID),
 	)
 
 	return signedTransaction
@@ -422,7 +422,7 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string
 		}),
 		WithInputs(inputs...),
 		WithOutputs(accountOutput),
-		WithAllotAllManaToAccount(w.currentSlot, implicitAccountID),
+		WithAllotAllManaToAccount(w.CurrentSlot(), implicitAccountID),
 	)
 
 	return signedTransaction
@@ -566,11 +566,11 @@ func (w *Wallet) AllotManaFromBasicOutput(transactionName string, inputName stri
 		Features: iotago.BasicOutputFeatures{},
 	}
 
-	apiForSlot := w.Client.APIForSlot(w.currentSlot)
+	apiForSlot := w.Client.APIForSlot(w.CurrentSlot())
 	manaDecayProvider := apiForSlot.ManaDecayProvider()
 	storageScoreStructure := apiForSlot.StorageScoreStructure()
 
-	totalInputMana := lo.PanicOnErr(vm.TotalManaIn(manaDecayProvider, storageScoreStructure, w.currentSlot, vm.InputSet{input.ID: input.Output}, vm.RewardsInputSet{}))
+	totalInputMana := lo.PanicOnErr(vm.TotalManaIn(manaDecayProvider, storageScoreStructure, w.CurrentSlot(), vm.InputSet{input.ID: input.Output}, vm.RewardsInputSet{}))
 	outputMana := totalInputMana / iotago.Mana(len(accountIDs))
 	remainderMana := totalInputMana - outputMana*iotago.Mana(len(accountIDs))
 
@@ -597,14 +597,14 @@ func (w *Wallet) AllotManaFromBasicOutput(transactionName string, inputName stri
 }
 
 func (w *Wallet) CreateBasicOutputsEquallyFromInput(transactionName string, outputCount int, inputName string) *iotago.SignedTransaction {
-	apiForSlot := w.Client.APIForSlot(w.currentSlot)
+	apiForSlot := w.Client.APIForSlot(w.CurrentSlot())
 	manaDecayProvider := apiForSlot.ManaDecayProvider()
 	storageScoreStructure := apiForSlot.StorageScoreStructure()
 
 	inputState := w.OutputData(inputName)
 	inputAmount := inputState.Output.BaseTokenAmount()
 
-	totalInputMana := lo.PanicOnErr(vm.TotalManaIn(manaDecayProvider, storageScoreStructure, w.currentSlot, vm.InputSet{inputState.ID: inputState.Output}, vm.RewardsInputSet{}))
+	totalInputMana := lo.PanicOnErr(vm.TotalManaIn(manaDecayProvider, storageScoreStructure, w.CurrentSlot(), vm.InputSet{inputState.ID: inputState.Output}, vm.RewardsInputSet{}))
 
 	manaAmount := totalInputMana / iotago.Mana(outputCount)
 	remainderMana := totalInputMana - manaAmount*iotago.Mana(outputCount)
@@ -641,14 +641,14 @@ func (w *Wallet) CreateBasicOutputsEquallyFromInput(transactionName string, outp
 
 func (w *Wallet) CreateBasicOutputsAtAddressesFromInput(transactionName string, addressIndexes []uint32, inputName string) *iotago.SignedTransaction {
 	outputCount := len(addressIndexes)
-	apiForSlot := w.Client.APIForSlot(w.currentSlot)
+	apiForSlot := w.Client.APIForSlot(w.CurrentSlot())
 	manaDecayProvider := apiForSlot.ManaDecayProvider()
 	storageScoreStructure := apiForSlot.StorageScoreStructure()
 
 	inputState := w.OutputData(inputName)
 	inputAmount := inputState.Output.BaseTokenAmount()
 
-	totalInputMana := lo.PanicOnErr(vm.TotalManaIn(manaDecayProvider, storageScoreStructure, w.currentSlot, vm.InputSet{inputState.ID: inputState.Output}, vm.RewardsInputSet{}))
+	totalInputMana := lo.PanicOnErr(vm.TotalManaIn(manaDecayProvider, storageScoreStructure, w.CurrentSlot(), vm.InputSet{inputState.ID: inputState.Output}, vm.RewardsInputSet{}))
 
 	manaAmount := totalInputMana / iotago.Mana(outputCount)
 	remainderMana := totalInputMana - manaAmount*iotago.Mana(outputCount)
@@ -684,7 +684,7 @@ func (w *Wallet) CreateBasicOutputsAtAddressesFromInput(transactionName string, 
 }
 
 func (w *Wallet) CreateBasicOutputsEquallyFromInputs(transactionName string, inputNames []string, inputAddressIndexes []uint32, outputsCount int) *iotago.SignedTransaction {
-	apiForSlot := w.Client.APIForSlot(w.currentSlot)
+	apiForSlot := w.Client.APIForSlot(w.CurrentSlot())
 	manaDecayProvider := apiForSlot.ManaDecayProvider()
 	storageScoreStructure := apiForSlot.StorageScoreStructure()
 
@@ -696,7 +696,7 @@ func (w *Wallet) CreateBasicOutputsEquallyFromInputs(transactionName string, inp
 		inputStates = append(inputStates, inputState)
 		inputAmount := inputState.Output.BaseTokenAmount()
 
-		totalInputMana += lo.PanicOnErr(vm.TotalManaIn(manaDecayProvider, storageScoreStructure, w.currentSlot, vm.InputSet{inputState.ID: inputState.Output}, vm.RewardsInputSet{}))
+		totalInputMana += lo.PanicOnErr(vm.TotalManaIn(manaDecayProvider, storageScoreStructure, w.CurrentSlot(), vm.InputSet{inputState.ID: inputState.Output}, vm.RewardsInputSet{}))
 		totalInputBaseToken += inputAmount
 	}
 
@@ -876,7 +876,7 @@ func (w *Wallet) ClaimValidatorRewards(transactionName string, inputName string)
 		panic(fmt.Sprintf("output with alias %s is not *iotago.AccountOutput", inputName))
 	}
 
-	apiForSlot := w.Client.APIForSlot(w.currentSlot)
+	apiForSlot := w.Client.APIForSlot(w.CurrentSlot())
 
 	rewardResp := w.Client.Rewards(context.Background(), input.ID)
 
@@ -954,7 +954,7 @@ func (w *Wallet) AllotManaFromInputs(transactionName string, allotments iotago.A
 func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string) *iotago.SignedTransaction {
 	input := w.OutputData(inputName)
 
-	apiForSlot := w.Client.APIForSlot(w.currentSlot)
+	apiForSlot := w.Client.APIForSlot(w.CurrentSlot())
 	potentialMana := w.PotentialMana(apiForSlot, input)
 
 	rewardsResp := w.Client.Rewards(context.Background(), input.ID)
@@ -988,12 +988,12 @@ func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string)
 
 // Computes the Potential Mana that the output generates until the current slot.
 func (w *Wallet) PotentialMana(api iotago.API, input *OutputData) iotago.Mana {
-	return lo.PanicOnErr(iotago.PotentialMana(api.ManaDecayProvider(), api.StorageScoreStructure(), input.Output, input.ID.CreationSlot(), w.currentSlot))
+	return lo.PanicOnErr(iotago.PotentialMana(api.ManaDecayProvider(), api.StorageScoreStructure(), input.Output, input.ID.CreationSlot(), w.CurrentSlot()))
 }
 
 // Computes the decay on stored mana that the output holds until the current slot.
 func (w *Wallet) StoredMana(api iotago.API, input *OutputData) iotago.Mana {
-	return lo.PanicOnErr(api.ManaDecayProvider().DecayManaBySlots(input.Output.StoredMana(), input.ID.CreationSlot(), w.currentSlot))
+	return lo.PanicOnErr(api.ManaDecayProvider().DecayManaBySlots(input.Output.StoredMana(), input.ID.CreationSlot(), w.CurrentSlot()))
 }
 
 func (w *Wallet) AllotManaToWallet(transactionName string, inputName string, recipientWallet *Wallet) *iotago.SignedTransaction {
@@ -1003,7 +1003,7 @@ func (w *Wallet) AllotManaToWallet(transactionName string, inputName string, rec
 		transactionName,
 		[]uint32{0},
 		WithInputs(input),
-		WithAllotAllManaToAccount(w.currentSlot, recipientWallet.BlockIssuer.AccountData.ID),
+		WithAllotAllManaToAccount(w.CurrentSlot(), recipientWallet.BlockIssuer.AccountData.ID),
 	)
 
 	return signedTransaction
@@ -1021,7 +1021,7 @@ func (w *Wallet) CreateNFTFromInput(transactionName string, inputName string, op
 		[]uint32{0},
 		WithInputs(input),
 		WithOutputs(nftOutput),
-		WithAllotAllManaToAccount(w.currentSlot, w.BlockIssuer.AccountData.ID),
+		WithAllotAllManaToAccount(w.CurrentSlot(), w.BlockIssuer.AccountData.ID),
 	)
 }
 
@@ -1065,7 +1065,7 @@ func (w *Wallet) CreateNativeTokenFromInput(transactionName string, inputName st
 		WithCommitmentInput(&iotago.CommitmentInput{
 			CommitmentID: w.GetNewBlockIssuanceResponse().LatestCommitment.MustID(),
 		}),
-		WithAllotAllManaToAccount(w.currentSlot, accID),
+		WithAllotAllManaToAccount(w.CurrentSlot(), accID),
 	)
 }
 
@@ -1088,7 +1088,7 @@ func (w *Wallet) TransitionNFTWithTransactionOpts(transactionName string, inputN
 		append(opts,
 			WithInputs(input),
 			WithOutputs(nftOutput),
-			WithAllotAllManaToAccount(w.currentSlot, w.BlockIssuer.AccountData.ID))...,
+			WithAllotAllManaToAccount(w.CurrentSlot(), w.BlockIssuer.AccountData.ID))...,
 	)
 }
 
@@ -1099,7 +1099,7 @@ func (w *Wallet) createSignedTransactionWithOptions(transactionName string, addr
 
 	txBuilder := builder.NewTransactionBuilder(currentAPI, addressSigner)
 	// Use the wallet's current slot as creation slot by default.
-	txBuilder.SetCreationSlot(w.currentSlot)
+	txBuilder.SetCreationSlot(w.CurrentSlot())
 	// Set the transaction capabilities to be able to do anything.
 	txBuilder.WithTransactionCapabilities(iotago.TransactionCapabilitiesBitMaskWithCapabilities(iotago.WithTransactionCanDoAnything()))
 	// Always add a random payload to randomize transaction ID.
