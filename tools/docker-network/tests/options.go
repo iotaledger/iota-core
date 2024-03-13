@@ -16,7 +16,7 @@ var DefaultProtocolParametersOptions = []options.Option[iotago.V3ProtocolParamet
 	iotago.WithNetworkOptions("docker", iotago.PrefixTestnet),
 }
 
-// DefaultSnapshotOptions are the default snapshot options for the docker network.
+// DefaultAccountOptions are the default snapshot options for the docker network.
 func DefaultAccountOptions(protocolParams *iotago.V3ProtocolParameters) []options.Option[snapshotcreator.Options] {
 	return []options.Option[snapshotcreator.Options]{
 		snapshotcreator.WithAccounts(presets.AccountsDockerFunc(protocolParams)...),
@@ -60,7 +60,6 @@ func WithTick(tick time.Duration) options.Option[DockerTestFramework] {
 	}
 }
 
-// ///// Account Output options
 func WithStakingFeature(amount iotago.BaseToken, fixedCost iotago.Mana, startEpoch iotago.EpochIndex, optEndEpoch ...iotago.EpochIndex) options.Option[builder.AccountOutputBuilder] {
 	return func(accountBuilder *builder.AccountOutputBuilder) {
 		accountBuilder.Staking(amount, fixedCost, startEpoch, optEndEpoch...)

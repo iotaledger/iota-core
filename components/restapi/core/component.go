@@ -200,7 +200,7 @@ func configure() error {
 		}
 
 		return responseByHeader(c, resp)
-	})
+	}, checkNodeSynced())
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointOutputWithMetadata), func(c echo.Context) error {
 		resp, err := outputWithMetadataFromOutputID(c)
@@ -209,7 +209,7 @@ func configure() error {
 		}
 
 		return responseByHeader(c, resp)
-	})
+	}, checkNodeSynced())
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointTransactionsIncludedBlock), func(c echo.Context) error {
 		block, err := blockFromTransactionID(c)

@@ -11,7 +11,7 @@ import (
 )
 
 func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error) {
-	commitmentID, err := httpserver.ParseCommitmentIDQueryParam(c, api.ParameterCommitmentID)
+	queryCommitmentID, err := httpserver.ParseCommitmentIDQueryParam(c, api.ParameterCommitmentID)
 	if err != nil {
 		return nil, err
 	}
@@ -50,10 +50,6 @@ func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 		}
 	}
 
-	// do not respond to really old requests
-	if requestedSlot+iotago.SlotIndex(restapi.ParamsRestAPI.MaxRequestedSlotAge) < latestCommittedSlot {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "request is too old, request started at %d, latest committed slot index is %d", requestedSlot, latestCommittedSlot)
-	}
 	slotRange := uint32(requestedSlot) / restapi.ParamsRestAPI.RequestsMemoryCacheGranularity
 
 	return deps.RequestHandler.Validators(slotRange, cursorIndex, pageSize)
@@ -75,6 +71,7 @@ func validatorByAccountAddress(c echo.Context) (*api.ValidatorResponse, error) {
 }
 
 func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
+	var err error
 	outputID, err := httpserver.ParseOutputIDParam(c, api.ParameterOutputID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(api.ParameterOutputID))
@@ -82,8 +79,7 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 
 	var slot []iotago.SlotIndex
 	if len(c.QueryParam(api.ParameterSlot)) > 0 {
-		var err error
-		slotParam, err := httpserver.ParseSlotQueryParam(c, api.ParameterSlot)
+		slot, err = httpserver.ParseSlotQueryParam(c, api.ParameterSlot)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to parse slot index %s", c.Param(api.ParameterSlot))
 		}
@@ -95,6 +91,7 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 
 func selectedCommittee(c echo.Context) (*api.CommitteeResponse, error) {
 	var epoch iotago.EpochIndex
+
 	if len(c.QueryParam(api.ParameterEpoch)) == 0 {
 		// by default we return current epoch
 		epoch = deps.RequestHandler.CommittedAPI().TimeProvider().CurrentEpoch()
@@ -103,6 +100,10 @@ func selectedCommittee(c echo.Context) (*api.CommitteeResponse, error) {
 		epoch, err = httpserver.ParseEpochQueryParam(c, api.ParameterEpoch)
 		if err != nil {
 			return nil, err
+		}
+		currentEpoch := deps.RequestHandler.CommittedAPI().TimeProvider().CurrentEpoch()
+		if epoch > currentEpoch {
+			return nil, ierrors.Wrapf(echo.ErrBadRequest, "provided epoch %d is from the future, current epoch: %d", epoch, currentEpoch)
 		}
 	}
 
