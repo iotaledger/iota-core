@@ -92,21 +92,13 @@ func (t *TipSelection) Construct(tipManager tipmanager.TipManager, spendDAG spen
 	t.rootBlock = rootBlockRetriever
 	t.livenessThreshold = livenessThresholdFunc
 
-	t.ShutdownEvent().OnTrigger(func() {
-		t.StoppedEvent().Trigger()
-	})
-
-	t.ConstructedEvent().Trigger()
-
 	t.acceptanceTime.OnUpdate(func(_ time.Time, acceptanceTime time.Time) {
 		t.triggerLivenessThreshold(acceptanceTime)
 	})
 
 	tipManager.OnBlockAdded(t.classifyTip)
 
-	t.InitializedEvent().Trigger()
-
-	return t
+	return module.InitSimpleLifecycle(t)
 }
 
 // SelectTips selects the tips that should be used as references for a new block.
