@@ -14,7 +14,7 @@ import (
 func (r *RequestHandler) BlockByID(blockID iotago.BlockID) (*iotago.Block, error) {
 	block, exists := r.protocol.Engines.Main.Get().Block(blockID)
 	if !exists {
-		return nil, ierrors.Wrapf(echo.ErrNotFound, "block not found: %s", blockID.ToHex())
+		return nil, ierrors.WithMessagef(echo.ErrNotFound, "block %s not found", blockID.ToHex())
 	}
 
 	return block.ProtocolBlock(), nil
@@ -23,7 +23,7 @@ func (r *RequestHandler) BlockByID(blockID iotago.BlockID) (*iotago.Block, error
 func (r *RequestHandler) BlockMetadataByBlockID(blockID iotago.BlockID) (*api.BlockMetadataResponse, error) {
 	blockMetadata, err := r.protocol.Engines.Main.Get().BlockRetainer.BlockMetadata(blockID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get block metadata %s: %s", blockID.ToHex(), err)
+		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to get block metadata %s: %w", blockID.ToHex(), err)
 	}
 
 	return blockMetadata, nil
@@ -41,7 +41,7 @@ func (r *RequestHandler) BlockMetadataByID(c echo.Context) (*api.BlockMetadataRe
 func (r *RequestHandler) BlockWithMetadataByID(blockID iotago.BlockID) (*api.BlockWithMetadataResponse, error) {
 	block, exists := r.protocol.Engines.Main.Get().Block(blockID)
 	if !exists {
-		return nil, ierrors.Wrapf(echo.ErrNotFound, "no transaction found for block ID %s", blockID.ToHex())
+		return nil, ierrors.WithMessagef(echo.ErrNotFound, "no transaction found for block ID %s", blockID.ToHex())
 	}
 
 	blockMetadata, err := r.BlockMetadataByBlockID(blockID)
@@ -58,7 +58,7 @@ func (r *RequestHandler) BlockWithMetadataByID(blockID iotago.BlockID) (*api.Blo
 func (r *RequestHandler) BlockIssuance() (*api.IssuanceBlockHeaderResponse, error) {
 	references := r.protocol.Engines.Main.Get().TipSelection.SelectTips(iotago.BasicBlockMaxParents)
 	if len(references[iotago.StrongParentType]) == 0 {
-		return nil, ierrors.Wrap(echo.ErrServiceUnavailable, "no strong parents available")
+		return nil, ierrors.WithMessage(echo.ErrServiceUnavailable, "no strong parents available")
 	}
 
 	// get the latest parent block issuing time
@@ -67,7 +67,7 @@ func (r *RequestHandler) BlockIssuance() (*api.IssuanceBlockHeaderResponse, erro
 		for _, blockID := range references[parentType] {
 			block, exists := r.protocol.Engines.Main.Get().Block(blockID)
 			if !exists {
-				return nil, ierrors.Wrapf(echo.ErrNotFound, "no block found for parent, block ID: %s", blockID.ToHex())
+				return nil, ierrors.WithMessagef(echo.ErrNotFound, "failed to retrieve parents: no block found for block ID %s", blockID.ToHex())
 			}
 
 			if latestParentBlockIssuingTime.Before(block.ProtocolBlock().Header.IssuingTime) {
