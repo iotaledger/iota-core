@@ -305,6 +305,7 @@ func (e *EventAPIDockerTestFramework) AssertOutputsWithMetadataByUnlockCondition
 					return true
 				}
 			}
+
 			return false
 		})
 	}()
@@ -318,7 +319,8 @@ func (e *EventAPIDockerTestFramework) AssertDelegationOutput(ctx context.Context
 		defer subInfo.Close()
 		e.assertOutputMetadataTopics(ctx, "AssertDelegationOutput", outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
 			if resp.Output.Type() == iotago.OutputDelegation {
-				o := resp.Output.(*iotago.DelegationOutput)
+				o, ok := resp.Output.(*iotago.DelegationOutput)
+				require.True(e.Testing, ok)
 				actualDelegationID := o.DelegationID
 				if actualDelegationID.Empty() {
 					actualDelegationID = iotago.DelegationIDFromOutputID(resp.Metadata.OutputID)
@@ -326,6 +328,7 @@ func (e *EventAPIDockerTestFramework) AssertDelegationOutput(ctx context.Context
 
 				return delegationId.Matches(actualDelegationID)
 			}
+
 			return false
 		})
 	}()
@@ -339,9 +342,12 @@ func (e *EventAPIDockerTestFramework) AssertFoundryOutput(ctx context.Context, e
 		defer subInfo.Close()
 		e.assertOutputMetadataTopics(ctx, "AssertFoundryOutput", outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
 			if resp.Output.Type() == iotago.OutputFoundry {
-				o := resp.Output.(*iotago.FoundryOutput)
+				o, ok := resp.Output.(*iotago.FoundryOutput)
+				require.True(e.Testing, ok)
+
 				return foundryId.Matches(o.MustFoundryID())
 			}
+
 			return false
 		})
 	}()
@@ -355,13 +361,16 @@ func (e *EventAPIDockerTestFramework) AssertAccountOutput(ctx context.Context, e
 		defer subInfo.Close()
 		e.assertOutputMetadataTopics(ctx, "AssertAccountOutput", outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
 			if resp.Output.Type() == iotago.OutputAccount {
-				o := resp.Output.(*iotago.AccountOutput)
+				o, ok := resp.Output.(*iotago.AccountOutput)
+				require.True(e.Testing, ok)
 				actualAccountID := o.AccountID
 				if actualAccountID.Empty() {
 					actualAccountID = iotago.AccountIDFromOutputID(resp.Metadata.OutputID)
 				}
-				return accountId.Matches(o.AccountID)
+
+				return accountId.Matches(actualAccountID)
 			}
+
 			return false
 		})
 	}()
@@ -375,13 +384,16 @@ func (e *EventAPIDockerTestFramework) AssertAnchorOutput(ctx context.Context, ev
 		defer subInfo.Close()
 		e.assertOutputMetadataTopics(ctx, "AssertNFTOutput", outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
 			if resp.Output.Type() == iotago.OutputAnchor {
-				o := resp.Output.(*iotago.AnchorOutput)
+				o, ok := resp.Output.(*iotago.AnchorOutput)
+				require.True(e.Testing, ok)
 				actualAnchorID := o.AnchorID
 				if actualAnchorID.Empty() {
 					actualAnchorID = iotago.AnchorIDFromOutputID(resp.Metadata.OutputID)
 				}
-				return anchorId.Matches(o.AnchorID)
+
+				return anchorId.Matches(actualAnchorID)
 			}
+
 			return false
 		})
 	}()
@@ -400,8 +412,10 @@ func (e *EventAPIDockerTestFramework) AssertNFTOutput(ctx context.Context, event
 				if actualNFTID.Empty() {
 					actualNFTID = iotago.NFTIDFromOutputID(resp.Metadata.OutputID)
 				}
+
 				return nftId.Matches(actualNFTID)
 			}
+
 			return false
 		})
 	}()
@@ -426,7 +440,8 @@ func (e *EventAPIDockerTestFramework) assertCommitmentsTopics(ctx context.Contex
 				return
 			}
 		case <-ctx.Done():
-			fmt.Println("topic", callerName, "does not get expected commitments, recieved slots:", slots)
+			fmt.Println("topic", callerName, "does not get expected commitments, received slots:", slots)
+
 			return
 		}
 	}
@@ -454,6 +469,7 @@ func (e *EventAPIDockerTestFramework) assertBlocksTopics(ctx context.Context, ca
 			}
 		case <-ctx.Done():
 			fmt.Println("topic", callerName, "does not get expected Blocks, received blocks:", blkIDs)
+
 			return
 		}
 	}
@@ -482,6 +498,7 @@ func (e *EventAPIDockerTestFramework) assertBlockMetadataTopics(ctx context.Cont
 			}
 		case <-ctx.Done():
 			fmt.Println("topic", callerName, "does not get expected BlockMetadata, received blocks:", blkIDs)
+
 			return
 		}
 	}
@@ -500,6 +517,7 @@ func (e *EventAPIDockerTestFramework) assertOutputMetadataTopics(ctx context.Con
 			}
 		case <-ctx.Done():
 			fmt.Println("topic", callerName, "does not get expected outputs")
+
 			return
 		}
 	}

@@ -65,12 +65,12 @@ func test_Commitments(t *testing.T, e *EventAPIDockerTestFramework) {
 	// prepare the expected commitments to be received
 	expectedLatestSlots := make([]iotago.SlotIndex, 0)
 	for i := infoResp.Status.LatestCommitmentID.Slot() + 2; i < infoResp.Status.LatestCommitmentID.Slot()+6; i++ {
-		expectedLatestSlots = append(expectedLatestSlots, iotago.SlotIndex(i))
+		expectedLatestSlots = append(expectedLatestSlots, i)
 	}
 
 	expectedFinalizedSlots := make([]iotago.SlotIndex, 0)
 	for i := infoResp.Status.LatestFinalizedSlot + 2; i < infoResp.Status.LatestFinalizedSlot+6; i++ {
-		expectedFinalizedSlots = append(expectedFinalizedSlots, iotago.SlotIndex(i))
+		expectedFinalizedSlots = append(expectedFinalizedSlots, i)
 	}
 
 	assertions := []func(){
@@ -128,7 +128,7 @@ func test_BasicTaggedDataBlocks(t *testing.T, e *EventAPIDockerTestFramework) {
 	account := e.dockerFramework.CreateAccount()
 
 	// prepare data blocks to send
-	expectedBlocks := make(map[string]*iotago.Block, 0)
+	expectedBlocks := make(map[string]*iotago.Block)
 	for i := 0; i < 10; i++ {
 		blk := e.dockerFramework.CreateTaggedDataBlock(account.ID, []byte("tag"))
 		expectedBlocks[blk.MustID().ToHex()] = blk
@@ -176,7 +176,7 @@ func test_DelegationTransactionBlocks(t *testing.T, e *EventAPIDockerTestFramewo
 	fundsOutputID := e.dockerFramework.RequestFaucetFunds(ctx, iotago.AddressEd25519)
 
 	// prepare data blocks to send
-	delegationId, outputId, blk := e.dockerFramework.CreateDelegationBlockFromInput(account.ID, e.dockerFramework.Node("V2"), fundsOutputID)
+	delegationId, outputId, blk := e.dockerFramework.CreateDelegationBlockFromInput(account.ID, e.dockerFramework.Node("V2").AccountAddress(t), fundsOutputID)
 	expectedBlocks := map[string]*iotago.Block{
 		blk.MustID().ToHex(): blk,
 	}
@@ -259,6 +259,7 @@ func test_AccountTransactionBlocks(t *testing.T, e *EventAPIDockerTestFramework)
 			assertion()
 		}
 
+		// TODO test transactioMetadataTopics
 		// e.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID())
 		// e.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID())
 
