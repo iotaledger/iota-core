@@ -8,6 +8,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/gommon/bytes"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"go.uber.org/dig"
@@ -88,7 +89,12 @@ func provide(c *dig.Container) error {
 	}
 
 	if err := c.Provide(func(deps requestHandlerDeps) *requesthandler.RequestHandler {
-		return requesthandler.New(deps.Protocol)
+		maxCacheSizeBytes, err := bytes.Parse(ParamsRestAPI.MaxCacheSize)
+		if err != nil {
+			Component.LogPanicf("parameter %s invalid", Component.App().Config().GetParameterPath(&(ParamsRestAPI.MaxCacheSize)))
+		}
+
+		return requesthandler.New(deps.Protocol, requesthandler.WithCacheMaxSizeOptions(int(maxCacheSizeBytes)))
 	}); err != nil {
 		Component.LogPanic(err.Error())
 	}
