@@ -257,7 +257,7 @@ func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []by
 
 	attestationsCount, err := stream.PeekSize(reader, serializer.SeriLengthPrefixTypeAsUint32)
 	if err != nil {
-		p.Events.Error.Trigger(ierrors.Errorf("failed peek attestations count"), id)
+		p.Events.Error.Trigger(ierrors.Errorf("failed to peek attestations count"), id)
 
 		return
 	}
