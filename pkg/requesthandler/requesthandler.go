@@ -21,7 +21,7 @@ func New(p *protocol.Protocol, opts ...options.Option[RequestHandler]) *RequestH
 	return options.Apply(&RequestHandler{
 		workerPool:       p.Workers.CreatePool("BlockHandler"),
 		protocol:         p,
-		optsCacheMaxSize: 2 << 20, // 2MB
+		optsCacheMaxSize: 50 << 20, // 50MB
 	}, opts, func(r *RequestHandler) {
 		r.cache = cache.NewCache(r.optsCacheMaxSize)
 	})

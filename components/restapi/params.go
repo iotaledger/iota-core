@@ -17,7 +17,7 @@ type ParametersRestAPI struct {
 	// MaxPageSize defines the maximum number of results per page.
 	MaxPageSize uint32 `default:"100" usage:"the maximum number of results per page"`
 	// MaxCacheSize defines the maximum size of cache for results.
-	MaxCacheSize string `default:"2MB" usage:"the maximum size of cache for results"`
+	MaxCacheSize string `default:"50MB" usage:"the maximum size of cache for results"`
 
 	JWTAuth struct {
 		// salt used inside the JWT tokens for the REST API. Change this to a different value to invalidate JWT tokens not matching this new value
