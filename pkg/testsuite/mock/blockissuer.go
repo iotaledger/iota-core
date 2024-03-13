@@ -515,7 +515,7 @@ func (i *BlockIssuer) getReferencesWithRetry(ctx context.Context, parentsCount i
 		case <-timeout.C:
 			return nil, ierrors.New("timeout while trying to select tips and determine references")
 		case <-ctx.Done():
-			return nil, ierrors.Errorf("context canceled whilst trying to select tips and determine references: %w", ctx.Err())
+			return nil, ierrors.Wrap(ctx.Err(), "context canceled whilst trying to select tips and determine references")
 		}
 	}
 }

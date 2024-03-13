@@ -394,6 +394,15 @@ func Test_CoreAPI(t *testing.T) {
 				require.EqualValues(t, 4, len(resp.Committee))
 			},
 		},
+		{
+			name: "Test_CommitteeWithEpoch",
+			testFunc: func(t *testing.T, nodeAlias string) {
+				resp, err := d.wallet.Clients[nodeAlias].Committee(context.Background(), 0)
+				require.NoError(t, err)
+				require.Equal(t, iotago.EpochIndex(0), resp.Epoch)
+				require.Equal(t, 4, len(resp.Committee))
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -595,6 +604,15 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 				accountAddress := tpkg.RandAccountAddress()
 				commitmentID := tpkg.RandCommitmentID()
 				resp, err := d.wallet.Clients[nodeAlias].Congestion(context.Background(), accountAddress, 0, commitmentID)
+				require.Error(t, err)
+				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.Nil(t, resp)
+			},
+		},
+		{
+			name: "Test_Committee_Failure",
+			testFunc: func(t *testing.T, nodeAlias string) {
+				resp, err := d.wallet.Clients[nodeAlias].Committee(context.Background(), 4)
 				require.Error(t, err)
 				require.True(t, isStatusCode(err, http.StatusBadRequest))
 				require.Nil(t, resp)
