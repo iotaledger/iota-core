@@ -10,8 +10,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"sort"
-	"testing"
+	"strconv"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -95,7 +96,7 @@ func (d *DockerTestFramework) AssertIndexerFoundry(foundryID iotago.FoundryID) {
 func (d *DockerTestFramework) AssertValidatorExists(accountAddr *iotago.AccountAddress) {
 	d.Eventually(func() error {
 		for _, node := range d.Nodes() {
-			_, err := d.wallet.Clients[node.Name].StakingAccount(context.TODO(), accountAddr)
+			_, err := d.wallet.Clients[node.Name].Validator(context.TODO(), accountAddr)
 			if err != nil {
 				return err
 			}
@@ -112,12 +113,12 @@ func (d *DockerTestFramework) AssertCommittee(expectedEpoch iotago.EpochIndex, e
 	sort.Strings(expectedCommitteeMember)
 
 	status := d.NodeStatus("V1")
-	api := d.wallet.DefaultClient().CommittedAPI()
-	expectedSlotStart := api.TimeProvider().EpochStart(expectedEpoch)
+	testAPI := d.wallet.DefaultClient().CommittedAPI()
+	expectedSlotStart := testAPI.TimeProvider().EpochStart(expectedEpoch)
 	require.Greater(d.Testing, expectedSlotStart, status.LatestAcceptedBlockSlot)
 
 	slotToWait := expectedSlotStart - status.LatestAcceptedBlockSlot
-	secToWait := time.Duration(slotToWait) * time.Duration(api.ProtocolParameters().SlotDurationInSeconds()) * time.Second
+	secToWait := time.Duration(slotToWait) * time.Duration(testAPI.ProtocolParameters().SlotDurationInSeconds()) * time.Second
 	fmt.Println("Wait for ", secToWait, "until expected epoch: ", expectedEpoch)
 	time.Sleep(secToWait)
 
@@ -227,6 +228,17 @@ func (d *DockerTestFramework) AwaitCommitment(targetSlot iotago.SlotIndex) {
 	}
 }
 
+func (d *DockerTestFramework) AwaitFinalization(targetSlot iotago.SlotIndex) {
+	d.Eventually(func() error {
+		currentFinalisedSlot := d.NodeStatus("V1").LatestFinalizedSlot
+		if targetSlot > currentFinalisedSlot {
+			return ierrors.Errorf("finalized slot %d is not reached yet", targetSlot)
+		}
+
+		return nil
+	})
+}
+
 func (d *DockerTestFramework) AwaitAddressUnspentOutputAccepted(ctx context.Context, addr iotago.Address) (outputID iotago.OutputID, output iotago.Output, err error) {
 	indexerClt, err := d.wallet.DefaultClient().Indexer(ctx)
 	require.NoError(d.Testing, err)
@@ -305,7 +317,7 @@ func createLogDirectory(testName string) string {
 	return dir
 }
 
-func AwaitEventAPITopics(t *testing.T, duration time.Duration, cancleFunc context.CancelFunc, receiveChan chan struct{}, numOfTopics int) error {
+func AwaitEventAPITopics(duration time.Duration, cancleFunc context.CancelFunc, receiveChan chan struct{}, numOfTopics int) error {
 	counter := 0
 	timer := time.NewTimer(duration)
 	defer timer.Stop()
@@ -334,5 +346,33 @@ func getDelegationStartEpoch(api iotago.API, commitmentSlot iotago.SlotIndex) io
 	if pastBoundedSlot <= registrationSlot {
 		return pastBoundedEpoch + 1
 	}
+
 	return pastBoundedEpoch + 2
+}
+
+func isStatusCode(err error, status int) bool {
+	if err == nil {
+		return false
+	}
+	code, err := extractStatusCode(err.Error())
+	if err != nil {
+		return false
+	}
+
+	return code == status
+}
+
+func extractStatusCode(errorMessage string) (int, error) {
+	re := regexp.MustCompile(`code=(\d+)`)
+	matches := re.FindStringSubmatch(errorMessage)
+	if len(matches) != 2 {
+		return 0, ierrors.Errorf("unable to extract status code from error message")
+	}
+
+	statusCode, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return 0, err
+	}
+
+	return statusCode, nil
 }
