@@ -274,7 +274,7 @@ func (t *TestSuite) delegatorReward(epoch iotago.EpochIndex, profitMargin, poolR
 	if poolRewardWithFixedCost >= fixedCost {
 		poolRewards = poolRewardWithFixedCost - fixedCost
 	}
-	unDecayedEpochRewards := (((profitMarginComplement * poolRewards) >> profitMarginExponent) * delegatedAmount) / poolStake
+	unDecayedEpochRewards := (((profitMarginComplement * poolRewards) >> profitMarginExponent) / poolStake) * delegatedAmount
 
 	decayProvider := t.api.ManaDecayProvider()
 	decayedEpochRewards, err := decayProvider.DecayManaByEpochs(iotago.Mana(unDecayedEpochRewards), epoch, epoch)
