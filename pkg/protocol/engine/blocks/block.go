@@ -2,6 +2,7 @@ package blocks
 
 import (
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/iotaledger/hive.go/ds"
@@ -12,10 +13,15 @@ import (
 	"github.com/iotaledger/hive.go/stringify"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Block struct {
+	AllParentsBooked          reactive.Event
+	AllDependenciesReady      reactive.Event
+	SignedTransactionMetadata reactive.Variable[mempool.SignedTransactionMetadata]
+
 	// BlockDAG block
 	missing             bool
 	missingBlockID      iotago.BlockID
@@ -77,6 +83,10 @@ func (r *rootBlock) String() string {
 // NewBlock creates a new Block with the given options.
 func NewBlock(modelBlock *model.Block) *Block {
 	return &Block{
+		AllParentsBooked:          reactive.NewEvent(),
+		AllDependenciesReady:      reactive.NewEvent(),
+		SignedTransactionMetadata: reactive.NewVariable[mempool.SignedTransactionMetadata](),
+
 		witnesses:             ds.NewSet[account.SeatIndex](),
 		spenderIDs:            ds.NewSet[iotago.TransactionID](),
 		payloadSpenderIDs:     ds.NewSet[iotago.TransactionID](),
@@ -95,6 +105,10 @@ func NewBlock(modelBlock *model.Block) *Block {
 
 func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issuingTime time.Time) *Block {
 	b := &Block{
+		AllParentsBooked:          reactive.NewEvent(),
+		AllDependenciesReady:      reactive.NewEvent(),
+		SignedTransactionMetadata: reactive.NewVariable[mempool.SignedTransactionMetadata](),
+
 		witnesses:             ds.NewSet[account.SeatIndex](),
 		spenderIDs:            ds.NewSet[iotago.TransactionID](),
 		payloadSpenderIDs:     ds.NewSet[iotago.TransactionID](),
@@ -117,6 +131,8 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 	}
 
 	// This should be true since we commit and evict on acceptance.
+	b.AllParentsBooked.Set(true)
+	b.AllDependenciesReady.Set(true)
 	b.solid.Set(true)
 	b.booked.Set(true)
 	b.weightPropagated.Set(true)
@@ -128,6 +144,10 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 
 func NewMissingBlock(blockID iotago.BlockID) *Block {
 	return &Block{
+		AllParentsBooked:          reactive.NewEvent(),
+		AllDependenciesReady:      reactive.NewEvent(),
+		SignedTransactionMetadata: reactive.NewVariable[mempool.SignedTransactionMetadata](),
+
 		missing:               true,
 		missingBlockID:        blockID,
 		witnesses:             ds.NewSet[account.SeatIndex](),
@@ -689,4 +709,25 @@ func (b *Block) ModelBlock() *model.Block {
 
 func (b *Block) WorkScore() iotago.WorkScore {
 	return b.workScore
+}
+
+func (b *Block) WaitForUnreferencedOutputs(unreferencedOutputs ds.Set[mempool.StateMetadata]) {
+	var unreferencedOutputCount atomic.Int32
+	unreferencedOutputCount.Store(int32(unreferencedOutputs.Size()))
+
+	unreferencedOutputs.Range(func(unreferencedOutput mempool.StateMetadata) {
+		dependencyReady := false
+
+		unreferencedOutput.OnAccepted(func() {
+			unreferencedOutput.OnEarliestIncludedAttachmentUpdated(func(_, earliestIncludedAttachment iotago.BlockID) {
+				if !dependencyReady && earliestIncludedAttachment.Slot() <= b.ID().Slot() {
+					dependencyReady = true
+
+					if unreferencedOutputCount.Add(-1) == 0 {
+						b.AllDependenciesReady.Trigger()
+					}
+				}
+			})
+		})
+	})
 }

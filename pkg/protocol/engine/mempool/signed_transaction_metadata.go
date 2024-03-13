@@ -11,6 +11,8 @@ type SignedTransactionMetadata interface {
 
 	OnSignaturesInvalid(func(err error)) (unsubscribe func())
 
+	SignaturesInvalid() error
+
 	TransactionMetadata() TransactionMetadata
 
 	Attachments() []iotago.BlockID

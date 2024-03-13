@@ -15,12 +15,13 @@ type StateMetadata struct {
 	state mempool.State
 
 	// lifecycle
-	spenderCount       uint64
-	spent              *promise.Event
-	doubleSpent        *promise.Event
-	spendAccepted      reactive.Variable[*TransactionMetadata]
-	spendCommitted     reactive.Variable[*TransactionMetadata]
-	allSpendersRemoved *event.Event
+	spenderCount                    uint64
+	spent                           *promise.Event
+	doubleSpent                     *promise.Event
+	spendAccepted                   reactive.Variable[*TransactionMetadata]
+	spendCommitted                  reactive.Variable[*TransactionMetadata]
+	earliestIncludedValidAttachment reactive.Variable[iotago.BlockID]
+	allSpendersRemoved              *event.Event
 
 	spenderIDs reactive.DerivedSet[iotago.TransactionID]
 
@@ -31,11 +32,12 @@ func NewStateMetadata(state mempool.State, optSource ...*TransactionMetadata) *S
 	return (&StateMetadata{
 		state: state,
 
-		spent:              promise.NewEvent(),
-		doubleSpent:        promise.NewEvent(),
-		spendAccepted:      reactive.NewVariable[*TransactionMetadata](),
-		spendCommitted:     reactive.NewVariable[*TransactionMetadata](),
-		allSpendersRemoved: event.New(),
+		spent:                           promise.NewEvent(),
+		doubleSpent:                     promise.NewEvent(),
+		spendAccepted:                   reactive.NewVariable[*TransactionMetadata](),
+		spendCommitted:                  reactive.NewVariable[*TransactionMetadata](),
+		earliestIncludedValidAttachment: reactive.NewVariable[iotago.BlockID](),
+		allSpendersRemoved:              event.New(),
 
 		spenderIDs: reactive.NewDerivedSet[iotago.TransactionID](),
 
@@ -50,6 +52,7 @@ func (s *StateMetadata) setup(optSource ...*TransactionMetadata) *StateMetadata 
 	source := optSource[0]
 
 	s.spenderIDs.InheritFrom(source.spenderIDs)
+	s.earliestIncludedValidAttachment.InheritFrom(source.earliestIncludedValidAttachment)
 
 	source.OnPending(func() { s.accepted.Set(false) })
 	source.OnAccepted(func() { s.accepted.Set(true) })
@@ -112,6 +115,14 @@ func (s *StateMetadata) PendingSpenderCount() int {
 
 func (s *StateMetadata) HasNoSpenders() bool {
 	return atomic.LoadUint64(&s.spenderCount) == 0
+}
+
+func (s *StateMetadata) EarliestIncludedAttachment() iotago.BlockID {
+	return s.earliestIncludedValidAttachment.Get()
+}
+
+func (s *StateMetadata) OnEarliestIncludedAttachmentUpdated(callback func(prevID iotago.BlockID, newID iotago.BlockID)) {
+	s.earliestIncludedValidAttachment.OnUpdate(callback)
 }
 
 func (s *StateMetadata) increaseSpenderCount() {
