@@ -216,7 +216,7 @@ func (m *Manager) account(accountID iotago.AccountID, targetSlot iotago.SlotInde
 	// read initial account data at the latest committed slot
 	loadedAccount, exists, err := m.accountsTree.Get(accountID)
 	if err != nil {
-		return nil, false, ierrors.Wrapf(err, "can't retrieve account, could not load account (%s) from accounts tree", accountID)
+		return nil, false, ierrors.Wrapf(err, "can't retrieve account, could not load account %s from accounts tree", accountID)
 	}
 
 	if !exists {
@@ -247,7 +247,7 @@ func (m *Manager) PastAccounts(accountIDs iotago.AccountIDs, targetSlot iotago.S
 		// read initial account data at the latest committed slot
 		loadedAccount, exists, err := m.accountsTree.Get(accountID)
 		if err != nil {
-			return nil, ierrors.Wrapf(err, "can't retrieve account, could not load account (%s) from accounts tree", accountID)
+			return nil, ierrors.Wrapf(err, "can't retrieve account, could not load account %s from accounts tree", accountID)
 		}
 
 		if !exists {
@@ -344,11 +344,11 @@ func (m *Manager) AddAccount(output *utxoledger.Output, blockIssuanceCredits iot
 	)
 
 	if err := m.accountsTree.Set(accountOutput.AccountID, accountData); err != nil {
-		return ierrors.Wrapf(err, "can't add account, could not set account (%s) in accounts tree", accountOutput.AccountID)
+		return ierrors.Wrapf(err, "can't add account, could not set account %s in accounts tree", accountOutput.AccountID)
 	}
 
 	if err := m.accountsTree.Commit(); err != nil {
-		return ierrors.Wrapf(err, "can't add account (%s), could not commit accounts tree", accountOutput.AccountID)
+		return ierrors.Wrapf(err, "can't add account %s, could not commit accounts tree", accountOutput.AccountID)
 	}
 
 	return nil
@@ -368,12 +368,12 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetSlo
 	for diffSlot := m.latestCommittedSlot; diffSlot > targetSlot; diffSlot-- {
 		diffStore, err := m.slotDiff(diffSlot)
 		if err != nil {
-			return false, ierrors.Errorf("can't retrieve account, could not find diff store for slot (%d)", diffSlot)
+			return false, ierrors.Errorf("can't retrieve account, could not find diff store for slot %d", diffSlot)
 		}
 
 		found, err := diffStore.Has(accountData.ID)
 		if err != nil {
-			return false, ierrors.Wrapf(err, "can't retrieve account, could not check if diff store for slot (%d) has account (%s)", diffSlot, accountData.ID)
+			return false, ierrors.Wrapf(err, "can't retrieve account, could not check if diff store for slot %d has account %s", diffSlot, accountData.ID)
 		}
 
 		// no changes for this account in this slot
@@ -383,7 +383,7 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetSlo
 
 		diffChange, destroyed, err := diffStore.Load(accountData.ID)
 		if err != nil {
-			return false, ierrors.Wrapf(err, "can't retrieve account, could not load diff for account (%s) in slot (%d)", accountData.ID, diffSlot)
+			return false, ierrors.Wrapf(err, "can't retrieve account, could not load diff for account %s in slot %d", accountData.ID, diffSlot)
 		}
 
 		// update the account data with the diff
@@ -401,25 +401,25 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetSlo
 
 		validatorStake, err := safemath.SafeSub(int64(accountData.ValidatorStake), diffChange.ValidatorStakeChange)
 		if err != nil {
-			return false, ierrors.Wrapf(err, "can't retrieve account, validator stake underflow for account (%s) in slot (%d): %d - %d", accountData.ID, diffSlot, accountData.ValidatorStake, diffChange.ValidatorStakeChange)
+			return false, ierrors.Wrapf(err, "can't retrieve account, validator stake underflow for account %s in slot %d: %d - %d", accountData.ID, diffSlot, accountData.ValidatorStake, diffChange.ValidatorStakeChange)
 		}
 		accountData.ValidatorStake = iotago.BaseToken(validatorStake)
 
 		delegationStake, err := safemath.SafeSub(int64(accountData.DelegationStake), diffChange.DelegationStakeChange)
 		if err != nil {
-			return false, ierrors.Wrapf(err, "can't retrieve account, delegation stake underflow for account (%s) in slot (%d): %d - %d", accountData.ID, diffSlot, accountData.DelegationStake, diffChange.DelegationStakeChange)
+			return false, ierrors.Wrapf(err, "can't retrieve account, delegation stake underflow for account %s in slot %d: %d - %d", accountData.ID, diffSlot, accountData.DelegationStake, diffChange.DelegationStakeChange)
 		}
 		accountData.DelegationStake = iotago.BaseToken(delegationStake)
 
 		stakeEpochEnd, err := safemath.SafeSub(int64(accountData.StakeEndEpoch), diffChange.StakeEndEpochChange)
 		if err != nil {
-			return false, ierrors.Wrapf(err, "can't retrieve account, stake end epoch underflow for account (%s) in slot (%d): %d - %d", accountData.ID, diffSlot, accountData.StakeEndEpoch, diffChange.StakeEndEpochChange)
+			return false, ierrors.Wrapf(err, "can't retrieve account, stake end epoch underflow for account %s in slot %d: %d - %d", accountData.ID, diffSlot, accountData.StakeEndEpoch, diffChange.StakeEndEpochChange)
 		}
 		accountData.StakeEndEpoch = iotago.EpochIndex(stakeEpochEnd)
 
 		fixedCost, err := safemath.SafeSub(int64(accountData.FixedCost), diffChange.FixedCostChange)
 		if err != nil {
-			return false, ierrors.Wrapf(err, "can't retrieve account, fixed cost underflow for account (%s) in slot (%d): %d - %d", accountData.ID, diffSlot, accountData.FixedCost, diffChange.FixedCostChange)
+			return false, ierrors.Wrapf(err, "can't retrieve account, fixed cost underflow for account %s in slot %d: %d - %d", accountData.ID, diffSlot, accountData.FixedCost, diffChange.FixedCostChange)
 		}
 		accountData.FixedCost = iotago.Mana(fixedCost)
 		if diffChange.PrevLatestSupportedVersionAndHash != diffChange.NewLatestSupportedVersionAndHash {
@@ -437,7 +437,7 @@ func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) (acco
 	// if any data is left on the account, we need to store in the diff, to be able to rollback
 	accountData, exists, err := m.accountsTree.Get(accountID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "can't retrieve account, could not load account (%s) from accounts tree", accountID)
+		return nil, ierrors.Wrapf(err, "can't retrieve account, could not load account %s from accounts tree", accountID)
 	}
 
 	if !exists {
@@ -509,7 +509,7 @@ func (m *Manager) commitAccountTree(slot iotago.SlotIndex, accountDiffChanges ma
 		// remove a destroyed account, no need to update with diffs
 		if destroyedAccounts.Has(accountID) {
 			if _, err := m.accountsTree.Delete(accountID); err != nil {
-				return ierrors.Wrapf(err, "could not delete account (%s) from accounts tree", accountID)
+				return ierrors.Wrapf(err, "could not delete account %s from accounts tree", accountID)
 			}
 
 			continue
@@ -517,7 +517,7 @@ func (m *Manager) commitAccountTree(slot iotago.SlotIndex, accountDiffChanges ma
 
 		accountData, exists, err := m.accountsTree.Get(accountID)
 		if err != nil {
-			return ierrors.Wrapf(err, "can't retrieve account, could not load account (%s) from accounts tree", accountID)
+			return ierrors.Wrapf(err, "can't retrieve account, could not load account %s from accounts tree", accountID)
 		}
 
 		if !exists {
@@ -529,7 +529,7 @@ func (m *Manager) commitAccountTree(slot iotago.SlotIndex, accountDiffChanges ma
 			if exists {
 				decayedPreviousCredits, err := m.apiProvider.APIForSlot(slot).ManaDecayProvider().DecayManaBySlots(iotago.Mana(accountData.Credits.Value), accountData.Credits.UpdateSlot, slot)
 				if err != nil {
-					return ierrors.Wrapf(err, "can't retrieve account, could not decay credits for account (%s) in slot (%d)", accountData.ID, slot)
+					return ierrors.Wrapf(err, "can't retrieve account, could not decay credits for account %s in slot %d", accountData.ID, slot)
 				}
 
 				// update the account data diff taking into account the decay, the modified diff will be stored in the calling
@@ -555,25 +555,25 @@ func (m *Manager) commitAccountTree(slot iotago.SlotIndex, accountDiffChanges ma
 
 		validatorStake, err := safemath.SafeAdd(int64(accountData.ValidatorStake), diffChange.ValidatorStakeChange)
 		if err != nil {
-			return ierrors.Wrapf(err, "can't retrieve account, validator stake overflow for account (%s) in slot (%d): %d + %d", accountData.ID, slot, accountData.ValidatorStake, diffChange.ValidatorStakeChange)
+			return ierrors.Wrapf(err, "can't retrieve account, validator stake overflow for account %s in slot %d: %d + %d", accountData.ID, slot, accountData.ValidatorStake, diffChange.ValidatorStakeChange)
 		}
 		accountData.ValidatorStake = iotago.BaseToken(validatorStake)
 
 		delegationStake, err := safemath.SafeAdd(int64(accountData.DelegationStake), diffChange.DelegationStakeChange)
 		if err != nil {
-			return ierrors.Wrapf(err, "can't retrieve account, delegation stake overflow for account (%s) in slot (%d): %d + %d", accountData.ID, slot, accountData.DelegationStake, diffChange.DelegationStakeChange)
+			return ierrors.Wrapf(err, "can't retrieve account, delegation stake overflow for account %s in slot %d: %d + %d", accountData.ID, slot, accountData.DelegationStake, diffChange.DelegationStakeChange)
 		}
 		accountData.DelegationStake = iotago.BaseToken(delegationStake)
 
 		stakeEndEpoch, err := safemath.SafeAdd(int64(accountData.StakeEndEpoch), diffChange.StakeEndEpochChange)
 		if err != nil {
-			return ierrors.Wrapf(err, "can't retrieve account, stake end epoch overflow for account (%s) in slot (%d): %d + %d", accountData.ID, slot, accountData.StakeEndEpoch, diffChange.StakeEndEpochChange)
+			return ierrors.Wrapf(err, "can't retrieve account, stake end epoch overflow for account %s in slot %d: %d + %d", accountData.ID, slot, accountData.StakeEndEpoch, diffChange.StakeEndEpochChange)
 		}
 		accountData.StakeEndEpoch = iotago.EpochIndex(stakeEndEpoch)
 
 		fixedCost, err := safemath.SafeAdd(int64(accountData.FixedCost), diffChange.FixedCostChange)
 		if err != nil {
-			return ierrors.Wrapf(err, "can't retrieve account, validator fixed cost overflow for account (%s) in slot (%d): %d + %d", accountData.ID, slot, accountData.FixedCost, diffChange.FixedCostChange)
+			return ierrors.Wrapf(err, "can't retrieve account, validator fixed cost overflow for account %s in slot %d: %d + %d", accountData.ID, slot, accountData.FixedCost, diffChange.FixedCostChange)
 		}
 		accountData.FixedCost = iotago.Mana(fixedCost)
 
@@ -582,7 +582,7 @@ func (m *Manager) commitAccountTree(slot iotago.SlotIndex, accountDiffChanges ma
 		}
 
 		if err := m.accountsTree.Set(accountID, accountData); err != nil {
-			return ierrors.Wrapf(err, "could not set account (%s) in accounts tree", accountID)
+			return ierrors.Wrapf(err, "could not set account %s in accounts tree", accountID)
 		}
 	}
 
@@ -610,7 +610,7 @@ func (m *Manager) updateSlotDiffWithBurns(slot iotago.SlotIndex, accountDiffs ma
 			accountDiff = model.NewAccountDiff()
 			accountData, exists, err := m.account(id, slot-1)
 			if err != nil {
-				panic(ierrors.Errorf("error loading account %s in slot %d: %w", id, slot-1, err))
+				panic(ierrors.Wrapf(err, "error loading account %s in slot %d", id, slot-1))
 			}
 			if !exists {
 				panic(ierrors.Errorf("trying to burn Mana from account %s which is not present in slot %d", id, slot-1))
@@ -638,7 +638,7 @@ func (m *Manager) updateSlotDiffWithVersionSignals(slot iotago.SlotIndex, accoun
 	for id, signaledBlock := range signalsStorage.AsMap() {
 		accountData, exists, err := m.accountsTree.Get(id)
 		if err != nil {
-			return ierrors.Wrapf(err, "can't retrieve account, could not load account (%s) from accounts tree", id)
+			return ierrors.Wrapf(err, "can't retrieve account, could not load account %s from accounts tree", id)
 		}
 
 		if !exists {
