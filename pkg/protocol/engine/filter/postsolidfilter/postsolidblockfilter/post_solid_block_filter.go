@@ -62,7 +62,7 @@ func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
 			if !exists {
 				c.filterBlock(
 					block,
-					ierrors.Join(iotago.ErrBlockParentNotFound, ierrors.Errorf("parent %s of block %s is not known", parentID, block.ID())),
+					ierrors.WithMessagef(iotago.ErrBlockParentNotFound, "parent %s of block %s is not known", parentID, block.ID()),
 				)
 
 				return
@@ -71,7 +71,7 @@ func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
 			if !block.IssuingTime().After(parent.IssuingTime()) {
 				c.filterBlock(
 					block,
-					ierrors.Join(iotago.ErrBlockIssuingTimeNonMonotonic, ierrors.Errorf("block %s issuing time %s not greater than parent's %s issuing time %s", block.ID(), block.IssuingTime(), parentID, parent.IssuingTime())),
+					ierrors.WithMessagef(iotago.ErrBlockIssuingTimeNonMonotonic, "block %s's issuing time %s is not greater than parent's %s issuing time %s", block.ID(), block.IssuingTime(), parentID, parent.IssuingTime()),
 				)
 
 				return
@@ -86,7 +86,7 @@ func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
 		if err != nil {
 			c.filterBlock(
 				block,
-				ierrors.Join(iotago.ErrIssuerAccountNotFound, ierrors.Wrapf(err, "could not retrieve account information for block issuer %s", block.ProtocolBlock().Header.IssuerID)),
+				ierrors.WithMessagef(iotago.ErrIssuerAccountNotFound, "could not retrieve account information for block issuer %s: %w", block.ProtocolBlock().Header.IssuerID, err),
 			)
 
 			return
@@ -94,7 +94,7 @@ func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
 		if !exists {
 			c.filterBlock(
 				block,
-				ierrors.Join(iotago.ErrIssuerAccountNotFound, ierrors.Errorf("block issuer account %s does not exist in slot commitment %s", block.ProtocolBlock().Header.IssuerID, block.ProtocolBlock().Header.SlotCommitmentID.Slot())),
+				ierrors.WithMessagef(iotago.ErrIssuerAccountNotFound, "block issuer account %s does not exist in slot commitment %s", block.ProtocolBlock().Header.IssuerID, block.ProtocolBlock().Header.SlotCommitmentID.Slot()),
 			)
 
 			return
@@ -107,7 +107,7 @@ func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
 			if err != nil {
 				c.filterBlock(
 					block,
-					ierrors.Join(iotago.ErrRMCNotFound, ierrors.Wrapf(err, "could not retrieve RMC for slot commitment %s", rmcSlot)),
+					ierrors.WithMessagef(iotago.ErrRMCNotFound, "could not retrieve RMC for slot commitment %s: %w", rmcSlot, err),
 				)
 
 				return
@@ -117,13 +117,13 @@ func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
 				if err != nil {
 					c.filterBlock(
 						block,
-						ierrors.Join(iotago.ErrFailedToCalculateManaCost, ierrors.Wrapf(err, "could not calculate Mana cost for block")),
+						ierrors.WithMessagef(iotago.ErrFailedToCalculateManaCost, "could not calculate Mana cost for block: %w", err),
 					)
 				}
 				if basicBlock.MaxBurnedMana < manaCost {
 					c.filterBlock(
 						block,
-						ierrors.Join(iotago.ErrBurnedInsufficientMana, ierrors.Errorf("block issuer account %s burned insufficient Mana, required %d, burned %d", block.ProtocolBlock().Header.IssuerID, manaCost, basicBlock.MaxBurnedMana)),
+						ierrors.WithMessagef(iotago.ErrBurnedInsufficientMana, "block issuer account %s burned insufficient Mana, required %d, burned %d", block.ProtocolBlock().Header.IssuerID, manaCost, basicBlock.MaxBurnedMana),
 					)
 
 					return
@@ -136,7 +136,7 @@ func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
 			if accountData.Credits.Value < 0 {
 				c.filterBlock(
 					block,
-					ierrors.Wrapf(iotago.ErrAccountLocked, "block issuer account %s", block.ProtocolBlock().Header.IssuerID),
+					ierrors.WithMessagef(iotago.ErrAccountLocked, "block issuer account %s", block.ProtocolBlock().Header.IssuerID),
 				)
 
 				return
@@ -148,7 +148,7 @@ func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
 			if accountData.ExpirySlot < block.ProtocolBlock().Header.SlotCommitmentID.Slot() {
 				c.filterBlock(
 					block,
-					ierrors.Wrapf(iotago.ErrAccountExpired, "block issuer account %s is expired, expiry slot %d in commitment %d", block.ProtocolBlock().Header.IssuerID, accountData.ExpirySlot, block.ProtocolBlock().Header.SlotCommitmentID.Slot()),
+					ierrors.WithMessagef(iotago.ErrAccountExpired, "block issuer account %s is expired, expiry slot %d in commitment %d", block.ProtocolBlock().Header.IssuerID, accountData.ExpirySlot, block.ProtocolBlock().Header.SlotCommitmentID.Slot()),
 				)
 
 				return
@@ -164,7 +164,7 @@ func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
 				if !accountData.BlockIssuerKeys.Has(expectedBlockIssuerKey) {
 					c.filterBlock(
 						block,
-						ierrors.Wrapf(iotago.ErrInvalidSignature, "block issuer account %s does not have block issuer key corresponding to public key %s in slot %d", block.ProtocolBlock().Header.IssuerID, hexutil.EncodeHex(signature.PublicKey[:]), block.ProtocolBlock().Header.SlotCommitmentID.Index()),
+						ierrors.WithMessagef(iotago.ErrInvalidSignature, "block issuer account %s does not have block issuer key corresponding to public key %s in slot %d", block.ProtocolBlock().Header.IssuerID, hexutil.EncodeHex(signature.PublicKey[:]), block.ProtocolBlock().Header.SlotCommitmentID.Index()),
 					)
 
 					return
@@ -174,7 +174,7 @@ func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
 				if err != nil {
 					c.filterBlock(
 						block,
-						ierrors.Wrapf(iotago.ErrInvalidSignature, "error: %s", err.Error()),
+						ierrors.WithMessagef(iotago.ErrInvalidSignature, "%w", err),
 					)
 
 					return
@@ -190,7 +190,7 @@ func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
 			default:
 				c.filterBlock(
 					block,
-					ierrors.Wrapf(iotago.ErrInvalidSignature, "only ed25519 signatures supported, got %s", block.ProtocolBlock().Signature.Type()),
+					ierrors.WithMessagef(iotago.ErrInvalidSignature, "only ed25519 signatures supported, got %s", block.ProtocolBlock().Signature.Type()),
 				)
 
 				return

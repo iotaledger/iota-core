@@ -66,7 +66,7 @@ func (f *PreSolidBlockFilter) ProcessReceivedBlock(block *model.Block, source pe
 	if apiForSlot.Version() != block.ProtocolBlock().Header.ProtocolVersion {
 		f.events.BlockPreFiltered.Trigger(&presolidfilter.BlockPreFilteredEvent{
 			Block:  block,
-			Reason: ierrors.Wrapf(ErrInvalidBlockVersion, "invalid protocol version %d (expected %d) for epoch %d", block.ProtocolBlock().Header.ProtocolVersion, apiForSlot.Version(), apiForSlot.TimeProvider().EpochFromSlot(block.ID().Slot())),
+			Reason: ierrors.WithMessagef(ErrInvalidBlockVersion, "invalid protocol version %d (expected %d) for epoch %d", block.ProtocolBlock().Header.ProtocolVersion, apiForSlot.Version(), apiForSlot.TimeProvider().EpochFromSlot(block.ID().Slot())),
 			Source: source,
 		})
 
@@ -79,7 +79,7 @@ func (f *PreSolidBlockFilter) ProcessReceivedBlock(block *model.Block, source pe
 		if !exists {
 			f.events.BlockPreFiltered.Trigger(&presolidfilter.BlockPreFilteredEvent{
 				Block:  block,
-				Reason: ierrors.Wrapf(ErrValidatorNotInCommittee, "no committee for slot %d", blockSlot),
+				Reason: ierrors.WithMessagef(ErrValidatorNotInCommittee, "no committee for slot %d", blockSlot),
 				Source: source,
 			})
 
@@ -89,7 +89,7 @@ func (f *PreSolidBlockFilter) ProcessReceivedBlock(block *model.Block, source pe
 		if !committee.HasAccount(block.ProtocolBlock().Header.IssuerID) {
 			f.events.BlockPreFiltered.Trigger(&presolidfilter.BlockPreFilteredEvent{
 				Block:  block,
-				Reason: ierrors.Wrapf(ErrValidatorNotInCommittee, "validation block issuer %s is not part of the committee for slot %d", block.ProtocolBlock().Header.IssuerID, blockSlot),
+				Reason: ierrors.WithMessagef(ErrValidatorNotInCommittee, "validation block issuer %s is not part of the committee for slot %d", block.ProtocolBlock().Header.IssuerID, blockSlot),
 				Source: source,
 			})
 
