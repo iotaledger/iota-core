@@ -243,8 +243,6 @@ func NewProvider(opts ...options.Option[TransactionRetainer]) module.Provider[*e
 			}, asyncOpt)
 		})
 
-		r.InitializedEvent().Trigger()
-
 		return r
 	})
 }
