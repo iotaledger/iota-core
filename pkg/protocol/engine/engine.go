@@ -455,7 +455,7 @@ func (e *Engine) setupBlockStorage() {
 	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		store, err := e.Storage.Blocks(block.ID().Slot())
 		if err != nil {
-			e.errorHandler(ierrors.Errorf("failed to store block with %s, storage with given index does not exist", block.ID()))
+			e.errorHandler(ierrors.Errorf("failed to store block %s, storage at block's slot does not exist", block.ID()))
 			return
 		}
 

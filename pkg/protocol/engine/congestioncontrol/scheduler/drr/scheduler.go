@@ -277,7 +277,7 @@ func (s *Scheduler) enqueueBasicBlock(block *blocks.Block) {
 		func(issuerID iotago.AccountID) Deficit {
 			quantum, quantumErr := s.quantumFunc(issuerID, slot)
 			if quantumErr != nil {
-				s.errorHandler(ierrors.Wrapf(quantumErr, "failed to retrieve deficit for issuerID %d in slot %d when submitting a block", issuerID, slot))
+				s.errorHandler(ierrors.Wrapf(quantumErr, "failed to retrieve deficit for issuerID %s in slot %d when submitting a block", issuerID, slot))
 
 				return 0
 			}
