@@ -54,11 +54,11 @@ func (r *RequestHandler) Validators(epochIndex iotago.EpochIndex, cursorIndex, p
 		return nil, ierrors.Wrapf(err, "failed to get registered validators for epoch %d", epochIndex)
 	}
 
-	pageEndIndex := lo.Min(cursorIndex+pageSize, uint32(len(registeredValidators)))
-	if cursorIndex >= pageEndIndex {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "invalid pagination cursorIndex, requesting index %d to %d", cursorIndex, pageEndIndex)
+	if cursorIndex >= uint32(len(registeredValidators)) {
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "invalid pagination cursorIndex, cursorIndex %d is larger than the number of registered validators %d", cursorIndex, len(registeredValidators))
 	}
 
+	pageEndIndex := lo.Min(cursorIndex+pageSize, uint32(len(registeredValidators)))
 	page := registeredValidators[cursorIndex:pageEndIndex]
 	resp := &api.ValidatorsResponse{
 		Validators: page,
