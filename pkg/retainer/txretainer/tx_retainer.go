@@ -110,31 +110,22 @@ func WithDebugStoreErrorMessages(store bool) options.Option[TransactionRetainer]
 	}
 }
 
-func New(module module.Module, workersGroup *workerpool.Group, dbExecFunc storage.SQLDatabaseExecFunc, latestCommittedSlotFunc SlotFunc, finalizedSlotFunc SlotFunc, errorHandler func(error), opts ...options.Option[TransactionRetainer]) *TransactionRetainer {
-	return options.Apply(&TransactionRetainer{
-		Module:                  module,
+func New(parentModule module.Module, workersGroup *workerpool.Group, dbExecFunc storage.SQLDatabaseExecFunc, latestCommittedSlotFunc SlotFunc, finalizedSlotFunc SlotFunc, errorHandler func(error), opts ...options.Option[TransactionRetainer]) *TransactionRetainer {
+	return module.InitSimpleLifecycle(options.Apply(&TransactionRetainer{
+		Module:                  parentModule.NewSubModule("TransactionRetainer"),
 		workerPool:              workersGroup.CreatePool("TxRetainer", workerpool.WithWorkerCount(1)),
 		txRetainerCache:         NewTransactionRetainerCache(),
 		txRetainerDatabase:      NewTransactionRetainerDB(dbExecFunc),
 		latestCommittedSlotFunc: latestCommittedSlotFunc,
 		finalizedSlotFunc:       finalizedSlotFunc,
 		errorHandler:            errorHandler,
-	}, opts, func(t *TransactionRetainer) {
-		t.ShutdownEvent().OnTrigger(func() {
-			t.workerPool.Shutdown()
-
-			t.StoppedEvent().Trigger()
-		})
-
-		t.ConstructedEvent().Trigger()
-		t.InitializedEvent().Trigger()
-	})
+	}, opts), (*TransactionRetainer).shutdown)
 }
 
 // NewProvider creates a new TransactionRetainer provider.
 func NewProvider(opts ...options.Option[TransactionRetainer]) module.Provider[*engine.Engine, retainer.TransactionRetainer] {
 	return module.Provide(func(e *engine.Engine) retainer.TransactionRetainer {
-		r := New(e.NewSubModule("TransactionRetainer"), e.Workers.CreateGroup("TransactionRetainer"),
+		r := New(e, e.Workers.CreateGroup("TransactionRetainer"),
 			e.Storage.TransactionRetainerDatabaseExecFunc(),
 			func() iotago.SlotIndex {
 				return e.SyncManager.LatestCommitment().Slot()
@@ -376,4 +367,11 @@ func (t *TransactionRetainer) TransactionMetadata(txID iotago.TransactionID) (*a
 	}
 
 	return response, nil
+}
+
+// Shutdown shuts down the TransactionRetainer.
+func (r *TransactionRetainer) shutdown() {
+	r.workerPool.Shutdown()
+
+	r.StoppedEvent().Trigger()
 }
