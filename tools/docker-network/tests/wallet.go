@@ -42,32 +42,6 @@ type DockerWallet struct {
 	accountsLock sync.RWMutex
 }
 
-// OutputData holds the details of an output that can be used to build a transaction.
-type OutputData struct {
-	// ID is the unique identifier of the output.
-	ID iotago.OutputID
-	// Output is the iotago Output.
-	Output iotago.Output
-	// Address is the address of the output.
-	Address iotago.Address
-	// AddressIndex is the index of the address in the keyManager.
-	AddressIndex uint32
-}
-
-// AccountData holds the details of an account that can be used to issue a block or account transition.
-type AccountData struct {
-	// ID is the unique identifier of the account.
-	ID iotago.AccountID
-	// AddressIndex is the index of the address in the keyManager.
-	AddressIndex uint32
-	// Address is the address of the account.
-	Address *iotago.AccountAddress
-	// Output is the latest iotago AccountOutput of the account.
-	Output *iotago.AccountOutput
-	// OutputID is the unique identifier of the Output.
-	OutputID iotago.OutputID
-}
-
 func NewDockerWallet(t *testing.T) *DockerWallet {
 	return &DockerWallet{
 		Testing:    t,
