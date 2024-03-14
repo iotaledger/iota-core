@@ -621,11 +621,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 			return false
 		}
 
-		inputRefs, errInput := tx.Inputs()
-		if errInput != nil {
-			err = ierrors.Errorf("failed to retrieve inputs of %s: %w", txID, errInput)
-			return false
-		}
+		inputRefs := tx.Inputs()
 
 		// process outputs
 		{
@@ -633,7 +629,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 			for _, inputRef := range lo.Map(inputRefs, mempool.UTXOInputStateRefFromInput) {
 				stateWithMetadata, stateError := l.memPool.StateMetadata(inputRef)
 				if stateError != nil {
-					err = ierrors.Errorf("failed to retrieve outputs of %s: %w", txID, errInput)
+					err = ierrors.Wrapf(stateError, "failed to retrieve outputs of %s", txID)
 					return false
 				}
 				spent := utxoledger.NewSpent(l.outputFromState(stateWithMetadata.State()), txWithMeta.ID(), stateDiff.Slot())

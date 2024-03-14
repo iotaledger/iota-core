@@ -2,10 +2,12 @@ package requesthandler
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -31,35 +33,40 @@ func (r *RequestHandler) CongestionByAccountAddress(accountAddress *iotago.Accou
 	}, nil
 }
 
-func (r *RequestHandler) Validators(slotRange, cursorIndex, pageSize uint32) (*api.ValidatorsResponse, error) {
-	latestCommittedSlot := r.protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot()
-	latestEpoch := r.protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
+func (r *RequestHandler) Validators(epochIndex iotago.EpochIndex, cursorIndex, pageSize uint32) (*api.ValidatorsResponse, error) {
+	apiForEpoch := r.APIProvider().APIForEpoch(epochIndex)
+	currentSlot := r.protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot()
+	currentEpoch := apiForEpoch.TimeProvider().EpochFromSlot(currentSlot)
+	var registeredValidators []*api.ValidatorResponse
+	var err error
 
-	// TODO: Move into the api cache package
-	//registeredValidators, exists := r.protocol.Engines.Main.Get().BlockRetainer.RegisteredValidatorsCache(slotRange)
-	//if !exists {
-	//	registeredValidators, err := r.protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(latestEpoch)
-	//	if err != nil {
-	//		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get ordered registered validators list for epoch %d : %s", latestEpoch, err)
-	//	}
-	//	r.protocol.Engines.Main.Get().BlockRetainer.RetainRegisteredValidatorsCache(slotRange, registeredValidators)
-	//}
-
-	registeredValidators, err := r.protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(latestEpoch)
-	if err != nil {
-		return nil, ierrors.Join(echo.ErrInternalServerError, ierrors.Wrapf(err, "failed to get ordered registered validators list for epoch %d", latestEpoch))
+	key := epochIndex.MustBytes()
+	// The key of validators cache for current epoch is the combination of current epoch and current slot. So the results is updated when new commitment is created.
+	if epochIndex == currentEpoch {
+		key = append(key, currentSlot.MustBytes()...)
 	}
 
-	page := registeredValidators[cursorIndex:lo.Min(cursorIndex+pageSize, uint32(len(registeredValidators)))]
+	// get registered validators from cache, if not found, get from engine and store in cache.
+	registeredValidators, err = r.cache.GetOrCreateRegisteredValidators(apiForEpoch, key, func() ([]*api.ValidatorResponse, error) {
+		return r.protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(epochIndex)
+	})
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to get registered validators for epoch %d", epochIndex)
+	}
+
+	if cursorIndex >= uint32(len(registeredValidators)) {
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "invalid pagination cursorIndex, cursorIndex %d is larger than the number of registered validators %d", cursorIndex, len(registeredValidators))
+	}
+
+	pageEndIndex := lo.Min(cursorIndex+pageSize, uint32(len(registeredValidators)))
+	page := registeredValidators[cursorIndex:pageEndIndex]
 	resp := &api.ValidatorsResponse{
 		Validators: page,
 		PageSize:   pageSize,
 	}
 	// this is the last page
-	if int(cursorIndex+pageSize) > len(registeredValidators) {
-		resp.Cursor = ""
-	} else {
-		resp.Cursor = fmt.Sprintf("%d,%d", slotRange, cursorIndex+pageSize)
+	if int(cursorIndex+pageSize) <= len(registeredValidators) {
+		resp.Cursor = fmt.Sprintf("%d,%d", epochIndex, cursorIndex+pageSize)
 	}
 
 	return resp, nil
@@ -99,6 +106,10 @@ func (r *RequestHandler) ValidatorByAccountAddress(accountAddress *iotago.Accoun
 func (r *RequestHandler) RewardsByOutputID(outputID iotago.OutputID, slot iotago.SlotIndex) (*api.ManaRewardsResponse, error) {
 	utxoOutput, err := r.protocol.Engines.Main.Get().Ledger.Output(outputID)
 	if err != nil {
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+			return nil, ierrors.Wrapf(echo.ErrNotFound, "output %s not found", outputID.ToHex())
+		}
+
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from ledger: %s", outputID.ToHex(), err)
 	}
 
@@ -155,16 +166,19 @@ func (r *RequestHandler) RewardsByOutputID(outputID iotago.OutputID, slot iotago
 			delegationEnd,
 			claimingEpoch,
 		)
+	default:
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "output %s is neither a delegation output nor account", outputID.ToHex())
 	}
+
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to calculate reward for output %s: %s", outputID.ToHex(), err)
 	}
 
 	latestCommittedEpochPoolRewards, poolRewardExists, err := r.protocol.Engines.Main.Get().SybilProtection.PoolRewardsForAccount(stakingPoolValidatorAccountID)
-
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to retrieve pool rewards for account %s: %s", stakingPoolValidatorAccountID.ToHex(), err)
 	}
+
 	if !poolRewardExists {
 		latestCommittedEpochPoolRewards = 0
 	}
@@ -200,6 +214,15 @@ func (r *RequestHandler) SelectedCommittee(epoch iotago.EpochIndex) (*api.Commit
 		})
 
 		return true
+	})
+
+	// sort committee by pool stake, then by address
+	sort.Slice(committee, func(i, j int) bool {
+		if committee[i].PoolStake == committee[j].PoolStake {
+			return committee[i].AddressBech32 < committee[j].AddressBech32
+		}
+
+		return committee[i].PoolStake > committee[j].PoolStake
 	})
 
 	return &api.CommitteeResponse{

@@ -11,7 +11,7 @@ import (
 )
 
 func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error) {
-	commitmentID, err := httpserver.ParseCommitmentIDQueryParam(c, api.ParameterCommitmentID)
+	queryCommitmentID, err := httpserver.ParseCommitmentIDQueryParam(c, api.ParameterCommitmentID)
 	if err != nil {
 		return nil, err
 	}
@@ -26,8 +26,19 @@ func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error)
 	if workScore != 0 {
 		workScores = append(workScores, workScore)
 	}
+	maxCommittableAge := deps.RequestHandler.CommittedAPI().ProtocolParameters().MaxCommittableAge()
+	latestCommittedSlot := deps.RequestHandler.GetLatestCommitment().Slot()
+	if queryCommitmentID != iotago.EmptyCommitmentID {
+		if latestCommittedSlot >= maxCommittableAge && queryCommitmentID.Slot()+maxCommittableAge < latestCommittedSlot {
+			return nil, ierrors.Wrapf(echo.ErrBadRequest, "invalid commitmentID, target slot index older than allowed (%d<%d)", queryCommitmentID.Slot(), latestCommittedSlot-maxCommittableAge)
+		}
 
-	commitment, err := deps.RequestHandler.GetCommitmentByID(commitmentID)
+		if queryCommitmentID.Slot() > latestCommittedSlot {
+			return nil, ierrors.Wrapf(echo.ErrBadRequest, "invalid commitmentID, slot %d is not committed yet, latest committed slot: %d", queryCommitmentID.Slot(), latestCommittedSlot)
+		}
+	}
+
+	queryCommittment, err := deps.RequestHandler.GetCommitmentByID(queryCommitmentID)
 	if err != nil {
 		return nil, err
 	}
@@ -43,31 +54,30 @@ func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error)
 		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "address %s is not an account address", c.Param(api.ParameterBech32Address))
 	}
 
-	return deps.RequestHandler.CongestionByAccountAddress(accountAddress, commitment, workScores...)
+	return deps.RequestHandler.CongestionByAccountAddress(accountAddress, queryCommittment, workScores...)
 }
 
 func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 	var err error
 	pageSize := httpserver.ParsePageSizeQueryParam(c, api.ParameterPageSize, restapi.ParamsRestAPI.MaxPageSize)
 	latestCommittedSlot := deps.RequestHandler.GetLatestCommitment().Slot()
+	currentEpoch := deps.RequestHandler.APIProvider().APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
+	requestedEpoch := currentEpoch
 
 	// no cursor provided will be the first request
-	requestedSlot := latestCommittedSlot
 	var cursorIndex uint32
 	if len(c.QueryParam(api.ParameterCursor)) != 0 {
-		requestedSlot, cursorIndex, err = httpserver.ParseSlotCursorQueryParam(c, api.ParameterCursor)
+		requestedEpoch, cursorIndex, err = httpserver.ParseEpochCursorQueryParam(c, api.ParameterCursor)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	// do not respond to really old requests
-	if requestedSlot+iotago.SlotIndex(restapi.ParamsRestAPI.MaxRequestedSlotAge) < latestCommittedSlot {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "request is too old, request started at %d, latest committed slot index is %d", requestedSlot, latestCommittedSlot)
+	if requestedEpoch > currentEpoch || requestedEpoch <= deps.RequestHandler.GetNodeStatus().PruningEpoch {
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "epoch %d is larger than current epoch or already pruned", requestedEpoch)
 	}
-	slotRange := uint32(requestedSlot) / restapi.ParamsRestAPI.RequestsMemoryCacheGranularity
 
-	return deps.RequestHandler.Validators(slotRange, pageSize, cursorIndex)
+	return deps.RequestHandler.Validators(requestedEpoch, cursorIndex, pageSize)
 }
 
 func validatorByAccountAddress(c echo.Context) (*api.ValidatorResponse, error) {
@@ -86,6 +96,7 @@ func validatorByAccountAddress(c echo.Context) (*api.ValidatorResponse, error) {
 }
 
 func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
+	var err error
 	outputID, err := httpserver.ParseOutputIDParam(c, api.ParameterOutputID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(api.ParameterOutputID))
@@ -93,7 +104,6 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 
 	var slot iotago.SlotIndex
 	if len(c.QueryParam(api.ParameterSlot)) > 0 {
-		var err error
 		slot, err = httpserver.ParseSlotQueryParam(c, api.ParameterSlot)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to parse slot index %s", c.Param(api.ParameterSlot))
@@ -113,6 +123,7 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 
 func selectedCommittee(c echo.Context) (*api.CommitteeResponse, error) {
 	var epoch iotago.EpochIndex
+
 	if len(c.QueryParam(api.ParameterEpoch)) == 0 {
 		// by default we return current epoch
 		epoch = deps.RequestHandler.CommittedAPI().TimeProvider().CurrentEpoch()
@@ -121,6 +132,10 @@ func selectedCommittee(c echo.Context) (*api.CommitteeResponse, error) {
 		epoch, err = httpserver.ParseEpochQueryParam(c, api.ParameterEpoch)
 		if err != nil {
 			return nil, err
+		}
+		currentEpoch := deps.RequestHandler.CommittedAPI().TimeProvider().CurrentEpoch()
+		if epoch > currentEpoch {
+			return nil, ierrors.Wrapf(echo.ErrBadRequest, "provided epoch %d is from the future, current epoch: %d", epoch, currentEpoch)
 		}
 	}
 
