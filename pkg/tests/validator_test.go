@@ -250,7 +250,8 @@ func Test_Validator_FixedCostExceedsRewards(t *testing.T) {
 func validatorTest(t *testing.T, test ValidatorTest) {
 	ts := test.ts
 
-	blockIssuanceInfo := ts.DefaultWallet().Client.BlockIssuance(context.Background())
+	blockIssuanceInfo, err := ts.DefaultWallet().Client.BlockIssuance(context.Background())
+	require.NoError(t, err)
 	tip := blockIssuanceInfo.StrongParents[0]
 	startEpoch := iotago.EpochIndex(0)
 	endEpoch := iotago.EpochIndex(len(test.epochPerformanceFactors) - 1)
@@ -294,8 +295,8 @@ func validatorTest(t *testing.T, test ValidatorTest) {
 	var totalStake iotago.BaseToken = 0
 	var totalValidatorStake iotago.BaseToken = 0
 	lo.ForEach(ts.Validators(), func(n *mock.Node) {
-		accountData := ts.DefaultWallet().Client.Validator(context.Background(), n.Validator.AccountData.Address)
-
+		accountData, err := ts.DefaultWallet().Client.Validator(context.Background(), n.Validator.AccountData.Address)
+		require.NoError(t, err)
 		totalStake += accountData.PoolStake
 		totalValidatorStake += accountData.ValidatorStake
 	})
@@ -308,8 +309,8 @@ func validatorTest(t *testing.T, test ValidatorTest) {
 	for _, validatorAccount := range []string{"Genesis:1", "Genesis:2"} {
 		output := ts.DefaultWallet().OutputData(validatorAccount)
 		accountID := output.Output.(*iotago.AccountOutput).AccountID
-		rewardresp := ts.DefaultWallet().Client.Rewards(context.Background(), output.ID)
-
+		rewardresp, err := ts.DefaultWallet().Client.Rewards(context.Background(), output.ID)
+		require.NoError(t, err)
 		actualRewards[accountID] = rewardresp.Rewards
 	}
 
@@ -352,8 +353,8 @@ func calculateEpochReward(ts *testsuite.TestSuite, accountID iotago.AccountID, e
 	if !ok {
 		panic(fmt.Sprintf("accountID %s cannot be cast to account address", accountID))
 	}
-	stakingResp := ts.DefaultWallet().Client.Validator(context.Background(), accountAddress)
-
+	stakingResp, err := ts.DefaultWallet().Client.Validator(context.Background(), accountAddress)
+	require.NoError(ts.Testing, err)
 	poolStake := stakingResp.PoolStake
 	poolCoefficientExp := iotago.BaseToken(ts.API.ProtocolParameters().RewardsParameters().PoolCoefficientExponent)
 
@@ -378,8 +379,8 @@ func calculateValidatorReward(ts *testsuite.TestSuite, accountID iotago.AccountI
 	if !ok {
 		panic(fmt.Sprintf("accountID %s cannot be cast to account address", accountID))
 	}
-	stakingResp := ts.DefaultWallet().Client.Validator(context.Background(), accountAddress)
-
+	stakingResp, err := ts.DefaultWallet().Client.Validator(context.Background(), accountAddress)
+	require.NoError(ts.Testing, err)
 	profitMarginExponent := ts.API.ProtocolParameters().RewardsParameters().ProfitMarginExponent
 	stakedAmount := stakingResp.ValidatorStake
 	fixedCost := stakingResp.FixedCost

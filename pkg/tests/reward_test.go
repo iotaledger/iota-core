@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
@@ -108,7 +110,8 @@ func Test_Delegation_DelayedClaimingDestroyOutputWithoutRewards(t *testing.T) {
 	block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1))
 
 	// TRANSITION TO DELAYED CLAIMING (IN THE SAME SLOT)
-	blockIssuanceInfo := ts.DefaultWallet().Client.BlockIssuance(context.TODO())
+	blockIssuanceInfo, err := ts.DefaultWallet().Client.BlockIssuance(context.TODO())
+	require.NoError(t, err)
 	latestCommitment := blockIssuanceInfo.LatestCommitment
 	apiForSlot := ts.DefaultWallet().Client.APIForSlot(block1_2Slot)
 

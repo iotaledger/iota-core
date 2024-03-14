@@ -103,7 +103,8 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, n
 
 	apiForBlock := i.retrieveAPI(blockParams.BlockHeader)
 	protoParams := apiForBlock.ProtocolParameters()
-	blockIssuanceInfo := i.Client.BlockIssuance(ctx)
+	blockIssuanceInfo, err := i.Client.BlockIssuance(ctx)
+	require.NoError(i.Testing, err)
 	if blockParams.BlockHeader.SlotCommitment == nil {
 		commitment := blockIssuanceInfo.LatestCommitment
 		blockSlot := apiForBlock.TimeProvider().SlotFromTime(*blockParams.BlockHeader.IssuingTime)
@@ -139,7 +140,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, n
 		blockParams.BlockHeader.References = referencesFromBlockIssuanceResponse(i.LatestBlockIssuanceResponse(ctx))
 	}
 
-	err := i.setDefaultBlockParams(ctx, blockParams.BlockHeader)
+	err = i.setDefaultBlockParams(ctx, blockParams.BlockHeader)
 	require.NoError(i.Testing, err)
 
 	if blockParams.HighestSupportedVersion == nil {
@@ -311,8 +312,8 @@ func (i *BlockIssuer) setDefaultBlockParams(ctx context.Context, blockParams *Bl
 		blockParams.IssuingTime = &issuingTime
 	}
 
-	issuanceInfo := i.Client.BlockIssuance(ctx)
-
+	issuanceInfo, err := i.Client.BlockIssuance(ctx)
+	require.NoError(i.Testing, err)
 	if blockParams.SlotCommitment == nil {
 		blockParams.SlotCommitment = issuanceInfo.LatestCommitment
 	}
@@ -384,7 +385,10 @@ func (i *BlockIssuer) CopyIdentityFromBlockIssuer(otherBlockIssuer *BlockIssuer)
 
 func (i *BlockIssuer) retrieveAPI(blockParams *BlockHeaderParams) iotago.API {
 	if blockParams.ProtocolVersion != nil {
-		return i.Client.APIForVersion(*blockParams.ProtocolVersion)
+		api, err := i.Client.APIForVersion(*blockParams.ProtocolVersion)
+		require.NoError(i.Testing, err)
+
+		return api
 	}
 
 	// It is crucial to get the API from the issuing time/slot as that defines the version with which the block should be issued.
@@ -396,7 +400,9 @@ func (i *BlockIssuer) GetNewBlockIssuanceResponse() *api.IssuanceBlockHeaderResp
 	i.mutex.Lock()
 
 	i.blockIssuanceResponseUsed = false
-	i.latestBlockIssuanceResp = i.Client.BlockIssuance(context.Background())
+	resp, err := i.Client.BlockIssuance(context.Background())
+	require.NoError(i.Testing, err)
+	i.latestBlockIssuanceResp = resp
 
 	return i.latestBlockIssuanceResp
 }
@@ -407,7 +413,9 @@ func (i *BlockIssuer) LatestBlockIssuanceResponse(context context.Context) *api.
 
 	if i.blockIssuanceResponseUsed {
 		i.blockIssuanceResponseUsed = false
-		i.latestBlockIssuanceResp = i.Client.BlockIssuance(context)
+		resp, err := i.Client.BlockIssuance(context)
+		require.NoError(i.Testing, err)
+		i.latestBlockIssuanceResp = resp
 	}
 
 	return i.latestBlockIssuanceResp

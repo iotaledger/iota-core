@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
@@ -878,8 +880,8 @@ func (w *Wallet) ClaimValidatorRewards(transactionName string, inputName string)
 
 	apiForSlot := w.Client.APIForSlot(w.CurrentSlot())
 
-	rewardResp := w.Client.Rewards(context.Background(), input.ID)
-
+	rewardResp, err := w.Client.Rewards(context.Background(), input.ID)
+	require.NoError(w.Testing, err)
 	potentialMana := w.PotentialMana(apiForSlot, input)
 	storedMana := w.StoredMana(apiForSlot, input)
 
@@ -957,7 +959,8 @@ func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string)
 	apiForSlot := w.Client.APIForSlot(w.CurrentSlot())
 	potentialMana := w.PotentialMana(apiForSlot, input)
 
-	rewardsResp := w.Client.Rewards(context.Background(), input.ID)
+	rewardsResp, err := w.Client.Rewards(context.Background(), input.ID)
+	require.NoError(w.Testing, err)
 
 	// Create Basic Output where the reward will be put.
 	outputStates := iotago.Outputs[iotago.Output]{&iotago.BasicOutput{
