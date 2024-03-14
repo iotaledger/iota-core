@@ -5,6 +5,7 @@ go 1.22.0
 replace github.com/goccy/go-graphviz => github.com/alexsporn/go-graphviz v0.0.0-20231011102718-04f10f0a9b59
 
 require (
+	github.com/VictoriaMetrics/fastcache v1.12.2
 	github.com/fjl/memsize v0.0.2
 	github.com/goccy/go-graphviz v0.1.2
 	github.com/golang-jwt/jwt v3.2.2+incompatible
@@ -79,6 +80,7 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
+	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
 	github.com/google/go-github v17.0.0+incompatible // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/gopacket v1.1.19 // indirect

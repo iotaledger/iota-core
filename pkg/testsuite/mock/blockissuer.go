@@ -212,7 +212,7 @@ func (i *BlockIssuer) IssueValidationBlock(ctx context.Context, alias string, no
 
 // CreateBlock creates a new block with the options.
 func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, opts ...options.Option[BasicBlockParams]) (*blocks.Block, error) {
-	blockParams := options.Apply(&BasicBlockParams{}, opts)
+	blockParams := options.Apply(&BasicBlockParams{BlockHeader: &BlockHeaderParams{}}, opts)
 
 	if blockParams.BlockHeader.IssuingTime == nil {
 		issuingTime := time.Now().UTC()
