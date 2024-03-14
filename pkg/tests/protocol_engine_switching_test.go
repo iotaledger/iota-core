@@ -709,8 +709,6 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 	const expectedCommittedSlotAfterPartitionMerge = 19
 	nodesP1 := []*mock.Node{node0, node1, node2}
 	nodesP2 := []*mock.Node{node3}
-	clientsP1 := []mock.Client{node0.Client, node1.Client, node2.Client}
-	clientsP2 := []mock.Client{node3.Client}
 
 	nodeOpts := []options.Option[protocol.Protocol]{
 		protocol.WithNotarizationProvider(
@@ -837,8 +835,8 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 
 		ts.AssertStrongTips(ts.Blocks("P1:20.3-node0", "P1:20.3-node1", "P1:20.3-node2"), nodesP1...)
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, clientsP1...)
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), false, clientsP2...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, mock.ClientsForNodes(nodesP1)...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), false, mock.ClientsForNodes(nodesP2)...)
 
 		// Assert Protocol.Chains and Protocol.Commitments state.
 		engineCommitmentsP1 := ts.CommitmentsOfMainEngine(nodesP1[0], 12, 18)
@@ -888,8 +886,8 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 
 		ts.AssertStrongTips(ts.Blocks("P2:20.3-node3"), nodesP2...)
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), true, clientsP2...)
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, clientsP1...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), true, mock.ClientsForNodes(nodesP2)...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, mock.ClientsForNodes(nodesP1)...)
 
 		// Assert Protocol.Chains and Protocol.Commitments state.
 		engineCommitmentsP2 = ts.CommitmentsOfMainEngine(nodesP2[0], 0, 18)
