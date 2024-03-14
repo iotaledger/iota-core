@@ -3,8 +3,6 @@ package requesthandler
 import (
 	"testing"
 
-	"github.com/labstack/echo/v4"
-	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -15,6 +13,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
+	"github.com/labstack/echo/v4"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_ValidatorsAPI(t *testing.T) {
