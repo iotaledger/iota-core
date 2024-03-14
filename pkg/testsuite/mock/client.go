@@ -22,12 +22,13 @@ type Client interface {
 	BlockIssuance(ctx context.Context) *api.IssuanceBlockHeaderResponse
 	BlockIssuer(ctx context.Context) nodeclient.BlockIssuerClient
 	BlockMetadataByBlockID(ctx context.Context, blockID iotago.BlockID) (*api.BlockMetadataResponse, error)
+	BlockWithMetadataByBlockID(ctx context.Context, blockID iotago.BlockID) (*api.BlockWithMetadataResponse, error)
 	CommitmentByID(ctx context.Context, commitmentID iotago.CommitmentID) *iotago.Commitment
-	CommitmentByIndex(ctx context.Context, slot iotago.SlotIndex) (*iotago.Commitment, error)
+	CommitmentBySlot(ctx context.Context, slot iotago.SlotIndex) (*iotago.Commitment, error)
 	CommitmentUTXOChangesByID(ctx context.Context, commitmentID iotago.CommitmentID) *api.UTXOChangesResponse
-	CommitmentUTXOChangesByIndex(ctx context.Context, slot iotago.SlotIndex) *api.UTXOChangesResponse
+	CommitmentUTXOChangesBySlot(ctx context.Context, slot iotago.SlotIndex) *api.UTXOChangesResponse
 	CommitmentUTXOChangesFullByID(ctx context.Context, commitmentID iotago.CommitmentID) *api.UTXOChangesFullResponse
-	CommitmentUTXOChangesFullByIndex(ctx context.Context, slot iotago.SlotIndex) *api.UTXOChangesFullResponse
+	CommitmentUTXOChangesFullBySlot(ctx context.Context, slot iotago.SlotIndex) *api.UTXOChangesFullResponse
 	CommittedAPI() iotago.API
 	Committee(ctx context.Context, optEpochIndex ...iotago.EpochIndex) *api.CommitteeResponse
 	Congestion(ctx context.Context, accountAddress *iotago.AccountAddress, workScore iotago.WorkScore, optCommitmentID ...iotago.CommitmentID) *api.CongestionResponse
@@ -47,11 +48,11 @@ type Client interface {
 	OutputWithMetadataByID(ctx context.Context, outputID iotago.OutputID) (iotago.Output, *api.OutputMetadata)
 	Rewards(ctx context.Context, outputID iotago.OutputID) *api.ManaRewardsResponse
 	Routes(ctx context.Context) *api.RoutesResponse
-	StakingAccount(ctx context.Context, accountAddress *iotago.AccountAddress) *api.ValidatorResponse
 	SubmitBlock(ctx context.Context, m *iotago.Block) (iotago.BlockID, error)
 	TransactionIncludedBlock(ctx context.Context, txID iotago.TransactionID) *iotago.Block
 	TransactionIncludedBlockMetadata(ctx context.Context, txID iotago.TransactionID) *api.BlockMetadataResponse
 	TransactionMetadata(ctx context.Context, txID iotago.TransactionID) *api.TransactionMetadataResponse
+	Validator(ctx context.Context, accountAddress *iotago.AccountAddress) *api.ValidatorResponse
 	Validators(ctx context.Context, pageSize uint64, cursor ...string) *api.ValidatorsResponse
 	ValidatorsAll(ctx context.Context, maxPages ...int) (validators *api.ValidatorsResponse, allRetrieved bool)
 }
@@ -87,11 +88,11 @@ func (c *TestSuiteClient) APIForVersion(version iotago.Version) iotago.API {
 	return api
 }
 
-func (c *TestSuiteClient) BlockByBlockID(ctx context.Context, blockID iotago.BlockID) (*iotago.Block, error) {
+func (c *TestSuiteClient) BlockByBlockID(_ context.Context, blockID iotago.BlockID) (*iotago.Block, error) {
 	return c.Node.RequestHandler.BlockFromBlockID(blockID)
 }
 
-func (c *TestSuiteClient) BlockIssuance(ctx context.Context) *api.IssuanceBlockHeaderResponse {
+func (c *TestSuiteClient) BlockIssuance(_ context.Context) *api.IssuanceBlockHeaderResponse {
 	blockIssuanceResponse, err := c.Node.RequestHandler.BlockIssuance()
 	require.NoError(c.Node.Testing, err, "failed to get block issuance response")
 
@@ -106,6 +107,10 @@ func (c *TestSuiteClient) BlockMetadataByBlockID(_ context.Context, blockID iota
 	return c.Node.RequestHandler.BlockMetadataFromBlockID(blockID)
 }
 
+func (c *TestSuiteClient) BlockWithMetadataByBlockID(_ context.Context, blockID iotago.BlockID) (*api.BlockWithMetadataResponse, error) {
+	return c.Node.RequestHandler.BlockWithMetadataFromBlockID(blockID)
+}
+
 func (c *TestSuiteClient) CommitmentByID(_ context.Context, commitmentID iotago.CommitmentID) *iotago.Commitment {
 	commitment, err := c.Node.RequestHandler.GetCommitmentByID(commitmentID)
 	require.NoError(c.Node.Testing, err, "failed to get commitment by ID %s", commitmentID)
@@ -113,34 +118,34 @@ func (c *TestSuiteClient) CommitmentByID(_ context.Context, commitmentID iotago.
 	return commitment.Commitment()
 }
 
-func (c *TestSuiteClient) CommitmentByIndex(_ context.Context, slot iotago.SlotIndex) (*iotago.Commitment, error) {
+func (c *TestSuiteClient) CommitmentBySlot(_ context.Context, slot iotago.SlotIndex) (*iotago.Commitment, error) {
 	commitment, err := c.Node.RequestHandler.GetCommitmentBySlot(slot)
 
 	return commitment.Commitment(), err
 }
 
-func (c *TestSuiteClient) CommitmentUTXOChangesByID(ctx context.Context, commitmentID iotago.CommitmentID) *api.UTXOChangesResponse {
+func (c *TestSuiteClient) CommitmentUTXOChangesByID(_ context.Context, commitmentID iotago.CommitmentID) *api.UTXOChangesResponse {
 	resp, err := c.Node.RequestHandler.GetUTXOChangesByCommitmentID(commitmentID)
 	require.NoError(c.Node.Testing, err, "failed to get UTXO changes by ID %s", commitmentID)
 
 	return resp
 }
 
-func (c *TestSuiteClient) CommitmentUTXOChangesByIndex(ctx context.Context, slot iotago.SlotIndex) *api.UTXOChangesResponse {
+func (c *TestSuiteClient) CommitmentUTXOChangesBySlot(_ context.Context, slot iotago.SlotIndex) *api.UTXOChangesResponse {
 	resp, err := c.Node.RequestHandler.GetUTXOChangesBySlot(slot)
 	require.NoError(c.Node.Testing, err, "failed to get UTXO changes by slot %d", slot)
 
 	return resp
 }
 
-func (c *TestSuiteClient) CommitmentUTXOChangesFullByID(ctx context.Context, commitmentID iotago.CommitmentID) *api.UTXOChangesFullResponse {
+func (c *TestSuiteClient) CommitmentUTXOChangesFullByID(_ context.Context, commitmentID iotago.CommitmentID) *api.UTXOChangesFullResponse {
 	resp, err := c.Node.RequestHandler.GetUTXOChangesFullByCommitmentID(commitmentID)
 	require.NoError(c.Node.Testing, err, "failed to get full UTXO changes by ID %s", commitmentID)
 
 	return resp
 }
 
-func (c *TestSuiteClient) CommitmentUTXOChangesFullByIndex(ctx context.Context, slot iotago.SlotIndex) *api.UTXOChangesFullResponse {
+func (c *TestSuiteClient) CommitmentUTXOChangesFullBySlot(_ context.Context, slot iotago.SlotIndex) *api.UTXOChangesFullResponse {
 	resp, err := c.Node.RequestHandler.GetUTXOChangesFullBySlot(slot)
 	require.NoError(c.Node.Testing, err, "failed to get full UTXO changes by slot %d", slot)
 
@@ -151,7 +156,7 @@ func (c *TestSuiteClient) CommittedAPI() iotago.API {
 	return c.Node.RequestHandler.CommittedAPI()
 }
 
-func (c *TestSuiteClient) Committee(ctx context.Context, optEpochIndex ...iotago.EpochIndex) *api.CommitteeResponse {
+func (c *TestSuiteClient) Committee(_ context.Context, optEpochIndex ...iotago.EpochIndex) *api.CommitteeResponse {
 	var epoch iotago.EpochIndex
 	if len(optEpochIndex) == 0 {
 		epoch = c.Node.RequestHandler.CommittedAPI().TimeProvider().CurrentEpoch()
@@ -164,7 +169,7 @@ func (c *TestSuiteClient) Committee(ctx context.Context, optEpochIndex ...iotago
 	return resp
 }
 
-func (c *TestSuiteClient) Congestion(ctx context.Context, accountAddress *iotago.AccountAddress, workScore iotago.WorkScore, optCommitmentID ...iotago.CommitmentID) *api.CongestionResponse {
+func (c *TestSuiteClient) Congestion(_ context.Context, accountAddress *iotago.AccountAddress, workScore iotago.WorkScore, optCommitmentID ...iotago.CommitmentID) *api.CongestionResponse {
 	var commitmentID iotago.CommitmentID
 	if len(optCommitmentID) == 0 {
 		// passing empty commitmentID to the handler will result in the latest commitment being used
@@ -178,15 +183,15 @@ func (c *TestSuiteClient) Congestion(ctx context.Context, accountAddress *iotago
 	return resp
 }
 
-func (c *TestSuiteClient) Do(ctx context.Context, method string, route string, reqObj interface{}, resObj interface{}) *http.Response {
+func (c *TestSuiteClient) Do(_ context.Context, _ string, _ string, _ interface{}, _ interface{}) *http.Response {
 	panic("not implemented")
 }
 
-func (c *TestSuiteClient) DoWithRequestHeaderHook(ctx context.Context, method string, route string, requestHeaderHook nodeclient.RequestHeaderHook, reqObj interface{}, resObj interface{}) *http.Response {
+func (c *TestSuiteClient) DoWithRequestHeaderHook(_ context.Context, _ string, _ string, _ nodeclient.RequestHeaderHook, _ interface{}, _ interface{}) *http.Response {
 	panic("not implemented")
 }
 
-func (c *TestSuiteClient) EventAPI(ctx context.Context) *nodeclient.EventAPIClient {
+func (c *TestSuiteClient) EventAPI(_ context.Context) *nodeclient.EventAPIClient {
 	panic("not implemented")
 }
 
@@ -194,15 +199,15 @@ func (c *TestSuiteClient) HTTPClient() *http.Client {
 	panic("not implemented")
 }
 
-func (c *TestSuiteClient) Health(ctx context.Context) bool {
+func (c *TestSuiteClient) Health(_ context.Context) bool {
 	panic("not implemented")
 }
 
-func (c *TestSuiteClient) Indexer(ctx context.Context) nodeclient.IndexerClient {
+func (c *TestSuiteClient) Indexer(_ context.Context) nodeclient.IndexerClient {
 	panic("not implemented")
 }
 
-func (c *TestSuiteClient) Info(ctx context.Context) *api.InfoResponse {
+func (c *TestSuiteClient) Info(_ context.Context) *api.InfoResponse {
 	return &api.InfoResponse{
 		Status:             c.Node.RequestHandler.GetNodeStatus(),
 		ProtocolParameters: c.Node.RequestHandler.GetProtocolParameters(),
@@ -213,11 +218,11 @@ func (c *TestSuiteClient) LatestAPI() iotago.API {
 	return c.Node.RequestHandler.LatestAPI()
 }
 
-func (c *TestSuiteClient) Management(ctx context.Context) nodeclient.ManagementClient {
+func (c *TestSuiteClient) Management(_ context.Context) nodeclient.ManagementClient {
 	panic("not implemented")
 }
 
-func (c *TestSuiteClient) NodeSupportsRoute(ctx context.Context, route string) bool {
+func (c *TestSuiteClient) NodeSupportsRoute(_ context.Context, _ string) bool {
 	panic("not implemented")
 }
 
@@ -228,14 +233,14 @@ func (c *TestSuiteClient) OutputByID(_ context.Context, outputID iotago.OutputID
 	return resp.Output
 }
 
-func (c *TestSuiteClient) OutputMetadataByID(ctx context.Context, outputID iotago.OutputID) *api.OutputMetadata {
+func (c *TestSuiteClient) OutputMetadataByID(_ context.Context, outputID iotago.OutputID) *api.OutputMetadata {
 	resp, err := c.Node.RequestHandler.OutputMetadataFromOutputID(outputID)
 	require.NoError(c.Node.Testing, err, "failed to get output metadata by ID %s", outputID)
 
 	return resp
 }
 
-func (c *TestSuiteClient) OutputWithMetadataByID(ctx context.Context, outputID iotago.OutputID) (iotago.Output, *api.OutputMetadata) {
+func (c *TestSuiteClient) OutputWithMetadataByID(_ context.Context, outputID iotago.OutputID) (iotago.Output, *api.OutputMetadata) {
 	resp, err := c.Node.RequestHandler.OutputWithMetadataFromOutputID(outputID)
 	require.NoError(c.Node.Testing, err, "failed to get output with metadata by ID %s", outputID)
 
@@ -243,53 +248,53 @@ func (c *TestSuiteClient) OutputWithMetadataByID(ctx context.Context, outputID i
 }
 
 // TODO: check if we should have slot parameter on this interface like we do on rewards endpoint of API.
-func (c *TestSuiteClient) Rewards(ctx context.Context, outputID iotago.OutputID) *api.ManaRewardsResponse {
+func (c *TestSuiteClient) Rewards(_ context.Context, outputID iotago.OutputID) *api.ManaRewardsResponse {
 	resp, err := c.Node.RequestHandler.RewardsByOutputID(outputID)
 	require.NoError(c.Node.Testing, err, "failed to get rewards by output ID %s", outputID)
 
 	return resp
 }
 
-func (c *TestSuiteClient) Routes(ctx context.Context) *api.RoutesResponse {
+func (c *TestSuiteClient) Routes(_ context.Context) *api.RoutesResponse {
 	panic("not implemented")
-}
-
-func (c *TestSuiteClient) StakingAccount(_ context.Context, accountAddress *iotago.AccountAddress) *api.ValidatorResponse {
-	resp, err := c.Node.RequestHandler.ValidatorByAccountAddress(accountAddress)
-	require.NoError(c.Node.Testing, err, "failed to get staking account by address %s", accountAddress)
-
-	return resp
 }
 
 func (c *TestSuiteClient) SubmitBlock(ctx context.Context, block *iotago.Block) (iotago.BlockID, error) {
 	return c.Node.RequestHandler.SubmitBlockAndAwaitBooking(ctx, block)
 }
 
-func (c *TestSuiteClient) TransactionIncludedBlock(ctx context.Context, txID iotago.TransactionID) *iotago.Block {
+func (c *TestSuiteClient) TransactionIncludedBlock(_ context.Context, txID iotago.TransactionID) *iotago.Block {
 	block, err := c.Node.RequestHandler.BlockFromTransactionID(txID)
 	require.NoError(c.Node.Testing, err, "failed to get block by ID %s", txID)
 
 	return block
 }
 
-func (c *TestSuiteClient) TransactionIncludedBlockMetadata(ctx context.Context, txID iotago.TransactionID) *api.BlockMetadataResponse {
+func (c *TestSuiteClient) TransactionIncludedBlockMetadata(_ context.Context, txID iotago.TransactionID) *api.BlockMetadataResponse {
 	resp, err := c.Node.RequestHandler.BlockMetadataFromTransactionID(txID)
 	require.NoError(c.Node.Testing, err, "failed to get block metadata by transaction ID %s", txID)
 
 	return resp
 }
 
-func (c *TestSuiteClient) TransactionMetadata(ctx context.Context, txID iotago.TransactionID) *api.TransactionMetadataResponse {
+func (c *TestSuiteClient) TransactionMetadata(_ context.Context, txID iotago.TransactionID) *api.TransactionMetadataResponse {
 	resp, err := c.Node.RequestHandler.TransactionMetadataFromTransactionID(txID)
 	require.NoError(c.Node.Testing, err, "failed to get transaction metadata by ID %s", txID)
 
 	return resp
 }
 
-func (c *TestSuiteClient) Validators(ctx context.Context, pageSize uint64, cursor ...string) *api.ValidatorsResponse {
+func (c *TestSuiteClient) Validator(_ context.Context, accountAddress *iotago.AccountAddress) *api.ValidatorResponse {
+	resp, err := c.Node.RequestHandler.ValidatorByAccountAddress(accountAddress)
+	require.NoError(c.Node.Testing, err, "failed to get staking account by address %s", accountAddress)
+
+	return resp
+}
+
+func (c *TestSuiteClient) Validators(_ context.Context, _ uint64, _ ...string) *api.ValidatorsResponse {
 	panic("not implemented")
 }
 
-func (c *TestSuiteClient) ValidatorsAll(ctx context.Context, maxPages ...int) (validators *api.ValidatorsResponse, allRetrieved bool) {
+func (c *TestSuiteClient) ValidatorsAll(_ context.Context, _ ...int) (validators *api.ValidatorsResponse, allRetrieved bool) {
 	panic("not implemented")
 }

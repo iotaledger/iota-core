@@ -174,7 +174,7 @@ func (t *TestSuite) issueBlockRow(prefix string, row int, parentsPrefix string, 
 			t.assertParentsCommitmentExistFromBlockOptions(issuingOptionsCopy[node.Name], node.Client)
 			t.assertParentsExistFromBlockOptions(issuingOptionsCopy[node.Name], node.Client)
 
-			t.DefaultWallet().SetDefaultNode(node)
+			t.DefaultWallet().SetDefaultClient(node.Client)
 			b, err = t.IssueBasicBlockWithOptions(blockName, t.DefaultWallet(), tx, issuingOptionsCopy[node.Name]...)
 			require.NoError(t.Testing, err)
 		}

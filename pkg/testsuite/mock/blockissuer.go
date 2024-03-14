@@ -126,7 +126,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, n
 
 			commitmentSlot := commitment.Slot - protoParams.MinCommittableAge()
 			var err error
-			commitment, err = i.Client.CommitmentByIndex(ctx, commitmentSlot)
+			commitment, err = i.Client.CommitmentBySlot(ctx, commitmentSlot)
 			if err != nil {
 				return nil, ierrors.Errorf("can't issue block: failed to get commitment at slot %d", commitmentSlot)
 			}
