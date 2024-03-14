@@ -54,7 +54,7 @@ type Options struct {
 	// SnapshotPath is the path to the snapshot file that should be used to initialize the protocol.
 	SnapshotPath string
 
-	// CommitmentCheck is an opt flag that allows enginem upon startup, check correctness of commitment and ledger state
+	// CommitmentCheck is an opt flag that allows engines check correctness of commitment and ledger state upon startup.
 	CommitmentCheck bool
 
 	// MaxAllowedWallClockDrift specifies how far in the future are blocks allowed to be ahead of our own wall clock (defaults to 0 seconds).
