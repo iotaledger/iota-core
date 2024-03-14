@@ -128,7 +128,7 @@ func (b *Booker) Queue(block *blocks.Block) error {
 func (b *Booker) Reset() { /* nothing to reset but comply with interface */ }
 
 func (b *Booker) setupBlock(block *blocks.Block) {
-	var directlyReferencedUTXODependencies, utxoDependencies ds.Set[mempool.StateMetadata]
+	var utxoDependencies, directlyReferencedUTXODependencies ds.Set[mempool.StateMetadata]
 	if signedTransactionMetadata := block.SignedTransactionMetadata.Get(); signedTransactionMetadata != nil && signedTransactionMetadata.SignaturesInvalid() == nil && !signedTransactionMetadata.TransactionMetadata().IsInvalid() {
 		utxoDependencies = signedTransactionMetadata.TransactionMetadata().Inputs()
 		directlyReferencedUTXODependencies = ds.NewSet[mempool.StateMetadata]()
