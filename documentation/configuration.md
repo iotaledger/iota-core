@@ -335,12 +335,13 @@ Example:
 
 ## <a id="protocol"></a> 9. Protocol
 
-| Name                             | Description                              | Type   | Default value                      |
-| -------------------------------- | ---------------------------------------- | ------ | ---------------------------------- |
-| [snapshot](#protocol_snapshot)   | Configuration for snapshot               | object |                                    |
-| [filter](#protocol_filter)       | Configuration for filter                 | object |                                    |
-| protocolParametersPath           | The path of the protocol parameters file | string | "testnet/protocol_parameters.json" |
-| [baseToken](#protocol_basetoken) | Configuration for baseToken              | object |                                    |
+| Name                             | Description                                                      | Type    | Default value                      |
+| -------------------------------- | ---------------------------------------------------------------- | ------- | ---------------------------------- |
+| [snapshot](#protocol_snapshot)   | Configuration for snapshot                                       | object  |                                    |
+| commitmentCheck                  | Specifies whether commitment and ledger checks should be enabled | boolean | true                               |
+| [filter](#protocol_filter)       | Configuration for filter                                         | object  |                                    |
+| protocolParametersPath           | The path of the protocol parameters file                         | string  | "testnet/protocol_parameters.json" |
+| [baseToken](#protocol_basetoken) | Configuration for baseToken                                      | object  |                                    |
 
 ### <a id="protocol_snapshot"></a> Snapshot
 
@@ -374,6 +375,7 @@ Example:
         "path": "testnet/snapshot.bin",
         "depth": 5
       },
+      "commitmentCheck": true,
       "filter": {
         "maxAllowedClockDrift": "5s"
       },
