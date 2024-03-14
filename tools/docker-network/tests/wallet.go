@@ -5,6 +5,7 @@ package tests
 import (
 	"crypto/ed25519"
 	"math/big"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -33,8 +34,11 @@ type DockerWallet struct {
 
 	lastUsedIndex atomic.Uint32
 
-	outputs  map[iotago.OutputID]*OutputData
-	accounts map[iotago.AccountID]*AccountData
+	outputs     map[iotago.OutputID]*OutputData
+	outputsLock sync.RWMutex
+
+	accounts     map[iotago.AccountID]*AccountData
+	accountsLock sync.RWMutex
 }
 
 // OutputData holds the details of an output that can be used to build a transaction.
@@ -78,14 +82,23 @@ func (w *DockerWallet) DefaultClient() *nodeclient.Client {
 }
 
 func (w *DockerWallet) AddOutput(outputID iotago.OutputID, output *OutputData) {
+	w.outputsLock.Lock()
+	defer w.outputsLock.Unlock()
+
 	w.outputs[outputID] = output
 }
 
 func (w *DockerWallet) AddAccount(accountID iotago.AccountID, data *AccountData) {
+	w.accountsLock.Lock()
+	defer w.accountsLock.Unlock()
+
 	w.accounts[accountID] = data
 }
 
 func (w *DockerWallet) Output(outputName iotago.OutputID) *OutputData {
+	w.outputsLock.RLock()
+	defer w.outputsLock.RUnlock()
+
 	output, exists := w.outputs[outputName]
 	if !exists {
 		panic(ierrors.Errorf("output %s not registered in wallet", outputName))
@@ -95,12 +108,37 @@ func (w *DockerWallet) Output(outputName iotago.OutputID) *OutputData {
 }
 
 func (w *DockerWallet) Account(accountID iotago.AccountID) *AccountData {
+	w.accountsLock.RLock()
+	defer w.accountsLock.RUnlock()
+
 	acc, exists := w.accounts[accountID]
 	if !exists {
 		panic(ierrors.Errorf("account %s not registered in wallet", accountID.ToHex()))
 	}
 
 	return acc
+}
+
+func (w *DockerWallet) Accounts(accountIds ...iotago.AccountID) []*AccountData {
+	w.accountsLock.RLock()
+	defer w.accountsLock.RUnlock()
+
+	accounts := make([]*AccountData, 0)
+	if len(accountIds) == 0 {
+		for _, acc := range w.accounts {
+			accounts = append(accounts, acc)
+		}
+	}
+
+	for _, id := range accountIds {
+		acc, exists := w.accounts[id]
+		if !exists {
+			panic(ierrors.Errorf("account %s not registered in wallet", id.ToHex()))
+		}
+		accounts = append(accounts, acc)
+	}
+
+	return accounts
 }
 
 func (w *DockerWallet) Address(index ...uint32) (uint32, *iotago.Ed25519Address) {
