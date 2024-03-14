@@ -22,7 +22,6 @@ import (
 
 type TestSuite struct {
 	T                    *testing.T
-	stores               map[iotago.SlotIndex]kvstore.KVStore
 	accounts             map[string]iotago.AccountID
 	poolRewards          map[iotago.EpochIndex]map[string]*model.PoolRewards
 	epochStats           map[iotago.EpochIndex]*model.PoolsStats
@@ -30,8 +29,7 @@ type TestSuite struct {
 
 	api iotago.API
 
-	Instance              *Tracker
-	performanceFactorFunc func(iotago.SlotIndex) *model.ValidatorPerformance
+	Instance *Tracker
 }
 
 func NewTestSuite(t *testing.T) *TestSuite {
