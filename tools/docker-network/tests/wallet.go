@@ -120,11 +120,11 @@ func (w *DockerWallet) Account(accountID iotago.AccountID) *mock.AccountData {
 	return acc
 }
 
-func (w *DockerWallet) Accounts(accountIds ...iotago.AccountID) []*AccountData {
+func (w *DockerWallet) Accounts(accountIds ...iotago.AccountID) []*mock.AccountData {
 	w.accountsLock.RLock()
 	defer w.accountsLock.RUnlock()
 
-	accounts := make([]*AccountData, 0)
+	accounts := make([]*mock.AccountData, 0)
 	if len(accountIds) == 0 {
 		for _, acc := range w.accounts {
 			accounts = append(accounts, acc)

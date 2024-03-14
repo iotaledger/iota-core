@@ -3,6 +3,9 @@ package requesthandler
 import (
 	"testing"
 
+	"github.com/labstack/echo/v4"
+	"github.com/stretchr/testify/require"
+
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -12,8 +15,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
-	"github.com/labstack/echo/v4"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_ValidatorsAPI(t *testing.T) {
@@ -64,12 +65,12 @@ func Test_ValidatorsAPI(t *testing.T) {
 	})
 
 	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
-		ts.Node("node1").Validator.AccountID,
-		ts.Node("node2").Validator.AccountID,
-		ts.Node("node3").Validator.AccountID,
+		ts.Node("node1").Validator.AccountData.ID,
+		ts.Node("node2").Validator.AccountData.ID,
+		ts.Node("node3").Validator.AccountData.ID,
 	}, ts.Nodes()...)
 
-	requestHandler := New(ts.DefaultWallet().Node.Protocol)
+	requestHandler := New(node1.Protocol)
 	hrp := ts.API.ProtocolParameters().Bech32HRP()
 
 	// Epoch 0, assert that node1 and node4 are the only candidates.
@@ -82,18 +83,18 @@ func Test_ValidatorsAPI(t *testing.T) {
 		ts.IssueBlocksAtSlots("wave-2:", []iotago.SlotIndex{5, 6, 7, 8}, 4, "node4-candidacy:1", ts.Nodes(), true, false)
 
 		ts.AssertSybilProtectionCandidates(0, []iotago.AccountID{
-			ts.Node("node1").Validator.AccountID,
-			ts.Node("node4").Validator.AccountID,
+			ts.Node("node1").Validator.AccountData.ID,
+			ts.Node("node4").Validator.AccountData.ID,
 		}, ts.Nodes()...)
 
 		ts.AssertSybilProtectionRegisteredValidators(0, []string{
-			ts.Node("node1").Validator.AccountID.ToAddress().Bech32(hrp),
-			ts.Node("node4").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node1").Validator.AccountData.ID.ToAddress().Bech32(hrp),
+			ts.Node("node4").Validator.AccountData.ID.ToAddress().Bech32(hrp),
 		}, ts.Nodes()...)
 
 		assertValidatorsFromRequestHandler(t, []string{
-			ts.Node("node1").Validator.AccountID.ToAddress().Bech32(hrp),
-			ts.Node("node4").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node1").Validator.AccountData.ID.ToAddress().Bech32(hrp),
+			ts.Node("node4").Validator.AccountData.ID.ToAddress().Bech32(hrp),
 		}, requestHandler, 0)
 	}
 
@@ -103,21 +104,21 @@ func Test_ValidatorsAPI(t *testing.T) {
 		ts.IssueBlocksAtSlots("wave-3:", []iotago.SlotIndex{9, 10}, 4, "node2-candidacy:1", ts.Nodes(), true, false)
 
 		ts.AssertSybilProtectionCandidates(0, []iotago.AccountID{
-			ts.Node("node1").Validator.AccountID,
-			ts.Node("node2").Validator.AccountID,
-			ts.Node("node4").Validator.AccountID,
+			ts.Node("node1").Validator.AccountData.ID,
+			ts.Node("node2").Validator.AccountData.ID,
+			ts.Node("node4").Validator.AccountData.ID,
 		}, ts.Nodes()...)
 
 		ts.AssertSybilProtectionRegisteredValidators(0, []string{
-			ts.Node("node1").Validator.AccountID.ToAddress().Bech32(hrp),
-			ts.Node("node2").Validator.AccountID.ToAddress().Bech32(hrp),
-			ts.Node("node4").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node1").Validator.AccountData.ID.ToAddress().Bech32(hrp),
+			ts.Node("node2").Validator.AccountData.ID.ToAddress().Bech32(hrp),
+			ts.Node("node4").Validator.AccountData.ID.ToAddress().Bech32(hrp),
 		}, ts.Nodes()...)
 
 		assertValidatorsFromRequestHandler(t, []string{
-			ts.Node("node1").Validator.AccountID.ToAddress().Bech32(hrp),
-			ts.Node("node2").Validator.AccountID.ToAddress().Bech32(hrp),
-			ts.Node("node4").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node1").Validator.AccountData.ID.ToAddress().Bech32(hrp),
+			ts.Node("node2").Validator.AccountData.ID.ToAddress().Bech32(hrp),
+			ts.Node("node4").Validator.AccountData.ID.ToAddress().Bech32(hrp),
 		}, requestHandler, 0)
 	}
 
@@ -127,21 +128,21 @@ func Test_ValidatorsAPI(t *testing.T) {
 		ts.IssueBlocksAtSlots("wave-5:", []iotago.SlotIndex{11}, 4, "node3-candidacy:1", ts.Nodes(), true, false)
 
 		ts.AssertSybilProtectionCandidates(0, []iotago.AccountID{
-			ts.Node("node1").Validator.AccountID,
-			ts.Node("node2").Validator.AccountID,
-			ts.Node("node4").Validator.AccountID,
+			ts.Node("node1").Validator.AccountData.ID,
+			ts.Node("node2").Validator.AccountData.ID,
+			ts.Node("node4").Validator.AccountData.ID,
 		}, ts.Nodes()...)
 
 		ts.AssertSybilProtectionRegisteredValidators(0, []string{
-			ts.Node("node1").Validator.AccountID.ToAddress().Bech32(hrp),
-			ts.Node("node2").Validator.AccountID.ToAddress().Bech32(hrp),
-			ts.Node("node4").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node1").Validator.AccountData.ID.ToAddress().Bech32(hrp),
+			ts.Node("node2").Validator.AccountData.ID.ToAddress().Bech32(hrp),
+			ts.Node("node4").Validator.AccountData.ID.ToAddress().Bech32(hrp),
 		}, ts.Nodes()...)
 
 		assertValidatorsFromRequestHandler(t, []string{
-			ts.Node("node1").Validator.AccountID.ToAddress().Bech32(hrp),
-			ts.Node("node2").Validator.AccountID.ToAddress().Bech32(hrp),
-			ts.Node("node4").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node1").Validator.AccountData.ID.ToAddress().Bech32(hrp),
+			ts.Node("node2").Validator.AccountData.ID.ToAddress().Bech32(hrp),
+			ts.Node("node4").Validator.AccountData.ID.ToAddress().Bech32(hrp),
 		}, requestHandler, 0)
 	}
 
@@ -155,25 +156,25 @@ func Test_ValidatorsAPI(t *testing.T) {
 
 		// request registered validators of epoch 0, the validator cache should be used.
 		assertValidatorsFromRequestHandler(t, []string{
-			ts.Node("node1").Validator.AccountID.ToAddress().Bech32(hrp),
-			ts.Node("node2").Validator.AccountID.ToAddress().Bech32(hrp),
-			ts.Node("node4").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node1").Validator.AccountData.ID.ToAddress().Bech32(hrp),
+			ts.Node("node2").Validator.AccountData.ID.ToAddress().Bech32(hrp),
+			ts.Node("node4").Validator.AccountData.ID.ToAddress().Bech32(hrp),
 		}, requestHandler, 0)
 
 		// epoch 1 should have 2 validators (node2, node3)
 		ts.AssertSybilProtectionCandidates(1, []iotago.AccountID{
-			ts.Node("node2").Validator.AccountID,
-			ts.Node("node3").Validator.AccountID,
+			ts.Node("node2").Validator.AccountData.ID,
+			ts.Node("node3").Validator.AccountData.ID,
 		}, ts.Nodes()...)
 
 		ts.AssertSybilProtectionRegisteredValidators(1, []string{
-			ts.Node("node2").Validator.AccountID.ToAddress().Bech32(hrp),
-			ts.Node("node3").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node2").Validator.AccountData.ID.ToAddress().Bech32(hrp),
+			ts.Node("node3").Validator.AccountData.ID.ToAddress().Bech32(hrp),
 		}, ts.Nodes()...)
 
 		assertValidatorsFromRequestHandler(t, []string{
-			ts.Node("node2").Validator.AccountID.ToAddress().Bech32(hrp),
-			ts.Node("node3").Validator.AccountID.ToAddress().Bech32(hrp),
+			ts.Node("node2").Validator.AccountData.ID.ToAddress().Bech32(hrp),
+			ts.Node("node3").Validator.AccountData.ID.ToAddress().Bech32(hrp),
 		}, requestHandler, 1)
 	}
 
