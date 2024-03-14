@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 func (t *TestSuite) AssertSybilProtectionCommittee(epoch iotago.EpochIndex, expectedAccounts []iotago.AccountID, nodes ...*mock.Node) {
@@ -75,6 +76,30 @@ func (t *TestSuite) AssertReelectedCommitteeSeatIndices(prevEpoch iotago.EpochIn
 			})
 
 			return innerErr
+		})
+	}
+}
+
+func (t *TestSuite) AssertSybilProtectionRegisteredValidators(epoch iotago.EpochIndex, expectedAccounts []string, nodes ...*mock.Node) {
+	mustNodes(nodes)
+
+	for _, node := range nodes {
+		t.Eventually(func() error {
+			candidates, err := node.Protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(epoch)
+			candidateIDs := lo.Map(candidates, func(candidate *api.ValidatorResponse) string {
+				return candidate.AddressBech32
+			})
+			require.NoError(t.Testing, err)
+
+			if !assert.ElementsMatch(t.fakeTesting, expectedAccounts, candidateIDs) {
+				return ierrors.Errorf("AssertSybilProtectionRegisteredValidators: %s: expected %s, got %s", node.Name, expectedAccounts, candidateIDs)
+			}
+
+			if len(expectedAccounts) != len(candidates) {
+				return ierrors.Errorf("AssertSybilProtectionRegisteredValidators: %s: expected %v, got %v", node.Name, len(expectedAccounts), len(candidateIDs))
+			}
+
+			return nil
 		})
 	}
 }
