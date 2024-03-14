@@ -36,6 +36,14 @@ func (c *BlockRetainerCache) setBlockMetadata(blockID iotago.BlockID, state api.
 		blocks = make(map[iotago.BlockID]api.BlockState)
 	}
 
+	prevState, ok := blocks[blockID]
+	if ok && state == api.BlockStateDropped {
+		if prevState == api.BlockStateAccepted || state == api.BlockStateConfirmed {
+			// do not overwrite acceptance with the local congestion dropped event
+			return
+		}
+	}
+
 	blocks[blockID] = state
 	c.uncommittedBlockMetadataChanges.Set(blockID.Slot(), blocks)
 }

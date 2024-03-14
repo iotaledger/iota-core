@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -132,23 +133,28 @@ func (tf *TestFramework) initiateRetainerBlockFlow(currentSlot iotago.SlotIndex,
 	}
 }
 
+func (tf *TestFramework) triggerBlockRetainerAction(alias string, act action) error {
+	var err error
+	switch act {
+	case none:
+		// no action
+	case eventAccepted:
+		err = tf.Instance.OnBlockAccepted(tf.getBlockID(alias))
+	case eventConfirmed:
+		err = tf.Instance.OnBlockConfirmed(tf.getBlockID(alias))
+	case eventDropped:
+		err = tf.Instance.OnBlockDropped(tf.getBlockID(alias))
+	default:
+		err = ierrors.Errorf("unknown action %d", act)
+	}
+
+	return err
+}
+
 func (tf *TestFramework) assertBlockMetadata(testActions []*BlockRetainerAction) {
 	for _, act := range testActions {
-		switch act.Action {
-		case none:
-			// no action
-		case eventAccepted:
-			err := tf.Instance.OnBlockAccepted(tf.getBlockID(act.Alias))
-			require.NoError(tf.test, err)
-		case eventConfirmed:
-			err := tf.Instance.OnBlockConfirmed(tf.getBlockID(act.Alias))
-			require.NoError(tf.test, err)
-		case eventDropped:
-			err := tf.Instance.OnBlockDropped(tf.getBlockID(act.Alias))
-			require.NoError(tf.test, err)
-		default:
-			require.Errorf(tf.test, nil, "unknown action")
-		}
+		err := tf.triggerBlockRetainerAction(act.Alias, act.Action)
+		require.NoError(tf.test, err)
 	}
 
 	for _, act := range testActions {
@@ -161,4 +167,9 @@ func (tf *TestFramework) assertBlockMetadata(testActions []*BlockRetainerAction)
 		require.NoError(tf.test, err)
 		require.Equal(tf.test, expectedResp, res, "block metadata mismatch for alias %s", act.Alias)
 	}
+}
+
+func (tf *TestFramework) assertError(act *BlockRetainerAction) {
+	err := tf.triggerBlockRetainerAction(act.Alias, act.Action)
+	require.Error(tf.test, err)
 }

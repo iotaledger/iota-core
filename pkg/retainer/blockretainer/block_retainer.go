@@ -103,7 +103,9 @@ func NewProvider() module.Provider[*engine.Engine, retainer.BlockRetainer] {
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (r *BlockRetainer) Reset() {
-	// todo reset to slot
+	r.Lock()
+	defer r.Unlock()
+
 	r.cache.uncommittedBlockMetadataChanges.Clear()
 }
 
