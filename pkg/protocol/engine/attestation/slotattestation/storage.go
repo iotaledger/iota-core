@@ -32,7 +32,7 @@ func (m *Manager) RestoreFromDisk() error {
 		}
 	}
 
-	m.TriggerInitialized()
+	m.InitializedEvent().Trigger()
 
 	return nil
 }

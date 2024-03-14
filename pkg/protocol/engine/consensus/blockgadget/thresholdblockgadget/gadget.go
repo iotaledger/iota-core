@@ -36,7 +36,7 @@ type Gadget struct {
 
 func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine, blockgadget.Gadget] {
 	return module.Provide(func(e *engine.Engine) blockgadget.Gadget {
-		g := New(e.BlockCache, e.SybilProtection.SeatManager(), e.ErrorHandler("gadget"), opts...)
+		g := New(e.NewSubModule("ThresholdBlockGadget"), e.BlockCache, e.SybilProtection.SeatManager(), e.ErrorHandler("gadget"), opts...)
 
 		wp := e.Workers.CreatePool("ThresholdBlockGadget", workerpool.WithWorkerCount(1))
 		e.Events.Booker.BlockBooked.Hook(g.TrackWitnessWeight, event.WithWorkerPool(wp))
@@ -47,8 +47,9 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(blockCache *blocks.Blocks, seatManager seatmanager.SeatManager, errorHandler func(error), opts ...options.Option[Gadget]) *Gadget {
-	return options.Apply(&Gadget{
+func New(subModule module.Module, blockCache *blocks.Blocks, seatManager seatmanager.SeatManager, errorHandler func(error), opts ...options.Option[Gadget]) *Gadget {
+	return module.InitSimpleLifecycle(options.Apply(&Gadget{
+		Module:       subModule,
 		events:       blockgadget.NewEvents(),
 		seatManager:  seatManager,
 		blockCache:   blockCache,
@@ -57,17 +58,11 @@ func New(blockCache *blocks.Blocks, seatManager seatmanager.SeatManager, errorHa
 		optsAcceptanceThreshold:               0.67,
 		optsConfirmationThreshold:             0.67,
 		optsConfirmationRatificationThreshold: 2,
-	}, opts,
-		(*Gadget).TriggerConstructed,
-	)
+	}, opts))
 }
 
 func (g *Gadget) Events() *blockgadget.Events {
 	return g.events
-}
-
-func (g *Gadget) Shutdown() {
-	g.TriggerStopped()
 }
 
 // Reset resets the component to a clean state as if it was created at the last commitment.

@@ -67,7 +67,7 @@ func newChains(protocol *Protocol) *Chains {
 	c.WithElements(func(chain *Chain) (teardown func()) {
 		return chain.Engine.OnUpdate(func(_ *engine.Engine, newEngine *engine.Engine) {
 			if newEngine != nil {
-				newEngine.Logger.OnLogLevelActive(log.LevelTrace, func() (shutdown func()) {
+				newEngine.OnLogLevelActive(log.LevelTrace, func() (shutdown func()) {
 					return attachEngineLogs(newEngine)
 				})
 			}
@@ -78,12 +78,12 @@ func newChains(protocol *Protocol) *Chains {
 		c.initLogger(protocol.NewChildLogger("Chains")),
 		c.initChainSwitching(),
 
-		protocol.Constructed.WithNonEmptyValue(func(_ bool) (shutdown func()) {
+		protocol.ConstructedEvent().WithNonEmptyValue(func(_ bool) (shutdown func()) {
 			return c.deriveLatestSeenSlot(protocol)
 		}),
 	)
 
-	protocol.Shutdown.OnTrigger(shutdown)
+	protocol.ShutdownEvent().OnTrigger(shutdown)
 
 	return c
 }

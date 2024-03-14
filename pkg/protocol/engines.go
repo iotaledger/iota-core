@@ -38,51 +38,45 @@ type Engines struct {
 	directory *utils.Directory
 
 	// ReactiveModule embeds a reactive module that provides default API for logging and lifecycle management.
-	*module.ReactiveModule
+	module.Module
 }
 
 // newEngines creates a new Engines instance.
 func newEngines(protocol *Protocol) *Engines {
 	e := &Engines{
-		Main:           reactive.NewVariable[*engine.Engine](),
-		ReactiveModule: protocol.NewReactiveSubModule("Engines"),
-		protocol:       protocol,
-		worker:         protocol.Workers.CreatePool("Engines", workerpool.WithWorkerCount(1)),
-		directory:      utils.NewDirectory(protocol.Options.BaseDirectory),
+		Main:      reactive.NewVariable[*engine.Engine](),
+		Module:    protocol.NewSubModule("Engines"),
+		protocol:  protocol,
+		worker:    protocol.Workers.CreatePool("Engines", workerpool.WithWorkerCount(1)),
+		directory: utils.NewDirectory(protocol.Options.BaseDirectory),
 	}
 
-	protocol.Constructed.OnTrigger(func() {
+	protocol.ConstructedEvent().OnTrigger(func() {
 		shutdown := lo.BatchReverse(
-			e.initLogger(protocol.NewChildLogger("Engines")),
+			e.initLogging(),
 
 			e.syncMainEngineFromMainChain(),
 			e.syncMainEngineInfoFile(),
 			e.injectEngineInstances(),
 		)
 
-		e.Shutdown.OnTrigger(func() {
+		e.ShutdownEvent().OnTrigger(func() {
 			shutdown()
 
-			e.Stopped.Trigger()
+			e.StoppedEvent().Trigger()
 		})
 
-		e.Initialized.Trigger()
+		e.InitializedEvent().Trigger()
 	})
 
-	e.Constructed.Trigger()
+	e.ConstructedEvent().Trigger()
 
 	return e
 }
 
-// initLogger initializes the logger for this component.
-func (e *Engines) initLogger(logger log.Logger) (shutdown func()) {
-	e.Logger = logger
-
-	return lo.BatchReverse(
-		e.Main.LogUpdates(e, log.LevelTrace, "Main", (*engine.Engine).LogName),
-
-		logger.UnsubscribeFromParentLogger,
-	)
+// initLogging initializes the logging for this component.
+func (e *Engines) initLogging() (shutdown func()) {
+	return e.Main.LogUpdates(e, log.LevelTrace, "Main", (*engine.Engine).LogName)
 }
 
 // ForkAtSlot creates a new engine instance that forks from the main engine at the given slot.
@@ -93,7 +87,7 @@ func (e *Engines) ForkAtSlot(slot iotago.SlotIndex) (*engine.Engine, error) {
 	}
 
 	// copy raw data on disk.
-	newStorage, err := storage.Clone(e.Logger, e.Main.Get().Storage, e.directory.Path(newEngineAlias), DatabaseVersion, errorHandler, e.protocol.Options.StorageOptions...)
+	newStorage, err := storage.Clone(e, e.Main.Get().Storage, e.directory.Path(newEngineAlias), DatabaseVersion, errorHandler, e.protocol.Options.StorageOptions...)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to copy storage from active engine instance (%s) to new engine instance (%s)", e.Main.Get().Storage.Directory(), e.directory.Path(newEngineAlias))
 	}
@@ -108,7 +102,7 @@ func (e *Engines) ForkAtSlot(slot iotago.SlotIndex) (*engine.Engine, error) {
 	evictionState.Initialize(latestCommitment.Slot())
 
 	blockCache := blocks.New(evictionState, newStorage.Settings().APIProvider())
-	accountsManager := accountsledger.New(newStorage.Settings().APIProvider(), blockCache.Block, newStorage.AccountDiffs, newStorage.Accounts())
+	accountsManager := accountsledger.New(module.New(log.NewLogger(log.WithName("ForkedAccountsLedger"))), newStorage.Settings().APIProvider(), blockCache.Block, newStorage.AccountDiffs, newStorage.Accounts())
 
 	accountsManager.SetLatestCommittedSlot(latestCommitment.Slot())
 	if err = accountsManager.Rollback(slot); err != nil {
@@ -204,13 +198,13 @@ func (e *Engines) loadEngineInstanceFromSnapshot(engineAlias string, snapshotPat
 		e.protocol.LogError("engine error", "err", err, "name", engineAlias[0:8])
 	}
 
-	return e.loadEngineInstanceWithStorage(engineAlias, storage.Create(e.Logger, e.directory.Path(engineAlias), DatabaseVersion, errorHandler, e.protocol.Options.StorageOptions...), engine.WithSnapshotPath(snapshotPath), engine.WithCommitmentCheck(commitmentCheck))
+	return e.loadEngineInstanceWithStorage(engineAlias, storage.Create(e, e.directory.Path(engineAlias), DatabaseVersion, errorHandler, e.protocol.Options.StorageOptions...), engine.WithSnapshotPath(snapshotPath), engine.WithCommitmentCheck(commitmentCheck))
 }
 
 // loadEngineInstanceWithStorage loads an engine instance with the given storage.
 func (e *Engines) loadEngineInstanceWithStorage(engineAlias string, storage *storage.Storage, engineOptions ...options.Option[engine.Engine]) *engine.Engine {
 	return engine.New(
-		e.protocol.Logger,
+		e.protocol,
 		e.protocol.Workers.CreateGroup(engineAlias),
 		storage,
 		e.protocol.Options.PreSolidFilterProvider,
@@ -275,7 +269,7 @@ func (e *Engines) injectEngineInstances() (shutdown func()) {
 				}(); err != nil {
 					e.LogError("failed to create new engine instance", "err", err)
 				} else {
-					e.protocol.Network.OnShutdown(func() { newEngine.Shutdown.Trigger() })
+					e.protocol.Network.OnShutdown(func() { newEngine.ShutdownEvent().Trigger() })
 
 					chain.Engine.Set(newEngine)
 				}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -30,7 +31,7 @@ func NewTestFramework(t *testing.T, apiProvider iotago.APIProvider, optsFilter .
 		Test:        t,
 		apiProvider: apiProvider,
 	}
-	tf.Filter = New(apiProvider, optsFilter...)
+	tf.Filter = New(module.NewTestModule(t), apiProvider, optsFilter...)
 
 	tf.Filter.events.BlockPreAllowed.Hook(func(block *model.Block) {
 		t.Logf("BlockPreAllowed: %s", block.ID())

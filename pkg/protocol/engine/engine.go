@@ -90,7 +90,7 @@ type Engine struct {
 	optsCheckCommitment  bool
 	optsBlockRequester   []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]]
 
-	*module.ReactiveModule
+	module.Module
 }
 
 func New(
@@ -134,7 +134,7 @@ func New(
 			optsSnapshotDepth:   5,
 			optsCheckCommitment: true,
 		}, opts, func(e *Engine) {
-			e.ReactiveModule = e.initReactiveModule(logger)
+			e.Module = e.initReactiveModule(logger)
 
 			e.errorHandler = func(err error) {
 				e.LogError("engine error", "err", err)
@@ -185,7 +185,7 @@ func New(
 		(*Engine).setupPruning,
 		(*Engine).acceptanceHandler,
 		func(e *Engine) {
-			e.Constructed.Trigger()
+			e.ConstructedEvent().Trigger()
 
 			// Make sure that we have the protocol parameters for the latest supported iota.go protocol version of the software.
 			// If not the user needs to update the protocol parameters file.
@@ -239,7 +239,7 @@ func New(
 				}
 			}
 
-			e.Initialized.Trigger()
+			e.InitializedEvent().Trigger()
 
 			e.LogTrace("initialized", "settings", e.Storage.Settings().String())
 		},
@@ -553,14 +553,14 @@ func (e *Engine) initRootCommitment() {
 		})
 	}
 
-	e.Constructed.OnTrigger(func() {
+	e.ConstructedEvent().OnTrigger(func() {
 		unsubscribe := e.Events.SlotGadget.SlotFinalized.Hook(updateRootCommitment).Unhook
 
-		e.Initialized.OnTrigger(func() {
+		e.InitializedEvent().OnTrigger(func() {
 			updateRootCommitment(e.Storage.Settings().LatestFinalizedSlot())
 		})
 
-		e.Shutdown.OnTrigger(unsubscribe)
+		e.ShutdownEvent().OnTrigger(unsubscribe)
 	})
 }
 
@@ -571,58 +571,66 @@ func (e *Engine) initLatestCommitment() {
 		})
 	}
 
-	e.Constructed.OnTrigger(func() {
+	e.ConstructedEvent().OnTrigger(func() {
 		unsubscribe := e.Events.Notarization.LatestCommitmentUpdated.Hook(updateLatestCommitment).Unhook
 
-		e.Initialized.OnTrigger(func() {
+		e.InitializedEvent().OnTrigger(func() {
 			updateLatestCommitment(e.Storage.Settings().LatestCommitment())
 		})
 
-		e.Shutdown.OnTrigger(unsubscribe)
+		e.ShutdownEvent().OnTrigger(unsubscribe)
 	})
 }
 
-func (e *Engine) initReactiveModule(parentLogger log.Logger) (reactiveModule *module.ReactiveModule) {
-	logger := parentLogger.NewChildLogger("Engine", true)
-	reactiveModule = module.NewReactiveModule(logger)
+func (e *Engine) initReactiveModule(parentLogger log.Logger) (reactiveModule module.Module) {
+	reactiveModule = module.New(parentLogger.NewChildLogger("Engine", true))
 
 	e.RootCommitment.LogUpdates(reactiveModule, log.LevelTrace, "RootCommitment")
 	e.LatestCommitment.LogUpdates(reactiveModule, log.LevelTrace, "LatestCommitment")
 
-	reactiveModule.Shutdown.OnTrigger(func() {
+	reactiveModule.ShutdownEvent().OnTrigger(func() {
 		reactiveModule.LogDebug("shutting down")
 
-		logger.UnsubscribeFromParentLogger()
-
-		// Shutdown should be performed in the reverse dataflow order.
 		e.BlockRequester.Shutdown()
-		e.Scheduler.Shutdown()
-		e.TipSelection.Shutdown()
-		e.TipManager.Shutdown()
-		e.Attestations.Shutdown()
-		e.SyncManager.Shutdown()
-		e.Notarization.Shutdown()
-		e.Clock.Shutdown()
-		e.SlotGadget.Shutdown()
-		e.BlockGadget.Shutdown()
-		e.UpgradeOrchestrator.Shutdown()
-		e.SybilProtection.Shutdown()
-		e.Booker.Shutdown()
-		e.Ledger.Shutdown()
-		e.PostSolidFilter.Shutdown()
-		e.BlockDAG.Shutdown()
-		e.PreSolidFilter.Shutdown()
-		e.BlockRetainer.Shutdown()
-		e.TxRetainer.Shutdown()
+
+		e.shutdownSubModules()
+
 		e.Workers.Shutdown()
 		e.Storage.Shutdown()
 
-		reactiveModule.LogDebug("stopped")
+		e.StoppedEvent().Trigger()
 
-		e.Stopped.Trigger()
+		reactiveModule.LogDebug("stopped")
 	})
 
 	return reactiveModule
+}
+
+func (e *Engine) shutdownSubModules() {
+	// shutdown should be performed in the reverse dataflow order.
+	shutdownOrder := []module.Module{
+		e.Scheduler,
+		e.TipSelection,
+		e.TipManager,
+		e.Attestations,
+		e.SyncManager,
+		e.Notarization,
+		e.Clock,
+		e.SlotGadget,
+		e.BlockGadget,
+		e.UpgradeOrchestrator,
+		e.SybilProtection,
+		e.Booker,
+		e.Ledger,
+		e.PostSolidFilter,
+		e.BlockDAG,
+		e.PreSolidFilter,
+		e.BlockRetainer,
+		e.TxRetainer,
+	}
+
+	module.TriggerAll(module.Module.ShutdownEvent, shutdownOrder...)
+	module.WaitAll(module.Module.StoppedEvent, shutdownOrder...).Wait()
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

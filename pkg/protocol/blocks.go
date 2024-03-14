@@ -34,13 +34,13 @@ type Blocks struct {
 // newBlocks creates a new blocks protocol instance for the given protocol.
 func newBlocks(protocol *Protocol) *Blocks {
 	b := &Blocks{
-		Logger:              lo.Return1(protocol.Logger.NewChildLogger("Blocks")),
+		Logger:              protocol.NewChildLogger("Blocks"),
 		protocol:            protocol,
 		workerPool:          protocol.Workers.CreatePool("Blocks"),
 		droppedBlocksBuffer: buffer.NewUnsolidCommitmentBuffer[*types.Tuple[*model.Block, peer.ID]](20, 100),
 	}
 
-	protocol.Constructed.OnTrigger(func() {
+	protocol.ConstructedEvent().OnTrigger(func() {
 		protocol.Commitments.WithElements(func(commitment *Commitment) (shutdown func()) {
 			return commitment.ReplayDroppedBlocks.OnUpdate(func(_ bool, replayBlocks bool) {
 				if replayBlocks {

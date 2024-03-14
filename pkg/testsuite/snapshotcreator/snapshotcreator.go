@@ -120,7 +120,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		engine.WithSnapshotPath(""),       // magic to disable loading snapshot
 		engine.WithCommitmentCheck(false), // to not check the commitment when creating a first snapshot
 	)
-	defer engineInstance.Shutdown.Trigger()
+	defer engineInstance.ShutdownEvent().Trigger()
 
 	if opt.AddGenesisRootBlock {
 		engineInstance.EvictionState.AddRootBlock(api.ProtocolParameters().GenesisBlockID(), genesisCommitment.ID())

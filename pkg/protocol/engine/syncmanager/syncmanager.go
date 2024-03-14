@@ -34,10 +34,7 @@ type SyncManager interface {
 	// Reset resets the component to a clean state as if it was created at the last commitment.
 	Reset()
 
-	// Shutdown shuts down the SyncManager.
-	Shutdown()
-
-	module.Interface
+	module.Module
 }
 
 type SyncStatus struct {
