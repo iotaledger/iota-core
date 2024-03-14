@@ -1,8 +1,10 @@
-package requesthandler
+package requesthandler_test
 
 import (
 	"testing"
 
+	"github.com/labstack/echo/v4"
+	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -10,11 +12,10 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/topstakers"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
+	"github.com/iotaledger/iota-core/pkg/requesthandler"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
-	"github.com/labstack/echo/v4"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_ValidatorsAPI(t *testing.T) {
@@ -42,7 +43,6 @@ func Test_ValidatorsAPI(t *testing.T) {
 	ts.AddValidatorNode("node2", testsuite.WithWalletAmount(1_000_005))
 	ts.AddValidatorNode("node3", testsuite.WithWalletAmount(1_000_004))
 	ts.AddValidatorNode("node4", testsuite.WithWalletAmount(1_000_003))
-	ts.AddDefaultWallet(node1)
 
 	nodeOpts := []options.Option[protocol.Protocol]{
 		protocol.WithNotarizationProvider(
@@ -70,7 +70,7 @@ func Test_ValidatorsAPI(t *testing.T) {
 		ts.Node("node3").Validator.AccountData.ID,
 	}, ts.Nodes()...)
 
-	requestHandler := New(node1.Protocol)
+	requestHandler := node1.RequestHandler
 	hrp := ts.API.ProtocolParameters().Bech32HRP()
 
 	// Epoch 0, assert that node1 and node4 are the only candidates.
@@ -185,7 +185,7 @@ func Test_ValidatorsAPI(t *testing.T) {
 	}
 }
 
-func assertValidatorsFromRequestHandler(t *testing.T, expectedValidators []string, requestHandler *RequestHandler, requestedEpoch iotago.EpochIndex) {
+func assertValidatorsFromRequestHandler(t *testing.T, expectedValidators []string, requestHandler *requesthandler.RequestHandler, requestedEpoch iotago.EpochIndex) {
 	resp, err := requestHandler.Validators(requestedEpoch, 0, 10)
 	require.NoError(t, err)
 	actualValidators := lo.Map(resp.Validators, func(validator *api.ValidatorResponse) string {

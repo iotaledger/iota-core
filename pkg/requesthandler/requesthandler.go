@@ -19,7 +19,7 @@ type RequestHandler struct {
 
 func New(p *protocol.Protocol, opts ...options.Option[RequestHandler]) *RequestHandler {
 	return options.Apply(&RequestHandler{
-		workerPool:       p.Workers.CreatePool("BlockHandler"),
+		workerPool:       p.Workers.CreatePool("RequestHandler"),
 		protocol:         p,
 		optsCacheMaxSize: 50 << 20, // 50MB
 	}, opts, func(r *RequestHandler) {
