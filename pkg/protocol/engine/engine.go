@@ -87,6 +87,7 @@ type Engine struct {
 	optsSnapshotPath     string
 	optsEntryPointsDepth int
 	optsSnapshotDepth    int
+	optsCheckCommitment  bool
 	optsBlockRequester   []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]]
 
 	module.Module
@@ -129,8 +130,9 @@ func New(
 			LatestCommitment: reactive.NewVariable[*model.Commitment](),
 			Workers:          workers,
 
-			optsSnapshotPath:  "snapshot.bin",
-			optsSnapshotDepth: 5,
+			optsSnapshotPath:    "snapshot.bin",
+			optsSnapshotDepth:   5,
+			optsCheckCommitment: true,
 		}, opts, func(e *Engine) {
 			e.Module = e.initReactiveModule(logger)
 
@@ -228,6 +230,13 @@ func New(
 				}
 
 				e.Reset()
+			}
+
+			// Check consistency of commitment and ledger state in the storage
+			if e.optsCheckCommitment {
+				if err := e.Storage.CheckCorrectnessCommitmentLedgerState(); err != nil {
+					panic(ierrors.Wrap(err, "commitment or ledger state are incorrect"))
+				}
 			}
 
 			e.InitializedEvent().Trigger()
@@ -382,6 +391,8 @@ func (e *Engine) ImportContents(reader io.ReadSeeker) (err error) {
 		return ierrors.Wrap(err, "failed to import attestation state")
 	} else if err = e.UpgradeOrchestrator.Import(reader); err != nil {
 		return ierrors.Wrap(err, "failed to import upgrade orchestrator")
+	} else if err = e.Storage.ImportRoots(reader, e.Storage.Settings().LatestCommitment()); err != nil {
+		return ierrors.Wrap(err, "failed to import roots")
 	}
 
 	return
@@ -408,6 +419,8 @@ func (e *Engine) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err
 		return ierrors.Wrap(err, "failed to export attestation state")
 	} else if err = e.UpgradeOrchestrator.Export(writer, targetSlot); err != nil {
 		return ierrors.Wrap(err, "failed to export upgrade orchestrator")
+	} else if err = e.Storage.ExportRoots(writer, targetCommitment.Commitment()); err != nil {
+		return ierrors.Wrap(err, "failed to export roots")
 	}
 
 	return
@@ -627,6 +640,12 @@ func (e *Engine) shutdownSubModules() {
 func WithSnapshotPath(snapshotPath string) options.Option[Engine] {
 	return func(e *Engine) {
 		e.optsSnapshotPath = snapshotPath
+	}
+}
+
+func WithCommitmentCheck(checkCommitment bool) options.Option[Engine] {
+	return func(e *Engine) {
+		e.optsCheckCommitment = checkCommitment
 	}
 }
 

@@ -64,8 +64,10 @@ type TestSuite struct {
 	wallets   *orderedmap.OrderedMap[string, *mock.Wallet]
 	running   bool
 
-	snapshotPath string
-	blocks       *shrinkingmap.ShrinkingMap[string, *blocks.Block]
+	snapshotPath    string
+	commitmentCheck bool
+
+	blocks *shrinkingmap.ShrinkingMap[string, *blocks.Block]
 
 	API                      iotago.API
 	ProtocolParameterOptions []options.Option[iotago.V3ProtocolParameters]
@@ -107,6 +109,8 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 
 		genesisBlock := blocks.NewRootBlock(t.API.ProtocolParameters().GenesisBlockID(), iotago.NewEmptyCommitment(t.API).MustID(), time.Unix(t.API.ProtocolParameters().GenesisUnixTimestamp(), 0))
 		t.RegisterBlock("Genesis", genesisBlock)
+
+		t.commitmentCheck = true
 
 		t.snapshotPath = t.Directory.Path("genesis_snapshot.bin")
 		defaultSnapshotOptions := []options.Option[snapshotcreator.Options]{
@@ -514,6 +518,7 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 	t.nodes.ForEach(func(_ string, node *mock.Node) bool {
 		baseOpts := []options.Option[protocol.Protocol]{
 			protocol.WithSnapshotPath(t.snapshotPath),
+			protocol.WithCommitmentCheck(t.commitmentCheck),
 			protocol.WithBaseDirectory(t.Directory.PathWithCreate(node.Name)),
 			protocol.WithSybilProtectionProvider(
 				sybilprotectionv1.NewProvider(),

@@ -187,3 +187,62 @@ func (s *Storage) Flush() {
 	s.permanent.Flush()
 	s.prunable.Flush()
 }
+
+// Checks the correctness of the latest commitment.
+// Additionally, for non-genesis slots it checks whether the ledger state corresponds to the state root.
+func (s *Storage) CheckCorrectnessCommitmentLedgerState() error {
+
+	// Get the latest commitment
+	latestCommitment := s.Settings().LatestCommitment()
+
+	latestCommitmentID := latestCommitment.ID()
+	latestCommittedSlotIndex := latestCommitment.Slot()
+
+	// Do the ledger state check only for non-genesis slots.
+	// TODO: once the genesis slot provides the roots, change this
+	if latestCommittedSlotIndex > s.Settings().APIProvider().CommittedAPI().ProtocolParameters().GenesisSlot() {
+		// Get the state root in the permanent storage (that corresponds to the last commitment)
+		latestStateRoot := s.Ledger().StateTreeRoot()
+
+		// Load root storage from prunable storage
+		rootsStorage, err := s.Roots(latestCommittedSlotIndex)
+		if err != nil {
+			return ierrors.Wrap(err, "failed to load roots storage")
+		}
+
+		// Load roots from prunable storage that correspond to the last committed slot index and commitment
+		roots, exists, err := rootsStorage.Load(latestCommitmentID)
+		if err != nil {
+			return ierrors.Wrap(err, "failed to load roots from prunable storage")
+		} else if !exists {
+			return ierrors.Wrap(err, "roots not found")
+		}
+
+		// Check the correctness of stored state root and the state root computed from the stored ledger state
+		if roots.StateRoot != latestStateRoot {
+			return ierrors.Wrap(err, "computed state root from storage does not correspond to stored state root")
+		}
+
+		if roots.ID() != latestCommitment.RootsID() {
+			return ierrors.Wrap(err, "root from prunable storage does not correspond to root from commitment")
+		}
+
+	}
+
+	// Verify the correctness of the slot commitment
+	computeCurrentCommitment := iotago.NewCommitment(
+		latestCommitment.Commitment().ProtocolVersion,
+		latestCommittedSlotIndex,
+		latestCommitment.PreviousCommitmentID(),
+		latestCommitment.RootsID(),
+		latestCommitment.CumulativeWeight(),
+		latestCommitment.ReferenceManaCost(),
+	)
+	computeCurrentCommitmentID := computeCurrentCommitment.MustID()
+
+	if computeCurrentCommitmentID != latestCommitmentID {
+		return ierrors.New("Computed commitment ID is different from the stored one")
+	}
+
+	return nil
+}

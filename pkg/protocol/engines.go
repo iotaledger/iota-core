@@ -140,7 +140,7 @@ func (e *Engines) ForkAtSlot(slot iotago.SlotIndex) (*engine.Engine, error) {
 }
 
 // loadMainEngine loads the main engine from disk or creates a new one if no engine exists.
-func (e *Engines) loadMainEngine(snapshotPath string) (*engine.Engine, error) {
+func (e *Engines) loadMainEngine(snapshotPath string, commitmentCheck bool) (*engine.Engine, error) {
 	info := &engineInfo{}
 	if err := ioutils.ReadJSONFromFile(e.infoFilePath(), info); err != nil && !ierrors.Is(err, os.ErrNotExist) {
 		return nil, ierrors.Errorf("unable to read engine info file: %w", err)
@@ -151,12 +151,12 @@ func (e *Engines) loadMainEngine(snapshotPath string) (*engine.Engine, error) {
 		// load previous engine as main engine if it exists.
 		if len(info.Name) > 0 {
 			if exists, isDirectory, err := ioutils.PathExists(e.directory.Path(info.Name)); err == nil && exists && isDirectory {
-				return e.loadEngineInstanceFromSnapshot(info.Name, snapshotPath)
+				return e.loadEngineInstanceFromSnapshot(info.Name, snapshotPath, commitmentCheck)
 			}
 		}
 
 		// load new engine if no previous engine exists.
-		return e.loadEngineInstanceFromSnapshot(lo.PanicOnErr(uuid.NewUUID()).String(), snapshotPath)
+		return e.loadEngineInstanceFromSnapshot(lo.PanicOnErr(uuid.NewUUID()).String(), snapshotPath, commitmentCheck)
 	})
 
 	// cleanup candidates
@@ -193,12 +193,12 @@ func (e *Engines) infoFilePath() string {
 }
 
 // loadEngineInstanceFromSnapshot loads an engine instance from a snapshot.
-func (e *Engines) loadEngineInstanceFromSnapshot(engineAlias string, snapshotPath string) *engine.Engine {
+func (e *Engines) loadEngineInstanceFromSnapshot(engineAlias string, snapshotPath string, commitmentCheck bool) *engine.Engine {
 	errorHandler := func(err error) {
 		e.protocol.LogError("engine error", "err", err, "name", engineAlias[0:8])
 	}
 
-	return e.loadEngineInstanceWithStorage(engineAlias, storage.Create(e, e.directory.Path(engineAlias), DatabaseVersion, errorHandler, e.protocol.Options.StorageOptions...), engine.WithSnapshotPath(snapshotPath))
+	return e.loadEngineInstanceWithStorage(engineAlias, storage.Create(e, e.directory.Path(engineAlias), DatabaseVersion, errorHandler, e.protocol.Options.StorageOptions...), engine.WithSnapshotPath(snapshotPath), engine.WithCommitmentCheck(commitmentCheck))
 }
 
 // loadEngineInstanceWithStorage loads an engine instance with the given storage.
@@ -262,7 +262,7 @@ func (e *Engines) injectEngineInstances() (shutdown func()) {
 
 				if newEngine, err := func() (*engine.Engine, error) {
 					if e.Main.Get() == nil {
-						return e.loadMainEngine(e.protocol.Options.SnapshotPath)
+						return e.loadMainEngine(e.protocol.Options.SnapshotPath, e.protocol.Options.CommitmentCheck)
 					}
 
 					return e.ForkAtSlot(chain.ForkingPoint.Get().Slot() - 1)
