@@ -12,6 +12,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/options"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/nodeclient"
@@ -24,7 +25,9 @@ type EventAPIDockerTestFramework struct {
 	DefaultClient   *nodeclient.Client
 
 	finishChan chan struct{}
-	waitFor    time.Duration
+
+	optsWaitFor time.Duration
+	optsTick    time.Duration
 }
 
 func NewEventAPIDockerTestFramework(t *testing.T, dockerFramework *DockerTestFramework) *EventAPIDockerTestFramework {
@@ -33,7 +36,8 @@ func NewEventAPIDockerTestFramework(t *testing.T, dockerFramework *DockerTestFra
 		dockerFramework: dockerFramework,
 		DefaultClient:   dockerFramework.wallet.DefaultClient(),
 		finishChan:      make(chan struct{}),
-		waitFor:         3 * time.Minute,
+		optsWaitFor:     3 * time.Minute,
+		optsTick:        5 * time.Second,
 	}
 }
 
@@ -44,6 +48,77 @@ func (e *EventAPIDockerTestFramework) ConnectEventAPIClient(ctx context.Context)
 	require.NoError(e.Testing, err)
 
 	return eventClt
+}
+
+// SubmitDataBlockStream submits a stream of data blocks to the network for the given duration.
+func (e *EventAPIDockerTestFramework) SubmitDataBlockStream(account *AccountData, duration time.Duration) {
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+
+	ticker := time.NewTicker(e.optsTick)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			for i := 0; i < 10; i++ {
+				blk := e.dockerFramework.CreateTaggedDataBlock(account.ID, []byte("tag"))
+				e.dockerFramework.SubmitBlock(context.Background(), blk)
+			}
+		case <-timer.C:
+			return
+		}
+	}
+}
+
+func (e *EventAPIDockerTestFramework) AssertBlockMetadataStateAcceptedBlocks(ctx context.Context, eventClt *nodeclient.EventAPIClient) {
+	acceptedChan, subInfo := eventClt.BlockMetadataAcceptedBlocks()
+	require.Nil(e.Testing, subInfo.Error())
+
+	go func() {
+		defer subInfo.Close()
+
+		// in order to inform that the channel is listened
+		e.finishChan <- struct{}{}
+
+		for {
+			select {
+			case blk := <-acceptedChan:
+				resp, err := eventClt.Client.BlockMetadataByBlockID(ctx, blk.BlockID)
+				require.NoError(e.Testing, err)
+				// accepted, confirmed are accepted
+				require.NotEqualf(e.Testing, api.BlockStatePending, resp.BlockState, "Block %s is pending in BlockMetadataAccepted topic", blk.BlockID.ToHex())
+
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+}
+
+func (e *EventAPIDockerTestFramework) AssertBlockMetadataStateConfirmedBlocks(ctx context.Context, eventClt *nodeclient.EventAPIClient) {
+	acceptedChan, subInfo := eventClt.BlockMetadataConfirmedBlocks()
+	require.Nil(e.Testing, subInfo.Error())
+
+	go func() {
+		defer subInfo.Close()
+
+		// in order to inform that the channel is listened
+		e.finishChan <- struct{}{}
+
+		for {
+			select {
+			case blk := <-acceptedChan:
+				resp, err := eventClt.Client.BlockMetadataByBlockID(ctx, blk.BlockID)
+				require.NoError(e.Testing, err)
+				require.NotEqualf(e.Testing, api.BlockStatePending, resp.BlockState, "Block %s is pending in BlockMetadataConfirmed endpoint", blk.BlockID.ToHex())
+				require.NotEqualf(e.Testing, api.BlockStateAccepted, resp.BlockState, "Block %s is accepted in BlockMetadataConfirmed endpoint", blk.BlockID.ToHex())
+
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 }
 
 func (e *EventAPIDockerTestFramework) AssertLatestCommitments(ctx context.Context, eventClt *nodeclient.EventAPIClient, expectedSlots []iotago.SlotIndex) {
@@ -525,7 +600,7 @@ func (e *EventAPIDockerTestFramework) assertOutputMetadataTopics(ctx context.Con
 
 func (e *EventAPIDockerTestFramework) AwaitEventAPITopics(t *testing.T, cancleFunc context.CancelFunc, numOfTopics int) error {
 	counter := 0
-	timer := time.NewTimer(e.waitFor)
+	timer := time.NewTimer(e.optsWaitFor)
 	defer timer.Stop()
 
 	for {
@@ -540,5 +615,17 @@ func (e *EventAPIDockerTestFramework) AwaitEventAPITopics(t *testing.T, cancleFu
 				return nil
 			}
 		}
+	}
+}
+
+func WithEventAPIWaitFor(waitFor time.Duration) options.Option[EventAPIDockerTestFramework] {
+	return func(d *EventAPIDockerTestFramework) {
+		d.optsWaitFor = waitFor
+	}
+}
+
+func WithEventAPITick(tick time.Duration) options.Option[EventAPIDockerTestFramework] {
+	return func(d *EventAPIDockerTestFramework) {
+		d.optsTick = tick
 	}
 }
