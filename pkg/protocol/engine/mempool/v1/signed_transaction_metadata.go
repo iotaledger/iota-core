@@ -2,7 +2,6 @@ package mempoolv1
 
 import (
 	"github.com/iotaledger/hive.go/ds/reactive"
-	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -19,11 +18,8 @@ type SignedTransactionMetadata struct {
 	evicted             reactive.Event
 }
 
-func NewSignedTransactionMetadata(signedTransaction mempool.SignedTransaction, transactionMetadata *TransactionMetadata) (*SignedTransactionMetadata, error) {
-	signedID, signedIDErr := signedTransaction.ID()
-	if signedIDErr != nil {
-		return nil, ierrors.Errorf("failed to retrieve signed transaction ID: %w", signedIDErr)
-	}
+func NewSignedTransactionMetadata(signedTransaction mempool.SignedTransaction, transactionMetadata *TransactionMetadata) *SignedTransactionMetadata {
+	signedID := signedTransaction.MustID()
 
 	return &SignedTransactionMetadata{
 		id:                  signedID,
@@ -33,7 +29,7 @@ func NewSignedTransactionMetadata(signedTransaction mempool.SignedTransaction, t
 		signaturesInvalid:   reactive.NewVariable[error](),
 		signaturesValid:     reactive.NewEvent(),
 		evicted:             reactive.NewEvent(),
-	}, nil
+	}
 }
 
 func (s *SignedTransactionMetadata) ID() iotago.SignedTransactionID {

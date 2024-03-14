@@ -360,20 +360,14 @@ func (m *MemPool[VoteRank]) storeTransaction(signedTransaction mempool.SignedTra
 		return nil, false, false, ierrors.Wrap(err, "failed to get input references of transaction")
 	}
 
-	newTransaction, err := NewTransactionMetadata(transaction, inputReferences)
-	if err != nil {
-		return nil, false, false, ierrors.Wrap(err, "failed to create transaction metadata")
-	}
+	newTransaction := NewTransactionMetadata(transaction, inputReferences)
 
 	storedTransaction, isNewTransaction := m.cachedTransactions.GetOrCreate(newTransaction.ID(), func() *TransactionMetadata { return newTransaction })
 	if isNewTransaction {
 		m.setupTransaction(storedTransaction)
 	}
 
-	newSignedTransaction, err := NewSignedTransactionMetadata(signedTransaction, storedTransaction)
-	if err != nil {
-		return nil, false, false, ierrors.Wrap(err, "failed to create signedTransaction metadata")
-	}
+	newSignedTransaction := NewSignedTransactionMetadata(signedTransaction, storedTransaction)
 
 	storedSignedTransaction, isNewSignedTransaction = m.cachedSignedTransactions.GetOrCreate(signedTransaction.MustID(), func() *SignedTransactionMetadata { return newSignedTransaction })
 	if isNewSignedTransaction {
