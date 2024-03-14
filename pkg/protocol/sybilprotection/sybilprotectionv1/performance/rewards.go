@@ -182,17 +182,17 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 
 		result, err := safemath.SafeMul(profitMarginComplement, uint64(poolReward))
 		if err != nil {
-			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate unDecayedEpochRewards due to overflow for epoch %d and validator accountID %s", epoch, validatorID)
+			return 0, 0, 0, ierrors.Wrapf(err, "failed to multiply profitMarginComplement and poolReward for unDecayedEpochRewards due to overflow for epoch %d and validator accountID %s", epoch, validatorID)
 		}
 
-		result, err = safemath.SafeMul(result>>profitMarginExponent, uint64(delegatedAmount))
+		result, err = safemath.SafeDiv(result>>profitMarginExponent, uint64(rewardsForAccountInEpoch.PoolStake))
 		if err != nil {
-			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate unDecayedEpochRewards due to overflow for epoch %d and validator accountID %s", epoch, validatorID)
+			return 0, 0, 0, ierrors.Wrapf(err, "failed to divide by PoolStake for unDecayedEpochRewards due to overflow for epoch %d and validator accountID %s", epoch, validatorID)
 		}
 
-		undecayedEpochRewards, err := safemath.SafeDiv(result, uint64(rewardsForAccountInEpoch.PoolStake))
+		undecayedEpochRewards, err := safemath.SafeMul(result, uint64(delegatedAmount))
 		if err != nil {
-			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate unDecayedEpochRewards due to overflow for epoch %d and validator accountID %s", epoch, validatorID)
+			return 0, 0, 0, ierrors.Wrapf(err, "failed to multiply by delegatedAmmount for unDecayedEpochRewards due to overflow for epoch %d and validator accountID %s", epoch, validatorID)
 		}
 
 		decayProvider := t.apiProvider.APIForEpoch(epoch).ManaDecayProvider()

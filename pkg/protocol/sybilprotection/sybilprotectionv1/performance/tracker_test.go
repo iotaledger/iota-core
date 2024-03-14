@@ -141,3 +141,37 @@ func TestManager_Candidates(t *testing.T) {
 	require.True(t, lo.PanicOnErr(ts.Instance.EligibleValidatorCandidates(1)).IsEmpty())
 	require.True(t, lo.PanicOnErr(ts.Instance.ValidatorCandidates(1)).IsEmpty())
 }
+
+func TestManager_Overflow(t *testing.T) {
+	ts := NewTestSuite(t)
+	epoch := iotago.EpochIndex(2)
+	epochActions := map[string]*EpochActions{
+		"A": {
+			PoolStake:                   200000000200,
+			ValidatorStake:              100,
+			Delegators:                  []iotago.BaseToken{200000000000, 100},
+			FixedCost:                   10,
+			ActiveSlotsCount:            8, // ideal performance
+			ValidationBlocksSentPerSlot: 10,
+			SlotPerformance:             10,
+		},
+	}
+	ts.ApplyEpochActions(epoch, epochActions)
+	ts.AssertEpochRewards(epoch, epochActions)
+	// better performin validator should get more rewards
+
+	epoch = iotago.EpochIndex(3)
+	epochActions = map[string]*EpochActions{
+		"A": {
+			PoolStake:                   10,
+			ValidatorStake:              5,
+			Delegators:                  []iotago.BaseToken{2, 3},
+			FixedCost:                   10,
+			ActiveSlotsCount:            6, // validator dropped out for two last slots
+			ValidationBlocksSentPerSlot: 10,
+			SlotPerformance:             10,
+		},
+	}
+	ts.ApplyEpochActions(epoch, epochActions)
+	ts.AssertEpochRewards(epoch, epochActions)
+}
