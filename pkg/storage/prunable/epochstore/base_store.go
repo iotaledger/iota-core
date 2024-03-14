@@ -53,7 +53,7 @@ func (s *BaseStore[V]) Load(epoch iotago.EpochIndex) (V, error) {
 	var zeroValue V
 
 	if s.isTooOld(epoch) {
-		return zeroValue, ierrors.Wrapf(database.ErrEpochPruned, "epoch %d is too old", epoch)
+		return zeroValue, ierrors.WithMessagef(database.ErrEpochPruned, "epoch %d is too old", epoch)
 	}
 
 	value, err := s.kv.Get(epoch)
@@ -79,7 +79,7 @@ func (s *BaseStore[V]) Store(epoch iotago.EpochIndex, value V) error {
 	})
 
 	if s.isTooOld(epoch) {
-		return ierrors.Wrapf(database.ErrEpochPruned, "epoch %d is too old", epoch)
+		return ierrors.WithMessagef(database.ErrEpochPruned, "epoch %d is too old", epoch)
 	}
 
 	return s.kv.Set(epoch, value)
