@@ -15,6 +15,7 @@ import (
 	"github.com/iotaledger/hive.go/app/configuration"
 	hivecrypto "github.com/iotaledger/hive.go/crypto"
 	"github.com/iotaledger/hive.go/crypto/pem"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/components/p2p"
 	"github.com/iotaledger/iota.go/v4/hexutil"
 )
@@ -43,50 +44,50 @@ func generateP2PIdentity(args []string) error {
 	}
 
 	if len(*databasePathFlag) == 0 {
-		return fmt.Errorf("'%s' not specified", FlagToolDatabasePath)
+		return ierrors.Errorf("'%s' not specified", FlagToolDatabasePath)
 	}
 
 	databasePath := *databasePathFlag
 	privKeyFilePath := filepath.Join(databasePath, p2p.IdentityPrivateKeyFileName)
 
 	if err := os.MkdirAll(databasePath, 0700); err != nil {
-		return fmt.Errorf("could not create peer store database dir '%s': %w", databasePath, err)
+		return ierrors.Wrapf(err, "could not create peer store database dir '%s'", databasePath)
 	}
 
 	_, err := os.Stat(privKeyFilePath)
 	switch {
 	case err == nil || os.IsExist(err):
 		// private key file already exists
-		return fmt.Errorf("private key file (%s) already exists", privKeyFilePath)
+		return ierrors.Errorf("private key file (%s) already exists", privKeyFilePath)
 
 	case os.IsNotExist(err):
 		// private key file does not exist, create a new one
 
 	default:
-		return fmt.Errorf("unable to check private key file (%s): %w", privKeyFilePath, err)
+		return ierrors.Wrapf(err, "unable to check private key file (%s)", privKeyFilePath)
 	}
 
 	var privKey ed25519.PrivateKey
 	if privateKeyFlag != nil && len(*privateKeyFlag) > 0 {
 		privKey, err = hivecrypto.ParseEd25519PrivateKeyFromString(*privateKeyFlag)
 		if err != nil {
-			return fmt.Errorf("invalid private key given '%s': %w", *privateKeyFlag, err)
+			return ierrors.Wrapf(err, "invalid private key given '%s'", *privateKeyFlag)
 		}
 	} else {
 		// create identity
 		_, privKey, err = ed25519.GenerateKey(nil)
 		if err != nil {
-			return fmt.Errorf("unable to generate Ed25519 private key for peer identity: %w", err)
+			return ierrors.Wrap(err, "unable to generate Ed25519 private key for peer identity")
 		}
 	}
 
 	libp2pPrivKey, libp2pPubKey, err := crypto.KeyPairFromStdKey(&privKey)
 	if err != nil {
-		return fmt.Errorf("unable to convert given private key '%s': %w", hexutil.EncodeHex(privKey), err)
+		return ierrors.Wrapf(err, "unable to convert given private key '%s'", hexutil.EncodeHex(privKey))
 	}
 
 	if err := pem.WriteEd25519PrivateKeyToPEMFile(privKeyFilePath, privKey); err != nil {
-		return fmt.Errorf("writing private key file for peer identity failed: %w", err)
+		return ierrors.Wrap(err, "writing private key file for peer identity failed")
 	}
 
 	return printP2PIdentity(libp2pPrivKey, libp2pPubKey, *outputJSONFlag)
@@ -103,17 +104,17 @@ func printP2PIdentity(libp2pPrivKey crypto.PrivKey, libp2pPubKey crypto.PubKey, 
 
 	privKeyBytes, err := libp2pPrivKey.Raw()
 	if err != nil {
-		return fmt.Errorf("unable to get raw private key bytes: %w", err)
+		return ierrors.Wrap(err, "unable to get raw private key bytes")
 	}
 
 	pubKeyBytes, err := libp2pPubKey.Raw()
 	if err != nil {
-		return fmt.Errorf("unable to get raw public key bytes: %w", err)
+		return ierrors.Wrap(err, "unable to get raw public key bytes")
 	}
 
 	peerID, err := peer.IDFromPublicKey(libp2pPubKey)
 	if err != nil {
-		return fmt.Errorf("unable to get peer identity from public key: %w", err)
+		return ierrors.Wrap(err, "unable to get peer identity from public key")
 	}
 
 	identity := P2PIdentity{
