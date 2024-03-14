@@ -231,3 +231,113 @@ func TestBlockRetainer_Dropped(t *testing.T) {
 		})
 	}
 }
+
+func TestBlockRetainer_Reset(t *testing.T) {
+	tf := NewTestFramework(t)
+
+	{
+		tf.commitSlot(2)
+		tf.finalizeSlot(0)
+		tf.initiateRetainerBlockFlow(5, []string{"A", "B"})
+		tf.initiateRetainerBlockFlow(6, []string{"C"})
+		tf.initiateRetainerBlockFlow(7, []string{"D"})
+
+	}
+	{
+		tf.commitSlot(4)
+		tf.finalizeSlot(1)
+		tf.assertBlockMetadata([]*BlockRetainerAction{
+			{
+				"A",
+				eventConfirmed,
+				api.BlockStateConfirmed,
+			},
+			{
+				"B",
+				eventAccepted,
+				api.BlockStateAccepted,
+			},
+			{
+				"C",
+				eventAccepted,
+				api.BlockStateAccepted,
+			},
+		})
+	}
+	{
+		tf.commitSlot(5)
+		tf.finalizeSlot(2)
+		tf.assertBlockMetadata([]*BlockRetainerAction{
+			{
+				"A", // is committed
+				none,
+				api.BlockStateConfirmed,
+			},
+			{
+				"B", // is committed
+				eventConfirmed,
+				api.BlockStateConfirmed,
+			},
+			{
+				"C",
+				eventConfirmed,
+				api.BlockStateConfirmed,
+			},
+			{
+				"D",
+				eventAccepted,
+				api.BlockStateAccepted,
+			},
+		})
+	}
+	{
+		tf.commitSlot(6)
+		tf.assertBlockMetadata([]*BlockRetainerAction{
+			{
+				"A", // is committed
+				none,
+				api.BlockStateConfirmed,
+			},
+			{
+				"B", // is committed
+				none,
+				api.BlockStateConfirmed,
+			},
+			{
+				"C",
+				eventConfirmed, // is committed
+				api.BlockStateConfirmed,
+			},
+			{
+				"D",
+				eventAccepted,
+				api.BlockStateAccepted,
+			},
+		})
+	}
+	{
+		tf.resetToSlot(5)
+		tf.assertBlockMetadata([]*BlockRetainerAction{
+			{
+				"A", // still committed, but confirmation is reset
+				none,
+				api.BlockStateAccepted,
+			},
+			{
+				"B", // still committed, but confirmation is reset
+				none,
+				api.BlockStateAccepted,
+			},
+			{
+				"C",
+				none, // bd cleared
+				api.BlockStateUnknown,
+			},
+			{
+				"D",
+				none, // cache cleared
+				api.BlockStateUnknown,
+			},
+		})
+	}
+}

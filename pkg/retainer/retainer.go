@@ -11,7 +11,7 @@ type BlockRetainer interface {
 	BlockMetadata(blockID iotago.BlockID) (*api.BlockMetadataResponse, error)
 
 	// Reset resets the component to a clean state as if it was created at the last commitment.
-	Reset()
+	Reset(targetSlot iotago.SlotIndex)
 
 	// Interface embeds the required methods of the module.Interface.
 	module.Interface
