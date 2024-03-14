@@ -27,13 +27,10 @@ type action int
 
 const (
 	none action = iota
-	eventBooked
 	eventAccepted
 	eventConfirmed
 	eventDropped
 )
-
-// todo check if event was triggered
 
 type TestFramework struct {
 	Instance *blockretainer.BlockRetainer
@@ -71,10 +68,6 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		return tf.stores[slotIndex], nil
 	}
 
-	latestCommittedSlotFunc := func() iotago.SlotIndex {
-		return tf.lastCommittedSlot
-	}
-
 	lastFinalizedSlotFunc := func() iotago.SlotIndex {
 		return tf.lastFinalizedSlot
 	}
@@ -83,13 +76,14 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		require.NoError(test, err)
 	}
 
-	tf.Instance = blockretainer.New(workers, storeFunc, latestCommittedSlotFunc, lastFinalizedSlotFunc, errorHandlerFunc)
+	tf.Instance = blockretainer.New(workers, storeFunc, lastFinalizedSlotFunc, errorHandlerFunc)
 
 	return tf
 }
 
 func (tf *TestFramework) commitSlot(slot iotago.SlotIndex) {
-	tf.lastCommittedSlot = slot
+	err := tf.Instance.CommitSlot(slot)
+	require.NoError(tf.test, err)
 }
 
 func (tf *TestFramework) finalizeSlot(slot iotago.SlotIndex) {
@@ -135,8 +129,6 @@ func (tf *TestFramework) initiateRetainerBlockFlow(currentSlot iotago.SlotIndex,
 		res, err := tf.Instance.BlockMetadata(blockID)
 		require.NoError(tf.test, err)
 		require.Equal(tf.test, expectedResp, res, "block metadata mismatch for alias %s", alias)
-
-		// todo check if event was triggered
 	}
 }
 
