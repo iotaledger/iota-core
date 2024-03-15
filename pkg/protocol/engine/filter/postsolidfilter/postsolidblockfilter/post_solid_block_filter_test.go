@@ -7,6 +7,7 @@ import (
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
@@ -36,7 +37,7 @@ func NewTestFramework(t *testing.T, apiProvider iotago.APIProvider, optsFilter .
 		accountData: make(map[iotago.AccountID]*accounts.AccountData),
 		rmcData:     make(map[iotago.SlotIndex]iotago.Mana),
 	}
-	tf.PostSolidFilter = New(optsFilter...)
+	tf.PostSolidFilter = New(module.NewTestModule(t), optsFilter...)
 
 	tf.PostSolidFilter.accountRetrieveFunc = func(accountID iotago.AccountID, targetSlot iotago.SlotIndex) (*accounts.AccountData, bool, error) {
 		if accountData, ok := tf.accountData[accountID]; ok {

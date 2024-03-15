@@ -37,6 +37,6 @@ type SeatManager interface {
 	// SeatCountInEpoch returns the number of seats in the SeatManager for the given epoch.
 	SeatCountInEpoch(epoch iotago.EpochIndex) int
 
-	// Interface embeds the required methods of the module.Interface.
-	module.Interface
+	// Interface embeds the required methods of the module.Module.
+	module.Module
 }

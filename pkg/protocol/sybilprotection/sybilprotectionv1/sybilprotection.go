@@ -47,55 +47,54 @@ type SybilProtection struct {
 func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engine.Engine, sybilprotection.SybilProtection] {
 	return module.Provide(func(e *engine.Engine) sybilprotection.SybilProtection {
 		return options.Apply(&SybilProtection{
+			Module: e.NewSubModule("SybilProtection"),
 			events: sybilprotection.NewEvents(),
 
 			apiProvider:             e,
 			optsSeatManagerProvider: topstakers.NewProvider(),
-		}, opts,
-			func(o *SybilProtection) {
-				o.seatManager = o.optsSeatManagerProvider(e)
+		}, opts, func(o *SybilProtection) {
+			o.seatManager = o.optsSeatManagerProvider(e)
 
-				e.Constructed.OnTrigger(func() {
-					o.ledger = e.Ledger
-					o.errHandler = e.ErrorHandler("SybilProtection")
-					logger := e.NewChildLogger("PerformanceTracker")
-					latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
-					latestCommittedEpoch := o.apiProvider.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
-					o.performanceTracker = performance.NewTracker(e.Storage.RewardsForEpoch, e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.CommitteeCandidates, e.Storage.ValidatorPerformances, latestCommittedEpoch, e, o.errHandler, logger)
-					o.lastCommittedSlot = latestCommittedSlot
+			e.ConstructedEvent().OnTrigger(func() {
+				o.ledger = e.Ledger
+				o.errHandler = e.ErrorHandler("SybilProtection")
+				logger := e.NewChildLogger("PerformanceTracker")
+				latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
+				latestCommittedEpoch := o.apiProvider.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
+				o.performanceTracker = performance.NewTracker(e.Storage.RewardsForEpoch, e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.CommitteeCandidates, e.Storage.ValidatorPerformances, latestCommittedEpoch, e, o.errHandler, logger)
+				o.lastCommittedSlot = latestCommittedSlot
 
-					if o.optsInitialCommittee != nil {
-						if _, err := o.seatManager.RotateCommittee(0, o.optsInitialCommittee); err != nil {
-							panic(ierrors.Wrap(err, "error while registering initial committee for epoch 0"))
-						}
+				if o.optsInitialCommittee != nil {
+					if _, err := o.seatManager.RotateCommittee(0, o.optsInitialCommittee); err != nil {
+						panic(ierrors.Wrap(err, "error while registering initial committee for epoch 0"))
+					}
+				}
+
+				// When the engine is triggered initialized, snapshot has been read or database has been initialized properly,
+				// so the committee should be available in the performance manager.
+				e.InitializedEvent().OnTrigger(func() {
+					// Mark the committee for the last committed slot as active.
+					currentEpoch := e.CommittedAPI().TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Slot())
+					err := o.seatManager.InitializeCommittee(currentEpoch, e.Clock.Accepted().RelativeTime())
+					if err != nil {
+						panic(ierrors.Wrap(err, "error while initializing committee"))
 					}
 
-					o.TriggerConstructed()
-
-					// When the engine is triggered initialized, snapshot has been read or database has been initialized properly,
-					// so the committee should be available in the performance manager.
-					e.Initialized.OnTrigger(func() {
-						// Mark the committee for the last committed slot as active.
-						currentEpoch := e.CommittedAPI().TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Slot())
-						err := o.seatManager.InitializeCommittee(currentEpoch, e.Clock.Accepted().RelativeTime())
-						if err != nil {
-							panic(ierrors.Wrap(err, "error while initializing committee"))
-						}
-
-						o.TriggerInitialized()
-					})
+					o.InitializedEvent().Trigger()
 				})
+			})
 
-				e.Events.SlotGadget.SlotFinalized.Hook(o.slotFinalized)
+			e.Events.SlotGadget.SlotFinalized.Hook(o.slotFinalized)
 
-				e.Events.SybilProtection.LinkTo(o.events)
-			},
-		)
+			e.Events.SybilProtection.LinkTo(o.events)
+
+			o.ShutdownEvent().OnTrigger(func() {
+				o.StoppedEvent().Trigger()
+			})
+
+			o.ConstructedEvent().Trigger()
+		})
 	})
-}
-
-func (o *SybilProtection) Shutdown() {
-	o.TriggerStopped()
 }
 
 func (o *SybilProtection) TrackBlock(block *blocks.Block) {

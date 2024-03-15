@@ -54,6 +54,9 @@ type Options struct {
 	// SnapshotPath is the path to the snapshot file that should be used to initialize the protocol.
 	SnapshotPath string
 
+	// CommitmentCheck is an opt flag that allows engines check correctness of commitment and ledger state upon startup.
+	CommitmentCheck bool
+
 	// MaxAllowedWallClockDrift specifies how far in the future are blocks allowed to be ahead of our own wall clock (defaults to 0 seconds).
 	MaxAllowedWallClockDrift time.Duration
 
@@ -159,6 +162,13 @@ func WithBaseDirectory(baseDirectory string) options.Option[Protocol] {
 func WithSnapshotPath(snapshot string) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.Options.SnapshotPath = snapshot
+	}
+}
+
+// WithCommitmentCheck is an option for the Protocol that allows to check the commitment and ledger state upon startup.
+func WithCommitmentCheck(commitmentCheck bool) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.Options.CommitmentCheck = commitmentCheck
 	}
 }
 

@@ -16,10 +16,11 @@ type Scheduler struct {
 
 func NewProvider() module.Provider[*engine.Engine, scheduler.Scheduler] {
 	return module.Provide(func(e *engine.Engine) scheduler.Scheduler {
-		s := New()
-		e.Constructed.OnTrigger(func() {
+		s := New(e.NewSubModule("Scheduler"))
+
+		e.ConstructedEvent().OnTrigger(func() {
 			e.Events.Scheduler.LinkTo(s.events)
-			s.TriggerConstructed()
+
 			e.Events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 				s.AddBlock(block)
 			})
@@ -29,15 +30,11 @@ func NewProvider() module.Provider[*engine.Engine, scheduler.Scheduler] {
 	})
 }
 
-func New() *Scheduler {
-	return &Scheduler{
+func New(subModule module.Module) *Scheduler {
+	return module.InitSimpleLifecycle(&Scheduler{
+		Module: subModule,
 		events: scheduler.NewEvents(),
-	}
-}
-
-func (s *Scheduler) Shutdown() {
-	s.TriggerShutdown()
-	s.TriggerStopped()
+	})
 }
 
 func (s *Scheduler) IsBlockIssuerReady(_ iotago.AccountID, _ ...iotago.WorkScore) bool {

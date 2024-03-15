@@ -51,6 +51,7 @@ type Ledger struct {
 func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 	return module.Provide(func(e *engine.Engine) ledger.Ledger {
 		l := New(
+			e.NewSubModule("Ledger"),
 			e.Storage.Ledger(),
 			e.Storage.Accounts(),
 			e.Storage.Commitments().Load,
@@ -61,7 +62,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.ErrorHandler("ledger"),
 		)
 
-		e.Constructed.OnTrigger(func() {
+		e.ConstructedEvent().OnTrigger(func() {
 			e.Events.Ledger.LinkTo(l.events)
 			l.spendDAG = spenddagv1.New[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank](func() int {
 				return l.sybilProtection.SeatManager().OnlineCommittee().Size()
@@ -82,8 +83,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			//	l.memPool.PublishRequestedState(scd.Commitment.Commitment())
 			// })
 
-			l.TriggerConstructed()
-			l.TriggerInitialized()
+			l.InitializedEvent().Trigger()
 		})
 
 		return l
@@ -91,6 +91,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 }
 
 func New(
+	subModule module.Module,
 	utxoLedger *utxoledger.Manager,
 	accountsStore kvstore.KVStore,
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error),
@@ -100,10 +101,11 @@ func New(
 	sybilProtection sybilprotection.SybilProtection,
 	errorHandler func(error),
 ) *Ledger {
-	return &Ledger{
+	l := &Ledger{
+		Module:           subModule,
 		events:           ledger.NewEvents(),
 		apiProvider:      apiProvider,
-		accountsLedger:   accountsledger.New(apiProvider, blocksFunc, slotDiffFunc, accountsStore),
+		accountsLedger:   accountsledger.New(subModule.NewSubModule("AccountsLedger"), apiProvider, blocksFunc, slotDiffFunc, accountsStore),
 		rmcManager:       rmc.NewManager(apiProvider, commitmentLoader),
 		utxoLedger:       utxoLedger,
 		commitmentLoader: commitmentLoader,
@@ -113,6 +115,12 @@ func New(
 			return sybilProtection.SeatManager().OnlineCommittee().Size()
 		}),
 	}
+
+	l.ShutdownEvent().OnTrigger(l.shutdown)
+
+	l.ConstructedEvent().Trigger()
+
+	return l
 }
 
 func (l *Ledger) OnTransactionAttached(handler func(transaction mempool.TransactionMetadata), opts ...event.Option) *event.Hook[func(metadata mempool.TransactionMetadata)] {
@@ -361,9 +369,10 @@ func (l *Ledger) Reset() {
 	l.rmcManager.Reset()
 }
 
-func (l *Ledger) Shutdown() {
-	l.TriggerStopped()
+func (l *Ledger) shutdown() {
 	l.spendDAG.Shutdown()
+
+	l.StoppedEvent().Trigger()
 }
 
 // Process the collected account changes. The consumedAccounts and createdAccounts maps only contain outputs with a

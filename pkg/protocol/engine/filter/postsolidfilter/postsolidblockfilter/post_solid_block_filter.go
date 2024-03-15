@@ -28,30 +28,41 @@ type PostSolidBlockFilter struct {
 
 func NewProvider(opts ...options.Option[PostSolidBlockFilter]) module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter] {
 	return module.Provide(func(e *engine.Engine) postsolidfilter.PostSolidFilter {
-		c := New(opts...)
-		e.Constructed.OnTrigger(func() {
-			c.accountRetrieveFunc = e.Ledger.Account
-			c.blockCacheRetrieveFunc = e.BlockCache.Block
+		c := New(e.NewSubModule("PostSolidFilter"), opts...)
 
-			e.Ledger.HookConstructed(func() {
-				c.rmcRetrieveFunc = e.Ledger.RMCManager().RMC
-			})
-
-			e.Events.BlockDAG.BlockSolid.Hook(c.ProcessSolidBlock)
+		e.ConstructedEvent().OnTrigger(func() {
 			e.Events.PostSolidFilter.LinkTo(c.events)
 
-			c.TriggerInitialized()
+			e.Events.BlockDAG.BlockSolid.Hook(c.ProcessSolidBlock)
+
+			e.Ledger.InitializedEvent().OnTrigger(func() {
+				c.Init(e.Ledger.Account, e.BlockCache.Block, e.Ledger.RMCManager().RMC)
+			})
 		})
 
 		return c
 	})
 }
 
-func New(opts ...options.Option[PostSolidBlockFilter]) *PostSolidBlockFilter {
+func New(module module.Module, opts ...options.Option[PostSolidBlockFilter]) *PostSolidBlockFilter {
 	return options.Apply(&PostSolidBlockFilter{
+		Module: module,
 		events: postsolidfilter.NewEvents(),
-	}, opts,
-	)
+	}, opts, func(p *PostSolidBlockFilter) {
+		p.ShutdownEvent().OnTrigger(func() {
+			p.StoppedEvent().Trigger()
+		})
+
+		p.ConstructedEvent().Trigger()
+	})
+}
+
+func (c *PostSolidBlockFilter) Init(accountRetrieveFunc func(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (*accounts.AccountData, bool, error), blockCacheRetrieveFunc func(iotago.BlockID) (*blocks.Block, bool), rmcRetrieveFunc func(iotago.SlotIndex) (iotago.Mana, error)) {
+	c.accountRetrieveFunc = accountRetrieveFunc
+	c.blockCacheRetrieveFunc = blockCacheRetrieveFunc
+	c.rmcRetrieveFunc = rmcRetrieveFunc
+
+	c.InitializedEvent().Trigger()
 }
 
 func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
@@ -203,10 +214,6 @@ func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (c *PostSolidBlockFilter) Reset() { /* nothing to reset but comply with interface */ }
-
-func (c *PostSolidBlockFilter) Shutdown() {
-	c.TriggerStopped()
-}
 
 func (c *PostSolidBlockFilter) filterBlock(block *blocks.Block, reason error) {
 	block.SetInvalid()

@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/log"
+	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/retainer/txretainer"
 	"github.com/iotaledger/iota-core/pkg/storage/clonablesql"
@@ -38,7 +39,7 @@ func newTestSuite(t *testing.T) *txRetainerTestsuite {
 		database: newClonableSQLiteDatabase(t),
 	}
 
-	testSuite.TxRetainer = txretainer.New(workers, testSuite.database.ExecDBFunc(),
+	testSuite.TxRetainer = txretainer.New(module.NewTestModule(t), workers, testSuite.database.ExecDBFunc(),
 		func() iotago.SlotIndex {
 			return testSuite.latestCommittedSlot
 		}, func() iotago.SlotIndex {
@@ -54,7 +55,7 @@ func newTestSuite(t *testing.T) *txRetainerTestsuite {
 
 func (ts *txRetainerTestsuite) Close() {
 	ts.database.Shutdown()
-	ts.TxRetainer.Shutdown()
+	ts.TxRetainer.ShutdownEvent().Trigger()
 }
 
 func (ts *txRetainerTestsuite) SetLatestCommittedSlot(slot iotago.SlotIndex) {

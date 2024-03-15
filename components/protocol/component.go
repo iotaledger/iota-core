@@ -147,6 +147,7 @@ func provide(c *dig.Container) error {
 				),
 			),
 			protocol.WithSnapshotPath(ParamsProtocol.Snapshot.Path),
+			protocol.WithCommitmentCheck(ParamsProtocol.CommitmentCheck),
 			protocol.WithMaxAllowedWallClockDrift(ParamsProtocol.Filter.MaxAllowedClockDrift),
 			protocol.WithPreSolidFilterProvider(
 				presolidblockfilter.NewProvider(),

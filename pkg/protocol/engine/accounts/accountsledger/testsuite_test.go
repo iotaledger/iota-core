@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger"
@@ -79,7 +80,7 @@ func (t *TestSuite) initAccountLedger() *accountsledger.Manager {
 		return storage.Get(id)
 	}
 
-	manager := accountsledger.New(t.apiProvider, blockFunc, slotDiffFunc, mapdb.NewMapDB())
+	manager := accountsledger.New(module.NewTestModule(t.T), t.apiProvider, blockFunc, slotDiffFunc, mapdb.NewMapDB())
 
 	return manager
 }
