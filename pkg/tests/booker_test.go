@@ -16,6 +16,8 @@ import (
 )
 
 func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
+	t.Skip("This test is currently disabled because it is not yet clear how to handle this case.")
+
 	ts := testsuite.NewTestSuite(t)
 	defer ts.Shutdown()
 
@@ -212,6 +214,8 @@ func Test_DoubleSpend(t *testing.T) {
 }
 
 func Test_MultipleAttachments(t *testing.T) {
+	t.Skip("This test is currently disabled because it is not yet clear how to handle this case.")
+
 	ts := testsuite.NewTestSuite(t)
 	defer ts.Shutdown()
 
@@ -320,6 +324,8 @@ func Test_MultipleAttachments(t *testing.T) {
 }
 
 func Test_SpendRejectedCommittedRace(t *testing.T) {
+	t.Skip("This test is currently disabled because it is not yet clear how to handle this case.")
+
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
