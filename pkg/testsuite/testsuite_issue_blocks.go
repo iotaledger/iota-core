@@ -35,7 +35,7 @@ func (t *TestSuite) assertParentsExistFromBlockOptions(blockOpts []options.Optio
 	t.AssertBlocksExist(t.Blocks(lo.Map(parents, func(id iotago.BlockID) string { return id.Alias() })...), true, node)
 }
 
-func (t *TestSuite) referenceDependencies(blockOpts []options.Option[mock.BlockHeaderParams], inputTxName string, blockName string) []options.Option[mock.BlockHeaderParams] {
+func (t *TestSuite) addReferenceToDependencies(blockOpts []options.Option[mock.BlockHeaderParams], inputTxName string) []options.Option[mock.BlockHeaderParams] {
 	if inputTxName != "Genesis" {
 		if attachments, exists := t.attachments.Get(inputTxName); !exists {
 			panic(fmt.Sprintf("input transaction %s does not have an attachment", inputTxName))
@@ -89,7 +89,7 @@ func (t *TestSuite) registerBlock(blockName string, block *blocks.Block) {
 	block.ID().RegisterAlias(blockName)
 
 	if tx, hasTransaction := block.SignedTransaction(); hasTransaction {
-		t.attachments.Compute(lo.Return1(tx.Transaction.ID()).Alias(), func(currentValue []*blocks.Block, exists bool) []*blocks.Block {
+		t.attachments.Compute(lo.Return1(tx.Transaction.ID()).Alias(), func(currentValue []*blocks.Block, _ bool) []*blocks.Block {
 			if currentValue == nil {
 				currentValue = make([]*blocks.Block, 0)
 			}
@@ -208,7 +208,7 @@ func (t *TestSuite) issueBlockRow(prefix string, row int, parentsPrefix string, 
 			tx := t.DefaultWallet().CreateBasicOutputsEquallyFromInput(txName, 1, inputName)
 
 			issuingOptionsCopy[node.Name] = t.limitParentsCountInBlockOptions(issuingOptionsCopy[node.Name], iotago.BasicBlockMaxParents)
-			issuingOptionsCopy[node.Name] = t.referenceDependencies(issuingOptionsCopy[node.Name], inputTxName, blockName)
+			issuingOptionsCopy[node.Name] = t.addReferenceToDependencies(issuingOptionsCopy[node.Name], inputTxName)
 			t.assertParentsCommitmentExistFromBlockOptions(issuingOptionsCopy[node.Name], node)
 			t.assertParentsExistFromBlockOptions(issuingOptionsCopy[node.Name], node)
 
