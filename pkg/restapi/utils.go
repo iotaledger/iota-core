@@ -30,7 +30,7 @@ func CompileRoutesAsRegexes(routes []string) ([]*regexp.Regexp, error) {
 	for i, route := range routes {
 		reg := CompileRouteAsRegex(route)
 		if reg == nil {
-			return nil, ierrors.Errorf("Invalid route in config: %s", route)
+			return nil, ierrors.Errorf("invalid route in config: %s", route)
 		}
 		regexes[i] = reg
 	}

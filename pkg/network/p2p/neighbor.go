@@ -69,7 +69,7 @@ func newNeighbor(parentLogger log.Logger, p *network.Peer, stream *PacketsStream
 		sendQueue:          make(chan *queuedPacket, NeighborsSendQueueSize),
 	}
 
-	n.logger.LogInfo("created", "ID", n.Peer().ID)
+	n.logger.LogInfo("created", "ID", n.Peer().ID.String())
 
 	return n
 }
@@ -120,9 +120,9 @@ func (n *neighbor) readLoop() {
 			packet := stream.packetFactory()
 			err := stream.ReadPacket(packet)
 			if err != nil {
-				n.logger.LogInfof("Stream read packet error: %s", err)
+				n.logger.LogInfof("Stream read packet error: %s", err.Error())
 				if disconnectErr := n.disconnect(); disconnectErr != nil {
-					n.logger.LogWarnf("Failed to disconnect, error: %s", disconnectErr)
+					n.logger.LogWarnf("Failed to disconnect, error: %s", disconnectErr.Error())
 				}
 
 				return
@@ -148,15 +148,15 @@ func (n *neighbor) writeLoop() {
 				if n.stream == nil {
 					n.logger.LogWarnf("send error, no stream for protocol, peerID: %s, protocol: %s", n.Peer().ID, sendPacket.protocolID)
 					if disconnectErr := n.disconnect(); disconnectErr != nil {
-						n.logger.LogWarnf("Failed to disconnect, error: %s", disconnectErr)
+						n.logger.LogWarnf("Failed to disconnect, error: %s", disconnectErr.Error())
 					}
 
 					return
 				}
 				if err := n.stream.WritePacket(sendPacket.packet); err != nil {
-					n.logger.LogWarnf("send error, peerID: %s, error: %s", n.Peer().ID, err)
+					n.logger.LogWarnf("send error, peerID: %s, error: %s", n.Peer().ID.String(), err.Error())
 					if disconnectErr := n.disconnect(); disconnectErr != nil {
-						n.logger.LogWarnf("Failed to disconnect, error: %s", disconnectErr)
+						n.logger.LogWarnf("Failed to disconnect, error: %s", disconnectErr.Error())
 					}
 
 					return
@@ -169,7 +169,7 @@ func (n *neighbor) writeLoop() {
 // Close closes the connection with the neighbor.
 func (n *neighbor) Close() {
 	if err := n.disconnect(); err != nil {
-		n.logger.LogErrorf("Failed to disconnect the neighbor, error: %s", err)
+		n.logger.LogErrorf("Failed to disconnect the neighbor, error: %s", err.Error())
 	}
 	n.wg.Wait()
 	n.logger.UnsubscribeFromParentLogger()

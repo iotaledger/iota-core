@@ -7,7 +7,6 @@ import (
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
-	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -58,11 +57,8 @@ func (t *TransactionMetadata) ValidAttachments() []iotago.BlockID {
 	return t.validAttachments.Keys()
 }
 
-func NewTransactionMetadata(transaction mempool.Transaction, referencedInputs []mempool.StateReference) (*TransactionMetadata, error) {
-	transactionID, transactionIDErr := transaction.ID()
-	if transactionIDErr != nil {
-		return nil, ierrors.Errorf("failed to retrieve transaction ID: %w", transactionIDErr)
-	}
+func NewTransactionMetadata(transaction mempool.Transaction, referencedInputs []mempool.StateReference) *TransactionMetadata {
+	transactionID := transaction.MustID()
 
 	return (&TransactionMetadata{
 		id:               transactionID,
@@ -92,7 +88,7 @@ func NewTransactionMetadata(transaction mempool.Transaction, referencedInputs []
 		allValidAttachmentsEvicted:      reactive.NewVariable[iotago.SlotIndex](),
 
 		inclusionFlags: newInclusionFlags(),
-	}).setup(), nil
+	}).setup()
 }
 
 func (t *TransactionMetadata) ID() iotago.TransactionID {

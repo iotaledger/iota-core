@@ -110,7 +110,7 @@ func (o *SybilProtection) TrackBlock(block *blocks.Block) {
 
 	accountData, exists, err := o.ledger.Account(block.ProtocolBlock().Header.IssuerID, block.SlotCommitmentID().Slot())
 	if err != nil {
-		o.errHandler(ierrors.Wrapf(err, "error while retrieving account from account %s in slot %d from accounts ledger", block.ProtocolBlock().Header.IssuerID, block.SlotCommitmentID().Slot()))
+		o.errHandler(ierrors.Wrapf(err, "error while retrieving data for account %s in slot %d from accounts ledger", block.ProtocolBlock().Header.IssuerID, block.SlotCommitmentID().Slot()))
 
 		return
 	}
@@ -313,7 +313,7 @@ func (o *SybilProtection) EligibleValidators(epoch iotago.EpochIndex) (accounts.
 			return ierrors.Wrapf(err, "failed to load account data for candidate %s", candidate)
 		}
 		if !exists {
-			return ierrors.Errorf("account of committee candidate does not exist: %s", candidate)
+			return ierrors.Errorf("account of committee candidate %s does not exist", candidate)
 		}
 		// if `End Epoch` is the current one or has passed, validator is no longer considered for validator selection
 		if accountData.StakeEndEpoch <= epoch {
@@ -348,7 +348,7 @@ func (o *SybilProtection) OrderedRegisteredCandidateValidatorsList(epoch iotago.
 			return ierrors.Wrapf(err, "failed to get account %s", candidate)
 		}
 		if !exists {
-			return ierrors.Errorf("account of committee candidate does not exist: %s", candidate)
+			return ierrors.Errorf("account of committee candidate %s does not exist", candidate)
 		}
 		// if `End Epoch` is the current one or has passed, validator is no longer considered for validator selection
 		if accountData.StakeEndEpoch <= epoch {

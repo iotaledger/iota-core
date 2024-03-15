@@ -121,7 +121,7 @@ func (r *BlockRetainer) getBlockMetadata(blockID iotago.BlockID) (*slotstore.Blo
 func (r *BlockRetainer) BlockMetadata(blockID iotago.BlockID) (*api.BlockMetadataResponse, error) {
 	blockStatus, err := r.blockState(blockID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "block %s not found", blockID.ToHex())
+		return nil, ierrors.Wrapf(err, "block %s not found", blockID)
 	}
 
 	// we do not expose accepted flag

@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/app/configuration"
 	hivep2p "github.com/iotaledger/hive.go/crypto/p2p"
 	"github.com/iotaledger/hive.go/crypto/pem"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/components/p2p"
 )
 
@@ -33,7 +34,7 @@ func extractP2PIdentity(args []string) error {
 	}
 
 	if len(*databasePathFlag) == 0 {
-		return fmt.Errorf("'%s' not specified", FlagToolDatabasePath)
+		return ierrors.Errorf("'%s' not specified", FlagToolDatabasePath)
 	}
 
 	databasePath := *databasePathFlag
@@ -43,18 +44,18 @@ func extractP2PIdentity(args []string) error {
 	switch {
 	case os.IsNotExist(err):
 		// private key does not exist
-		return fmt.Errorf("private key file (%s) does not exist", privKeyFilePath)
+		return ierrors.Errorf("private key file (%s) does not exist", privKeyFilePath)
 
 	case err == nil || os.IsExist(err):
 		// private key file exists
 
 	default:
-		return fmt.Errorf("unable to check private key file (%s): %w", privKeyFilePath, err)
+		return ierrors.Wrapf(err, "unable to check private key file (%s)", privKeyFilePath)
 	}
 
 	privKey, err := pem.ReadEd25519PrivateKeyFromPEMFile(privKeyFilePath)
 	if err != nil {
-		return fmt.Errorf("reading private key file for peer identity failed: %w", err)
+		return ierrors.Wrap(err, "reading private key file for peer identity failed")
 	}
 
 	libp2pPrivKey, err := hivep2p.Ed25519PrivateKeyToLibp2pPrivateKey(privKey)

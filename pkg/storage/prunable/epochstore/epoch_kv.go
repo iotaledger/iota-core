@@ -65,7 +65,7 @@ func (e *EpochKVStore) GetEpoch(epoch iotago.EpochIndex) (kvstore.KVStore, error
 	})
 
 	if e.isTooOld(epoch) {
-		return nil, ierrors.Wrapf(database.ErrEpochPruned, "epoch %d is too old", epoch)
+		return nil, ierrors.WithMessagef(database.ErrEpochPruned, "epoch %d is too old", epoch)
 	}
 
 	return lo.PanicOnErr(e.kv.WithExtendedRealm(epoch.MustBytes())), nil

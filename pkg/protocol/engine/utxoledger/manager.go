@@ -136,7 +136,7 @@ func (m *Manager) ReadLedgerIndexWithoutLocking() (iotago.SlotIndex, error) {
 			return m.apiProvider.CommittedAPI().ProtocolParameters().GenesisSlot(), nil
 		}
 
-		return 0, ierrors.Errorf("failed to load ledger milestone index: %w", err)
+		return 0, ierrors.Wrap(err, "failed to load ledger milestone index")
 	}
 
 	return lo.DropCount(iotago.SlotIndexFromBytes(value))
@@ -200,12 +200,12 @@ func (m *Manager) ApplyDiffWithoutLocking(slot iotago.SlotIndex, newOutputs Outp
 
 	for _, output := range newOutputs {
 		if err := m.stateTree.Set(output.OutputID(), newStateMetadata(output)); err != nil {
-			return ierrors.Wrapf(err, "failed to set new oputput in state tree, outputID: %s", output.OutputID())
+			return ierrors.Wrapf(err, "failed to set new oputput in state tree, outputID: %s", output.OutputID().ToHex())
 		}
 	}
 	for _, spent := range newSpents {
 		if _, err := m.stateTree.Delete(spent.OutputID()); err != nil {
-			return ierrors.Wrapf(err, "failed to delete spent output from state tree, outputID: %s", spent.OutputID())
+			return ierrors.Wrapf(err, "failed to delete spent output from state tree, outputID: %s", spent.OutputID().ToHex())
 		}
 	}
 
@@ -276,12 +276,12 @@ func (m *Manager) RollbackDiffWithoutLocking(slot iotago.SlotIndex, newOutputs O
 
 	for _, spent := range newSpents {
 		if err := m.stateTree.Set(spent.OutputID(), newStateMetadata(spent.Output())); err != nil {
-			return ierrors.Wrapf(err, "failed to set new spent output in state tree, outputID: %s", spent.OutputID())
+			return ierrors.Wrapf(err, "failed to set new spent output in state tree, outputID: %s", spent.OutputID().ToHex())
 		}
 	}
 	for _, output := range newOutputs {
 		if _, err := m.stateTree.Delete(output.OutputID()); err != nil {
-			return ierrors.Wrapf(err, "failed to delete new output from state tree, outputID: %s", output.OutputID())
+			return ierrors.Wrapf(err, "failed to delete new output from state tree, outputID: %s", output.OutputID().ToHex())
 		}
 	}
 
@@ -314,7 +314,7 @@ func (m *Manager) CheckLedgerState(tokenSupply iotago.BaseToken) error {
 
 func (m *Manager) AddGenesisUnspentOutputWithoutLocking(unspentOutput *Output) error {
 	if err := m.importUnspentOutputWithoutLocking(unspentOutput); err != nil {
-		return ierrors.Wrapf(err, "failed to import unspent output, outputID: %s", unspentOutput.OutputID())
+		return ierrors.Wrapf(err, "failed to import unspent output, outputID: %s", unspentOutput.OutputID().ToHex())
 	}
 
 	if err := m.stateTree.Commit(); err != nil {
@@ -347,7 +347,7 @@ func (m *Manager) importUnspentOutputWithoutLocking(unspentOutput *Output) error
 	}
 
 	if err := m.stateTree.Set(unspentOutput.OutputID(), newStateMetadata(unspentOutput)); err != nil {
-		return ierrors.Wrapf(err, "failed to set state tree entry for output, outputID: %s", unspentOutput.OutputID())
+		return ierrors.Wrapf(err, "failed to set state tree entry for output, outputID: %s", unspentOutput.OutputID().ToHex())
 	}
 
 	return nil

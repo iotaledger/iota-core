@@ -3,7 +3,6 @@ package inx
 import (
 	"context"
 
-	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	inx "github.com/iotaledger/inx/go"
@@ -58,8 +57,12 @@ func (s *Server) ValidatePayload(_ context.Context, payload *inx.RawPayload) (*i
 			// TaggedData is always valid if serix decoding was successful
 			return nil
 
+		case *iotago.CandidacyAnnouncement:
+			panic("TODO: implement me")
 		default:
-			return ierrors.Errorf("unsupported payload type: %T", typedPayload)
+			// We're switching on the Go payload type here, so we can only run into the default case
+			// if we added a new payload type and have not handled it above. In this case we want to panic.
+			panic("all supported payload types should be handled above")
 		}
 	}(); err != nil {
 		//nolint:nilerr // this is expected behavior

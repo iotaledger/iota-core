@@ -352,7 +352,7 @@ func (m *MemPool[VoteRank]) storeTransaction(signedTransaction mempool.SignedTra
 
 	if m.lastCommittedSlot >= blockID.Slot() {
 		// block will be retained as invalid, we do not store tx failure as it was block's fault
-		return nil, false, false, ierrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Slot(), m.lastCommittedSlot)
+		return nil, false, false, ierrors.Errorf("blockID %s is older than last evicted slot %d", blockID, m.lastCommittedSlot)
 	}
 
 	inputReferences, err := m.vm.Inputs(transaction)
@@ -360,20 +360,14 @@ func (m *MemPool[VoteRank]) storeTransaction(signedTransaction mempool.SignedTra
 		return nil, false, false, ierrors.Wrap(err, "failed to get input references of transaction")
 	}
 
-	newTransaction, err := NewTransactionMetadata(transaction, inputReferences)
-	if err != nil {
-		return nil, false, false, ierrors.Errorf("failed to create transaction metadata: %w", err)
-	}
+	newTransaction := NewTransactionMetadata(transaction, inputReferences)
 
 	storedTransaction, isNewTransaction := m.cachedTransactions.GetOrCreate(newTransaction.ID(), func() *TransactionMetadata { return newTransaction })
 	if isNewTransaction {
 		m.setupTransaction(storedTransaction)
 	}
 
-	newSignedTransaction, err := NewSignedTransactionMetadata(signedTransaction, storedTransaction)
-	if err != nil {
-		return nil, false, false, ierrors.Errorf("failed to create signedTransaction metadata: %w", err)
-	}
+	newSignedTransaction := NewSignedTransactionMetadata(signedTransaction, storedTransaction)
 
 	storedSignedTransaction, isNewSignedTransaction = m.cachedSignedTransactions.GetOrCreate(signedTransaction.MustID(), func() *SignedTransactionMetadata { return newSignedTransaction })
 	if isNewSignedTransaction {
