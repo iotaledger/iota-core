@@ -22,6 +22,7 @@ var eventAPITests = map[string]func(t *testing.T, e *EventAPIDockerTestFramework
 	"Test_AccountTransactionBlocks":    test_AccountTransactionBlocks,
 	"Test_FoundryTransactionBlocks":    test_FoundryTransactionBlocks,
 	"Test_NFTTransactionBlocks":        test_NFTTransactionBlocks,
+	"Test_BlockMetadataMatchedCoreAPI": test_BlockMetadataMatchedCoreAPI,
 }
 
 func Test_MQTTTopics(t *testing.T) {
@@ -398,5 +399,37 @@ func test_NFTTransactionBlocks(t *testing.T, e *EventAPIDockerTestFramework) {
 		// wait until all topics receives all expected objects
 		err = e.AwaitEventAPITopics(t, cancel, totalTopics)
 		require.NoError(t, err)
+	}
+}
+
+func test_BlockMetadataMatchedCoreAPI(t *testing.T, e *EventAPIDockerTestFramework) {
+	// get event API client ready
+	ctx, cancel := context.WithCancel(context.Background())
+	eventClt := e.ConnectEventAPIClient(ctx)
+	defer eventClt.Close()
+
+	{
+		account := e.dockerFramework.CreateAccount()
+
+		assertions := []func(){
+			func() { e.AssertBlockMetadataStateAcceptedBlocks(ctx, eventClt) },
+			func() { e.AssertBlockMetadataStateConfirmedBlocks(ctx, eventClt) },
+		}
+
+		totalTopics := len(assertions)
+		for _, assertion := range assertions {
+			assertion()
+		}
+
+		// wait until all topics starts listening
+		err := e.AwaitEventAPITopics(t, cancel, totalTopics)
+		require.NoError(t, err)
+
+		// issue blocks
+		e.SubmitDataBlockStream(account, 5*time.Minute)
+
+		// time's up, cancel the context
+		time.Sleep(5 * time.Minute)
+		cancel()
 	}
 }
