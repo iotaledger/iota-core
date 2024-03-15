@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
@@ -47,7 +48,7 @@ func NewTestFramework(test *testing.T, opts ...options.Option[TestFramework]) *T
 
 		t.TipManager = tipmanagertests.NewTestFramework(test)
 
-		t.Instance = tipselectionv1.New().Construct(
+		t.Instance = tipselectionv1.New(module.NewTestModule(test)).Construct(
 			t.TipManager.Instance,
 			spenddagv1.New[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank](t.CommitteeSize),
 			transactionMetadataRetriever,

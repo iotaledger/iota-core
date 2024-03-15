@@ -6,7 +6,6 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -65,8 +64,6 @@ type Manager struct {
 	apiProvider iotago.APIProvider
 
 	module.Module
-
-	log.Logger
 }
 
 func NewProvider() module.Provider[*engine.Engine, attestation.Attestations] {
@@ -74,7 +71,7 @@ func NewProvider() module.Provider[*engine.Engine, attestation.Attestations] {
 		latestCommitment := e.Storage.Settings().LatestCommitment()
 
 		return NewManager(
-			e.Logger.NewChildLogger("AttestationManager"),
+			e.NewSubModule("AttestationManager"),
 			latestCommitment.Slot(),
 			latestCommitment.CumulativeWeight(),
 			e.Storage.Attestations,
@@ -85,15 +82,15 @@ func NewProvider() module.Provider[*engine.Engine, attestation.Attestations] {
 }
 
 func NewManager(
-	logger log.Logger,
+	subModule module.Module,
 	lastCommittedSlot iotago.SlotIndex,
 	lastCumulativeWeight uint64,
 	bucketedStorage func(slot iotago.SlotIndex) (kvstore.KVStore, error),
 	committeeFunc func(slot iotago.SlotIndex) (*account.SeatedAccounts, bool),
 	apiProvider iotago.APIProvider,
 ) *Manager {
-	m := &Manager{
-		Logger:               logger,
+	return module.InitSimpleLifecycle(&Manager{
+		Module:               subModule,
 		lastCommittedSlot:    lastCommittedSlot,
 		lastCumulativeWeight: lastCumulativeWeight,
 		committeeFunc:        committeeFunc,
@@ -101,17 +98,7 @@ func NewManager(
 		futureAttestations:   memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation](),
 		pendingAttestations:  memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation](),
 		apiProvider:          apiProvider,
-	}
-	m.TriggerConstructed()
-
-	return m
-}
-
-func (m *Manager) Shutdown() {
-	if err := m.writeToDisk(); err != nil {
-		panic(err)
-	}
-	m.TriggerStopped()
+	}, (*Manager).shutdown)
 }
 
 // Get returns the attestations that are included in the commitment of the given slot as list.
@@ -356,4 +343,12 @@ func (m *Manager) computeAttestationCommitmentOffset(slot iotago.SlotIndex) (cut
 	}
 
 	return slot - m.apiProvider.APIForSlot(slot).ProtocolParameters().MaxCommittableAge(), true
+}
+
+func (m *Manager) shutdown() {
+	if err := m.writeToDisk(); err != nil {
+		panic(err)
+	}
+
+	m.StoppedEvent().Trigger()
 }

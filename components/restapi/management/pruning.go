@@ -11,12 +11,12 @@ import (
 
 func pruneDatabase(c echo.Context) (*api.PruneDatabaseResponse, error) {
 	if deps.Protocol.Engines.Main.Get().Storage.IsPruning() {
-		return nil, ierrors.Wrapf(echo.ErrServiceUnavailable, "node is already pruning")
+		return nil, ierrors.WithMessage(echo.ErrServiceUnavailable, "node is already pruning")
 	}
 
 	request := &api.PruneDatabaseRequest{}
 	if err := c.Bind(request); err != nil {
-		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid request, error: %s", err)
+		return nil, ierrors.WithMessagef(httpserver.ErrInvalidParameter, "invalid request, error: %w", err)
 	}
 
 	// only allow one type of pruning at a time
@@ -24,7 +24,7 @@ func pruneDatabase(c echo.Context) (*api.PruneDatabaseResponse, error) {
 		(request.Epoch != 0 && request.Depth != 0) ||
 		(request.Epoch != 0 && request.TargetDatabaseSize != "") ||
 		(request.Depth != 0 && request.TargetDatabaseSize != "") {
-		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "either epoch, depth or size has to be specified")
+		return nil, ierrors.WithMessage(httpserver.ErrInvalidParameter, "either epoch, depth or size has to be specified")
 	}
 
 	var err error
@@ -32,26 +32,26 @@ func pruneDatabase(c echo.Context) (*api.PruneDatabaseResponse, error) {
 	if request.Epoch != 0 {
 		err = deps.Protocol.Engines.Main.Get().Storage.PruneByEpochIndex(request.Epoch)
 		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "pruning database failed: %s", err)
+			return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "pruning database failed: %w", err)
 		}
 	}
 
 	if request.Depth != 0 {
 		_, _, err := deps.Protocol.Engines.Main.Get().Storage.PruneByDepth(request.Depth)
 		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "pruning database failed: %s", err)
+			return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "pruning database failed: %w", err)
 		}
 	}
 
 	if request.TargetDatabaseSize != "" {
 		pruningTargetDatabaseSizeBytes, err := bytes.Parse(request.TargetDatabaseSize)
 		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "pruning database failed: %s", err)
+			return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "pruning database failed: %w", err)
 		}
 
 		err = deps.Protocol.Engines.Main.Get().Storage.PruneBySize(pruningTargetDatabaseSizeBytes)
 		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "pruning database failed: %s", err)
+			return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "pruning database failed: %w", err)
 		}
 	}
 

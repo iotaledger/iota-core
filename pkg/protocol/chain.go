@@ -106,7 +106,7 @@ func newChain(chains *Chains) *Chain {
 // initialized.
 func (c *Chain) WithInitializedEngine(callback func(engineInstance *engine.Engine) (shutdown func())) (shutdown func()) {
 	return c.Engine.WithNonEmptyValue(func(engineInstance *engine.Engine) (shutdown func()) {
-		return engineInstance.Initialized.WithNonEmptyValue(func(_ bool) (shutdown func()) {
+		return engineInstance.InitializedEvent().WithNonEmptyValue(func(_ bool) (shutdown func()) {
 			return callback(engineInstance)
 		})
 	})

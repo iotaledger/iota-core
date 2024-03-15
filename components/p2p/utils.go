@@ -18,7 +18,7 @@ func initPeerDB() (peerDB *network.DB, peerDBKVStore kvstore.KVStore, err error)
 
 	db, err := database.NewRocksDB(ParamsP2P.Database.Path)
 	if err != nil {
-		return nil, nil, ierrors.Wrap(err, "error creating peer database")
+		return nil, nil, ierrors.Wrap(err, "failed to create peer database")
 	}
 
 	peerDBKVStore = rocksdb.New(db)

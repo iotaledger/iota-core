@@ -87,9 +87,10 @@ type Engine struct {
 	optsSnapshotPath     string
 	optsEntryPointsDepth int
 	optsSnapshotDepth    int
+	optsCheckCommitment  bool
 	optsBlockRequester   []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]]
 
-	*module.ReactiveModule
+	module.Module
 }
 
 func New(
@@ -129,10 +130,11 @@ func New(
 			LatestCommitment: reactive.NewVariable[*model.Commitment](),
 			Workers:          workers,
 
-			optsSnapshotPath:  "snapshot.bin",
-			optsSnapshotDepth: 5,
+			optsSnapshotPath:    "snapshot.bin",
+			optsSnapshotDepth:   5,
+			optsCheckCommitment: true,
 		}, opts, func(e *Engine) {
-			e.ReactiveModule = e.initReactiveModule(logger)
+			e.Module = e.initReactiveModule(logger)
 
 			e.errorHandler = func(err error) {
 				e.LogError("engine error", "err", err)
@@ -183,7 +185,7 @@ func New(
 		(*Engine).setupPruning,
 		(*Engine).acceptanceHandler,
 		func(e *Engine) {
-			e.Constructed.Trigger()
+			e.ConstructedEvent().Trigger()
 
 			// Make sure that we have the protocol parameters for the latest supported iota.go protocol version of the software.
 			// If not the user needs to update the protocol parameters file.
@@ -230,7 +232,14 @@ func New(
 				e.Reset()
 			}
 
-			e.Initialized.Trigger()
+			// Check consistency of commitment and ledger state in the storage
+			if e.optsCheckCommitment {
+				if err := e.Storage.CheckCorrectnessCommitmentLedgerState(); err != nil {
+					panic(ierrors.Wrap(err, "commitment or ledger state are incorrect"))
+				}
+			}
+
+			e.InitializedEvent().Trigger()
 
 			e.LogTrace("initialized", "settings", e.Storage.Settings().String())
 		},
@@ -382,6 +391,8 @@ func (e *Engine) ImportContents(reader io.ReadSeeker) (err error) {
 		return ierrors.Wrap(err, "failed to import attestation state")
 	} else if err = e.UpgradeOrchestrator.Import(reader); err != nil {
 		return ierrors.Wrap(err, "failed to import upgrade orchestrator")
+	} else if err = e.Storage.ImportRoots(reader, e.Storage.Settings().LatestCommitment()); err != nil {
+		return ierrors.Wrap(err, "failed to import roots")
 	}
 
 	return
@@ -408,6 +419,8 @@ func (e *Engine) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err
 		return ierrors.Wrap(err, "failed to export attestation state")
 	} else if err = e.UpgradeOrchestrator.Export(writer, targetSlot); err != nil {
 		return ierrors.Wrap(err, "failed to export upgrade orchestrator")
+	} else if err = e.Storage.ExportRoots(writer, targetCommitment.Commitment()); err != nil {
+		return ierrors.Wrap(err, "failed to export roots")
 	}
 
 	return
@@ -455,7 +468,7 @@ func (e *Engine) setupBlockStorage() {
 	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		store, err := e.Storage.Blocks(block.ID().Slot())
 		if err != nil {
-			e.errorHandler(ierrors.Errorf("failed to store block with %s, storage with given index does not exist", block.ID()))
+			e.errorHandler(ierrors.Errorf("failed to store block %s, storage at block's slot does not exist", block.ID()))
 			return
 		}
 
@@ -540,14 +553,14 @@ func (e *Engine) initRootCommitment() {
 		})
 	}
 
-	e.Constructed.OnTrigger(func() {
+	e.ConstructedEvent().OnTrigger(func() {
 		unsubscribe := e.Events.SlotGadget.SlotFinalized.Hook(updateRootCommitment).Unhook
 
-		e.Initialized.OnTrigger(func() {
+		e.InitializedEvent().OnTrigger(func() {
 			updateRootCommitment(e.Storage.Settings().LatestFinalizedSlot())
 		})
 
-		e.Shutdown.OnTrigger(unsubscribe)
+		e.ShutdownEvent().OnTrigger(unsubscribe)
 	})
 }
 
@@ -558,58 +571,66 @@ func (e *Engine) initLatestCommitment() {
 		})
 	}
 
-	e.Constructed.OnTrigger(func() {
+	e.ConstructedEvent().OnTrigger(func() {
 		unsubscribe := e.Events.Notarization.LatestCommitmentUpdated.Hook(updateLatestCommitment).Unhook
 
-		e.Initialized.OnTrigger(func() {
+		e.InitializedEvent().OnTrigger(func() {
 			updateLatestCommitment(e.Storage.Settings().LatestCommitment())
 		})
 
-		e.Shutdown.OnTrigger(unsubscribe)
+		e.ShutdownEvent().OnTrigger(unsubscribe)
 	})
 }
 
-func (e *Engine) initReactiveModule(parentLogger log.Logger) (reactiveModule *module.ReactiveModule) {
-	logger := parentLogger.NewChildLogger("Engine", true)
-	reactiveModule = module.NewReactiveModule(logger)
+func (e *Engine) initReactiveModule(parentLogger log.Logger) (reactiveModule module.Module) {
+	reactiveModule = module.New(parentLogger.NewChildLogger("Engine", true))
 
 	e.RootCommitment.LogUpdates(reactiveModule, log.LevelTrace, "RootCommitment")
 	e.LatestCommitment.LogUpdates(reactiveModule, log.LevelTrace, "LatestCommitment")
 
-	reactiveModule.Shutdown.OnTrigger(func() {
+	reactiveModule.ShutdownEvent().OnTrigger(func() {
 		reactiveModule.LogDebug("shutting down")
 
-		logger.UnsubscribeFromParentLogger()
-
-		// Shutdown should be performed in the reverse dataflow order.
 		e.BlockRequester.Shutdown()
-		e.Scheduler.Shutdown()
-		e.TipSelection.Shutdown()
-		e.TipManager.Shutdown()
-		e.Attestations.Shutdown()
-		e.SyncManager.Shutdown()
-		e.Notarization.Shutdown()
-		e.Clock.Shutdown()
-		e.SlotGadget.Shutdown()
-		e.BlockGadget.Shutdown()
-		e.UpgradeOrchestrator.Shutdown()
-		e.SybilProtection.Shutdown()
-		e.Booker.Shutdown()
-		e.Ledger.Shutdown()
-		e.PostSolidFilter.Shutdown()
-		e.BlockDAG.Shutdown()
-		e.PreSolidFilter.Shutdown()
-		e.BlockRetainer.Shutdown()
-		e.TxRetainer.Shutdown()
+
+		e.shutdownSubModules()
+
 		e.Workers.Shutdown()
 		e.Storage.Shutdown()
 
-		reactiveModule.LogDebug("stopped")
+		e.StoppedEvent().Trigger()
 
-		e.Stopped.Trigger()
+		reactiveModule.LogDebug("stopped")
 	})
 
 	return reactiveModule
+}
+
+func (e *Engine) shutdownSubModules() {
+	// shutdown should be performed in the reverse dataflow order.
+	shutdownOrder := []module.Module{
+		e.Scheduler,
+		e.TipSelection,
+		e.TipManager,
+		e.Attestations,
+		e.SyncManager,
+		e.Notarization,
+		e.Clock,
+		e.SlotGadget,
+		e.BlockGadget,
+		e.UpgradeOrchestrator,
+		e.SybilProtection,
+		e.Booker,
+		e.Ledger,
+		e.PostSolidFilter,
+		e.BlockDAG,
+		e.PreSolidFilter,
+		e.BlockRetainer,
+		e.TxRetainer,
+	}
+
+	module.TriggerAll(module.Module.ShutdownEvent, shutdownOrder...)
+	module.WaitAll(module.Module.StoppedEvent, shutdownOrder...).Wait()
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -619,6 +640,12 @@ func (e *Engine) initReactiveModule(parentLogger log.Logger) (reactiveModule *mo
 func WithSnapshotPath(snapshotPath string) options.Option[Engine] {
 	return func(e *Engine) {
 		e.optsSnapshotPath = snapshotPath
+	}
+}
+
+func WithCommitmentCheck(checkCommitment bool) options.Option[Engine] {
+	return func(e *Engine) {
+		e.optsCheckCommitment = checkCommitment
 	}
 }
 

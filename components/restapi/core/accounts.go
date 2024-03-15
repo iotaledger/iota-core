@@ -61,20 +61,23 @@ func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 	var err error
 	pageSize := httpserver.ParsePageSizeQueryParam(c, api.ParameterPageSize, restapi.ParamsRestAPI.MaxPageSize)
 	latestCommittedSlot := deps.RequestHandler.GetLatestCommitment().Slot()
+	currentEpoch := deps.RequestHandler.APIProvider().APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
+	requestedEpoch := currentEpoch
 
 	// no cursor provided will be the first request
-	requestedSlot := latestCommittedSlot
 	var cursorIndex uint32
 	if len(c.QueryParam(api.ParameterCursor)) != 0 {
-		requestedSlot, cursorIndex, err = httpserver.ParseSlotCursorQueryParam(c, api.ParameterCursor)
+		requestedEpoch, cursorIndex, err = httpserver.ParseEpochCursorQueryParam(c, api.ParameterCursor)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	slotRange := uint32(requestedSlot) / restapi.ParamsRestAPI.RequestsMemoryCacheGranularity
+	if requestedEpoch > currentEpoch || requestedEpoch <= deps.RequestHandler.GetNodeStatus().PruningEpoch {
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "epoch %d is larger than current epoch or already pruned", requestedEpoch)
+	}
 
-	return deps.RequestHandler.Validators(slotRange, cursorIndex, pageSize)
+	return deps.RequestHandler.Validators(requestedEpoch, cursorIndex, pageSize)
 }
 
 func validatorByAccountAddress(c echo.Context) (*api.ValidatorResponse, error) {

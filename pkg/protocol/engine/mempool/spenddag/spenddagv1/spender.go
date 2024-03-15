@@ -135,7 +135,7 @@ func (c *Spender[SpenderID, ResourceID, VoteRank]) JoinSpendSets(spendSets ds.Se
 	}
 
 	if c.evicted.Load() {
-		return nil, ierrors.Errorf("tried to join spend sets of evicted spender: %w", spenddag.ErrEntityEvicted)
+		return nil, ierrors.WithMessage(spenddag.ErrEntityEvicted, "tried to join spend sets of evicted spender")
 	}
 
 	registerConflictingSpender := func(c *Spender[SpenderID, ResourceID, VoteRank], spender *Spender[SpenderID, ResourceID, VoteRank]) {

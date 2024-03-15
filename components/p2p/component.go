@@ -331,7 +331,7 @@ func getMultiAddrsFromString(peers []string) ([]multiaddr.Multiaddr, error) {
 	for _, peer := range peers {
 		peerMultiAddr, err := multiaddr.NewMultiaddr(peer)
 		if err != nil {
-			return nil, ierrors.Errorf("invalid peer multiaddr \"%s\": %w", peer, err)
+			return nil, ierrors.Wrapf(err, "invalid peer multiaddr \"%s\"", peer)
 		}
 		peersMultiAddresses = append(peersMultiAddresses, peerMultiAddr)
 	}

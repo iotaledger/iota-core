@@ -31,8 +31,9 @@ type BlockRetainer struct {
 	module.Module
 }
 
-func New(workersGroup *workerpool.Group, retainerStoreFunc StoreFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *BlockRetainer {
-	return &BlockRetainer{
+func New(module module.Module, workersGroup *workerpool.Group, retainerStoreFunc StoreFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *BlockRetainer {
+	b := &BlockRetainer{
+		Module:                  module,
 		events:                  retainer.NewEvents(),
 		workerPool:              workersGroup.CreatePool("Retainer", workerpool.WithWorkerCount(1)),
 		store:                   retainerStoreFunc,
@@ -40,12 +41,20 @@ func New(workersGroup *workerpool.Group, retainerStoreFunc StoreFunc, latestComm
 		finalizedSlotFunc:       finalizedSlotFunc,
 		errorHandler:            errorHandler,
 	}
+
+	b.ShutdownEvent().OnTrigger(func() {
+		b.StoppedEvent().Trigger()
+	})
+
+	b.ConstructedEvent().Trigger()
+
+	return b
 }
 
 // NewProvider creates a new BlockRetainer provider.
 func NewProvider() module.Provider[*engine.Engine, retainer.BlockRetainer] {
 	return module.Provide(func(e *engine.Engine) retainer.BlockRetainer {
-		r := New(e.Workers.CreateGroup("Retainer"),
+		r := New(e.NewSubModule("BlockRetainer"), e.Workers.CreateGroup("Retainer"),
 			e.Storage.BlockMetadata,
 			func() iotago.SlotIndex {
 				return e.SyncManager.LatestCommitment().Slot()
@@ -83,7 +92,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.BlockRetainer] {
 
 		e.Events.Retainer.BlockRetained.LinkTo(r.events.BlockRetained)
 
-		r.TriggerInitialized()
+		r.InitializedEvent().Trigger()
 
 		return r
 	})
@@ -93,10 +102,6 @@ func NewProvider() module.Provider[*engine.Engine, retainer.BlockRetainer] {
 func (r *BlockRetainer) Reset() {
 	// TODO: check if something needs to be cleaned here
 	// on chain switching reset everything up to the forking point
-}
-
-func (r *BlockRetainer) Shutdown() {
-	r.workerPool.Shutdown()
 }
 
 func (r *BlockRetainer) getBlockMetadata(blockID iotago.BlockID) (*slotstore.BlockMetadata, error) {
@@ -116,7 +121,7 @@ func (r *BlockRetainer) getBlockMetadata(blockID iotago.BlockID) (*slotstore.Blo
 func (r *BlockRetainer) BlockMetadata(blockID iotago.BlockID) (*api.BlockMetadataResponse, error) {
 	blockStatus, err := r.blockState(blockID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "block %s not found", blockID.ToHex())
+		return nil, ierrors.Wrapf(err, "block %s not found", blockID)
 	}
 
 	return &api.BlockMetadataResponse{

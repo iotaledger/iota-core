@@ -31,32 +31,40 @@ type PreSolidBlockFilter struct {
 
 func NewProvider(opts ...options.Option[PreSolidBlockFilter]) module.Provider[*engine.Engine, presolidfilter.PreSolidFilter] {
 	return module.Provide(func(e *engine.Engine) presolidfilter.PreSolidFilter {
-		f := New(e, opts...)
-		f.TriggerConstructed()
+		f := New(e.NewSubModule("PreSolidBlockFilter"), e, opts...)
 
-		e.Constructed.OnTrigger(func() {
-			e.Events.PreSolidFilter.LinkTo(f.events)
-			e.SybilProtection.HookInitialized(func() {
-				f.committeeFunc = e.SybilProtection.SeatManager().CommitteeInSlot
+		e.ConstructedEvent().OnTrigger(func() {
+			e.SybilProtection.InitializedEvent().OnTrigger(func() {
+				f.Init(e.SybilProtection.SeatManager().CommitteeInSlot)
 			})
-			f.TriggerInitialized()
+
+			e.Events.PreSolidFilter.LinkTo(f.events)
 		})
 
 		return f
 	})
 }
 
-var _ presolidfilter.PreSolidFilter = new(PreSolidBlockFilter)
-
 // New creates a new PreSolidBlockFilter.
-func New(apiProvider iotago.APIProvider, opts ...options.Option[PreSolidBlockFilter]) *PreSolidBlockFilter {
+func New(module module.Module, apiProvider iotago.APIProvider, opts ...options.Option[PreSolidBlockFilter]) *PreSolidBlockFilter {
 	return options.Apply(&PreSolidBlockFilter{
+		Module:      module,
 		events:      presolidfilter.NewEvents(),
 		apiProvider: apiProvider,
-	}, opts,
-		(*PreSolidBlockFilter).TriggerConstructed,
-		(*PreSolidBlockFilter).TriggerInitialized,
-	)
+	}, opts, func(p *PreSolidBlockFilter) {
+		p.ShutdownEvent().OnTrigger(func() {
+			p.StoppedEvent().Trigger()
+		})
+
+		p.ConstructedEvent().Trigger()
+	})
+}
+
+// Init initializes the PreSolidBlockFilter.
+func (f *PreSolidBlockFilter) Init(committeeFunc func(iotago.SlotIndex) (*account.SeatedAccounts, bool)) {
+	f.committeeFunc = committeeFunc
+
+	f.InitializedEvent().Trigger()
 }
 
 // ProcessReceivedBlock processes block from the given source.
@@ -66,7 +74,7 @@ func (f *PreSolidBlockFilter) ProcessReceivedBlock(block *model.Block, source pe
 	if apiForSlot.Version() != block.ProtocolBlock().Header.ProtocolVersion {
 		f.events.BlockPreFiltered.Trigger(&presolidfilter.BlockPreFilteredEvent{
 			Block:  block,
-			Reason: ierrors.Wrapf(ErrInvalidBlockVersion, "invalid protocol version %d (expected %d) for epoch %d", block.ProtocolBlock().Header.ProtocolVersion, apiForSlot.Version(), apiForSlot.TimeProvider().EpochFromSlot(block.ID().Slot())),
+			Reason: ierrors.WithMessagef(ErrInvalidBlockVersion, "invalid protocol version %d (expected %d) for epoch %d", block.ProtocolBlock().Header.ProtocolVersion, apiForSlot.Version(), apiForSlot.TimeProvider().EpochFromSlot(block.ID().Slot())),
 			Source: source,
 		})
 
@@ -79,7 +87,7 @@ func (f *PreSolidBlockFilter) ProcessReceivedBlock(block *model.Block, source pe
 		if !exists {
 			f.events.BlockPreFiltered.Trigger(&presolidfilter.BlockPreFilteredEvent{
 				Block:  block,
-				Reason: ierrors.Wrapf(ErrValidatorNotInCommittee, "no committee for slot %d", blockSlot),
+				Reason: ierrors.WithMessagef(ErrValidatorNotInCommittee, "no committee for slot %d", blockSlot),
 				Source: source,
 			})
 
@@ -89,7 +97,7 @@ func (f *PreSolidBlockFilter) ProcessReceivedBlock(block *model.Block, source pe
 		if !committee.HasAccount(block.ProtocolBlock().Header.IssuerID) {
 			f.events.BlockPreFiltered.Trigger(&presolidfilter.BlockPreFilteredEvent{
 				Block:  block,
-				Reason: ierrors.Wrapf(ErrValidatorNotInCommittee, "validation block issuer %s is not part of the committee for slot %d", block.ProtocolBlock().Header.IssuerID, blockSlot),
+				Reason: ierrors.WithMessagef(ErrValidatorNotInCommittee, "validation block issuer %s is not part of the committee for slot %d", block.ProtocolBlock().Header.IssuerID, blockSlot),
 				Source: source,
 			})
 
@@ -102,7 +110,3 @@ func (f *PreSolidBlockFilter) ProcessReceivedBlock(block *model.Block, source pe
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (f *PreSolidBlockFilter) Reset() { /* nothing to reset but comply with interface */ }
-
-func (f *PreSolidBlockFilter) Shutdown() {
-	f.TriggerStopped()
-}

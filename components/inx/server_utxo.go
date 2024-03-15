@@ -2,7 +2,6 @@ package inx
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -189,7 +188,7 @@ func (s *Server) ReadUnspentOutputs(_ *inx.NoParams, srv inx.INX_ReadUnspentOutp
 		}
 
 		if err := srv.Send(payload); err != nil {
-			innerErr = fmt.Errorf("send error: %w", err)
+			innerErr = ierrors.Wrap(err, "send error")
 
 			return false
 		}
@@ -212,7 +211,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 
 		// Send Begin
 		if err := srv.Send(NewLedgerUpdateBatchBegin(commitment.ID(), len(outputs), len(spents))); err != nil {
-			return fmt.Errorf("send error: %w", err)
+			return ierrors.Wrap(err, "send error")
 		}
 
 		// Send consumed
@@ -223,7 +222,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 			}
 
 			if err := srv.Send(payload); err != nil {
-				return fmt.Errorf("send error: %w", err)
+				return ierrors.Wrap(err, "send error")
 			}
 		}
 
@@ -235,13 +234,13 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 			}
 
 			if err := srv.Send(payload); err != nil {
-				return fmt.Errorf("send error: %w", err)
+				return ierrors.Wrap(err, "send error")
 			}
 		}
 
 		// Send End
 		if err := srv.Send(NewLedgerUpdateBatchEnd(commitment.ID(), len(outputs), len(spents))); err != nil {
-			return fmt.Errorf("send error: %w", err)
+			return ierrors.Wrap(err, "send error")
 		}
 
 		return nil

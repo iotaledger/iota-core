@@ -199,7 +199,7 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 		}
 
 		if slotDiff.Slot != snapshotLedgerIndex-iotago.SlotIndex(i) {
-			return ierrors.Errorf("invalid LS slot index. %d vs %d", slotDiff.Slot, snapshotLedgerIndex-iotago.SlotIndex(i))
+			return ierrors.Errorf("invalid LS slot index, %d vs %d", slotDiff.Slot, snapshotLedgerIndex-iotago.SlotIndex(i))
 		}
 
 		if err := m.RollbackDiffWithoutLocking(slotDiff.Slot, slotDiff.Outputs, slotDiff.Spents); err != nil {
@@ -243,11 +243,11 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 		for _, outputID := range outputIDs.RemoveDupsAndSort() {
 			output, err := m.ReadOutputByOutputIDWithoutLocking(outputID)
 			if err != nil {
-				return 0, ierrors.Wrapf(err, "error while retrieving output %s", outputID)
+				return 0, ierrors.Wrapf(err, "error while retrieving output with ID %s", outputID.ToHex())
 			}
 
 			if err := stream.WriteBytes(writer, output.SnapshotBytes()); err != nil {
-				return 0, ierrors.Wrapf(err, "unable to write output with ID %s", outputID)
+				return 0, ierrors.Wrapf(err, "unable to write output with ID %s", outputID.ToHex())
 			}
 
 			outputCount++

@@ -19,10 +19,10 @@ func (r *RequestHandler) CongestionByAccountAddress(accountAddress *iotago.Accou
 	accountID := accountAddress.AccountID()
 	acc, exists, err := r.protocol.Engines.Main.Get().Ledger.Account(accountID, commitment.Slot())
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get account %s from the Ledger: %s", accountID.ToHex(), err)
+		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to get account %s from the Ledger: %w", accountID.ToHex(), err)
 	}
 	if !exists {
-		return nil, ierrors.Wrapf(echo.ErrNotFound, "account not found: %s", accountID.ToHex())
+		return nil, ierrors.WithMessagef(echo.ErrNotFound, "account %s not found", accountID.ToHex())
 	}
 
 	return &api.CongestionResponse{
@@ -33,35 +33,40 @@ func (r *RequestHandler) CongestionByAccountAddress(accountAddress *iotago.Accou
 	}, nil
 }
 
-func (r *RequestHandler) Validators(slotRange, cursorIndex, pageSize uint32) (*api.ValidatorsResponse, error) {
-	latestCommittedSlot := r.protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot()
-	latestEpoch := r.protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
+func (r *RequestHandler) Validators(epochIndex iotago.EpochIndex, cursorIndex, pageSize uint32) (*api.ValidatorsResponse, error) {
+	apiForEpoch := r.APIProvider().APIForEpoch(epochIndex)
+	currentSlot := r.protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot()
+	currentEpoch := apiForEpoch.TimeProvider().EpochFromSlot(currentSlot)
+	var registeredValidators []*api.ValidatorResponse
+	var err error
 
-	// TODO: Move into the api cache package
-	//registeredValidators, exists := r.protocol.Engines.Main.Get().BlockRetainer.RegisteredValidatorsCache(slotRange)
-	//if !exists {
-	//	registeredValidators, err := r.protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(latestEpoch)
-	//	if err != nil {
-	//		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get ordered registered validators list for epoch %d : %s", latestEpoch, err)
-	//	}
-	//	r.protocol.Engines.Main.Get().BlockRetainer.RetainRegisteredValidatorsCache(slotRange, registeredValidators)
-	//}
-
-	registeredValidators, err := r.protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(latestEpoch)
-	if err != nil {
-		return nil, ierrors.Join(echo.ErrInternalServerError, ierrors.Wrapf(err, "failed to get ordered registered validators list for epoch %d", latestEpoch))
+	key := epochIndex.MustBytes()
+	// The key of validators cache for current epoch is the combination of current epoch and current slot. So the results is updated when new commitment is created.
+	if epochIndex == currentEpoch {
+		key = append(key, currentSlot.MustBytes()...)
 	}
 
-	page := registeredValidators[cursorIndex:lo.Min(cursorIndex+pageSize, uint32(len(registeredValidators)))]
+	// get registered validators from cache, if not found, get from engine and store in cache.
+	registeredValidators, err = r.cache.GetOrCreateRegisteredValidators(apiForEpoch, key, func() ([]*api.ValidatorResponse, error) {
+		return r.protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(epochIndex)
+	})
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to get registered validators for epoch %d", epochIndex)
+	}
+
+	if cursorIndex >= uint32(len(registeredValidators)) {
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "invalid pagination cursorIndex, cursorIndex %d is larger than the number of registered validators %d", cursorIndex, len(registeredValidators))
+	}
+
+	pageEndIndex := lo.Min(cursorIndex+pageSize, uint32(len(registeredValidators)))
+	page := registeredValidators[cursorIndex:pageEndIndex]
 	resp := &api.ValidatorsResponse{
 		Validators: page,
 		PageSize:   pageSize,
 	}
 	// this is the last page
-	if int(cursorIndex+pageSize) > len(registeredValidators) {
-		resp.Cursor = ""
-	} else {
-		resp.Cursor = fmt.Sprintf("%d,%d", slotRange, cursorIndex+pageSize)
+	if int(cursorIndex+pageSize) <= len(registeredValidators) {
+		resp.Cursor = fmt.Sprintf("%d,%d", epochIndex, cursorIndex+pageSize)
 	}
 
 	return resp, nil
@@ -73,10 +78,10 @@ func (r *RequestHandler) ValidatorByAccountAddress(accountAddress *iotago.Accoun
 	accountID := accountAddress.AccountID()
 	accountData, exists, err := r.protocol.Engines.Main.Get().Ledger.Account(accountID, latestCommittedSlot)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get account %s from the Ledger: %s", accountID.ToHex(), err)
+		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to get account %s from the Ledger: %s", accountID.ToHex(), err)
 	}
 	if !exists {
-		return nil, ierrors.Wrapf(echo.ErrNotFound, "account %s not found for latest committedSlot %d", accountID.ToHex(), latestCommittedSlot)
+		return nil, ierrors.WithMessagef(echo.ErrNotFound, "account %s not found for latest committedSlot %d", accountID.ToHex(), latestCommittedSlot)
 	}
 
 	epoch := r.protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
@@ -102,10 +107,10 @@ func (r *RequestHandler) RewardsByOutputID(outputID iotago.OutputID, slot iotago
 	utxoOutput, err := r.protocol.Engines.Main.Get().Ledger.Output(outputID)
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			return nil, ierrors.Wrapf(echo.ErrNotFound, "output %s not found", outputID.ToHex())
+			return nil, ierrors.WithMessagef(echo.ErrNotFound, "output %s not found", outputID.ToHex())
 		}
 
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from ledger: %s", outputID.ToHex(), err)
+		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to get output %s from ledger: %w", outputID.ToHex(), err)
 	}
 
 	var stakingPoolValidatorAccountID iotago.AccountID
@@ -120,7 +125,7 @@ func (r *RequestHandler) RewardsByOutputID(outputID iotago.OutputID, slot iotago
 		accountOutput := utxoOutput.Output().(*iotago.AccountOutput)
 		feature, exists := accountOutput.FeatureSet()[iotago.FeatureStaking]
 		if !exists {
-			return nil, ierrors.Wrapf(echo.ErrBadRequest, "account %s is not a validator", outputID.ToHex())
+			return nil, ierrors.WithMessagef(echo.ErrBadRequest, "account %s is not a validator", outputID.ToHex())
 		}
 
 		//nolint:forcetypeassert
@@ -166,12 +171,12 @@ func (r *RequestHandler) RewardsByOutputID(outputID iotago.OutputID, slot iotago
 	}
 
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to calculate reward for output %s: %s", outputID.ToHex(), err)
+		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to calculate reward for output %s: %w", outputID.ToHex(), err)
 	}
 
 	latestCommittedEpochPoolRewards, poolRewardExists, err := r.protocol.Engines.Main.Get().SybilProtection.PoolRewardsForAccount(stakingPoolValidatorAccountID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to retrieve pool rewards for account %s: %s", stakingPoolValidatorAccountID.ToHex(), err)
+		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to retrieve pool rewards for account %s: %w", stakingPoolValidatorAccountID.ToHex(), err)
 	}
 
 	if !poolRewardExists {
