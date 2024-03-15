@@ -36,21 +36,10 @@ type Booker struct {
 
 func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine, booker.Booker] {
 	return module.Provide(func(e *engine.Engine) booker.Booker {
-		b := New(e, e.BlockCache, e.ErrorHandler("booker"), opts...)
-		e.Constructed.OnTrigger(func() {
-			b.ledger = e.Ledger
-			b.ledger.HookConstructed(func() {
-				b.spendDAG = b.ledger.SpendDAG()
-				b.loadBlockFromStorage = e.Block
-				b.ledger.MemPool().OnTransactionAttached(func(transaction mempool.TransactionMetadata) {
-					transaction.OnAccepted(func() {
-						b.events.TransactionAccepted.Trigger(transaction)
-					})
-					transaction.OnInvalid(func(err error) {
-						b.events.TransactionInvalid.Trigger(transaction, err)
-					})
-				})
-			})
+		b := New(e.NewSubModule("Booker"), e, e.BlockCache, e.ErrorHandler("booker"), opts...)
+
+		e.ConstructedEvent().OnTrigger(func() {
+			b.Init(e.Ledger, e.Block)
 
 			e.Events.SeatManager.BlockProcessed.Hook(func(block *blocks.Block) {
 				if err := b.Queue(block); err != nil {
@@ -59,25 +48,48 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 			})
 
 			e.Events.Booker.LinkTo(b.events)
-
-			b.TriggerInitialized()
 		})
 
 		return b
 	})
 }
 
-func New(apiProvider iotago.APIProvider, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
+func New(subModule module.Module, apiProvider iotago.APIProvider, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
 	return options.Apply(&Booker{
-		events:      booker.NewEvents(),
-		apiProvider: apiProvider,
-
+		Module:       subModule,
+		events:       booker.NewEvents(),
+		apiProvider:  apiProvider,
 		blockCache:   blockCache,
 		errorHandler: errorHandler,
-	}, opts, (*Booker).TriggerConstructed)
+	}, opts, func(b *Booker) {
+		b.ShutdownEvent().OnTrigger(func() {
+			b.StoppedEvent().Trigger()
+		})
+
+		b.ConstructedEvent().Trigger()
+	})
 }
 
-var _ booker.Booker = new(Booker)
+func (b *Booker) Init(ledger ledger.Ledger, loadBlockFromStorage func(iotago.BlockID) (*model.Block, bool)) {
+	b.ledger = ledger
+	b.loadBlockFromStorage = loadBlockFromStorage
+
+	ledger.InitializedEvent().OnTrigger(func() {
+		b.spendDAG = ledger.SpendDAG()
+
+		ledger.MemPool().OnTransactionAttached(func(transaction mempool.TransactionMetadata) {
+			transaction.OnAccepted(func() {
+				b.events.TransactionAccepted.Trigger(transaction)
+			})
+
+			transaction.OnInvalid(func(err error) {
+				b.events.TransactionInvalid.Trigger(transaction, err)
+			})
+		})
+
+		b.InitializedEvent().Trigger()
+	})
+}
 
 // Queue checks if payload is solid and then sets up the block to react to its parents.
 func (b *Booker) Queue(block *blocks.Block) error {
@@ -89,7 +101,7 @@ func (b *Booker) Queue(block *blocks.Block) error {
 	}
 
 	if signedTransactionMetadata == nil {
-		return ierrors.Errorf("transaction in %s was not attached", block.ID())
+		return ierrors.Errorf("transaction in block %s was not attached", block.ID())
 	}
 
 	// Based on the assumption that we always fork and the UTXO and Tangle past cones are always fully known.
@@ -122,10 +134,6 @@ func (b *Booker) Queue(block *blocks.Block) error {
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (b *Booker) Reset() { /* nothing to reset but comply with interface */ }
 
-func (b *Booker) Shutdown() {
-	b.TriggerStopped()
-}
-
 func (b *Booker) setupBlock(block *blocks.Block) {
 	var unbookedParentsCount atomic.Int32
 	unbookedParentsCount.Store(int32(len(block.Parents())))
@@ -150,7 +158,7 @@ func (b *Booker) setupBlock(block *blocks.Block) {
 
 		parentBlock.Invalid().OnUpdateOnce(func(_ bool, _ bool) {
 			if block.SetInvalid() {
-				b.events.BlockInvalid.Trigger(block, ierrors.Errorf("block marked as invalid in Booker because parent block is invalid %s", parentBlock.ID()))
+				b.events.BlockInvalid.Trigger(block, ierrors.Errorf("block marked as invalid in Booker because parent block %s is invalid", parentBlock.ID()))
 			}
 		})
 	})

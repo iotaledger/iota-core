@@ -44,7 +44,7 @@ func sendBlock(c echo.Context) (*api.BlockCreatedResponse, error) {
 
 	blockID, err := deps.RequestHandler.AttachBlock(c.Request().Context(), iotaBlock)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to attach block: %w", err)
+		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to attach block: %w", err)
 	}
 
 	return &api.BlockCreatedResponse{

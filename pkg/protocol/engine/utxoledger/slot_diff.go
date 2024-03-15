@@ -146,11 +146,11 @@ func (sd *SlotDiff) SHA256Sum() ([]byte, error) {
 	sdDiffHash := sha256.New()
 
 	if err := stream.WriteBytes(sdDiffHash, sd.KVStorableKey()); err != nil {
-		return nil, ierrors.Errorf("unable to serialize slot diff: %w", err)
+		return nil, ierrors.Wrap(err, "unable to serialize slot diff")
 	}
 
 	if err := stream.WriteBytes(sdDiffHash, sd.KVStorableValue()); err != nil {
-		return nil, ierrors.Errorf("unable to serialize slot diff: %w", err)
+		return nil, ierrors.Wrap(err, "unable to serialize slot diff")
 	}
 
 	// calculate sha256 hash

@@ -110,24 +110,22 @@ func WithDebugStoreErrorMessages(store bool) options.Option[TransactionRetainer]
 	}
 }
 
-func New(workersGroup *workerpool.Group, dbExecFunc storage.SQLDatabaseExecFunc, latestCommittedSlotFunc SlotFunc, finalizedSlotFunc SlotFunc, errorHandler func(error), opts ...options.Option[TransactionRetainer]) *TransactionRetainer {
-	return options.Apply(&TransactionRetainer{
+func New(parentModule module.Module, workersGroup *workerpool.Group, dbExecFunc storage.SQLDatabaseExecFunc, latestCommittedSlotFunc SlotFunc, finalizedSlotFunc SlotFunc, errorHandler func(error), opts ...options.Option[TransactionRetainer]) *TransactionRetainer {
+	return module.InitSimpleLifecycle(options.Apply(&TransactionRetainer{
+		Module:                  parentModule.NewSubModule("TransactionRetainer"),
 		workerPool:              workersGroup.CreatePool("TxRetainer", workerpool.WithWorkerCount(1)),
 		txRetainerCache:         NewTransactionRetainerCache(),
 		txRetainerDatabase:      NewTransactionRetainerDB(dbExecFunc),
 		latestCommittedSlotFunc: latestCommittedSlotFunc,
 		finalizedSlotFunc:       finalizedSlotFunc,
 		errorHandler:            errorHandler,
-	}, opts,
-		(*TransactionRetainer).TriggerConstructed,
-		(*TransactionRetainer).TriggerInitialized,
-	)
+	}, opts), (*TransactionRetainer).shutdown)
 }
 
 // NewProvider creates a new TransactionRetainer provider.
 func NewProvider(opts ...options.Option[TransactionRetainer]) module.Provider[*engine.Engine, retainer.TransactionRetainer] {
 	return module.Provide(func(e *engine.Engine) retainer.TransactionRetainer {
-		r := New(e.Workers.CreateGroup("TransactionRetainer"),
+		r := New(e, e.Workers.CreateGroup("TransactionRetainer"),
 			e.Storage.TransactionRetainerDatabaseExecFunc(),
 			func() iotago.SlotIndex {
 				return e.SyncManager.LatestCommitment().Slot()
@@ -141,7 +139,7 @@ func NewProvider(opts ...options.Option[TransactionRetainer]) module.Provider[*e
 
 		asyncOpt := event.WithWorkerPool(r.workerPool)
 
-		e.Initialized.OnTrigger(func() {
+		e.InitializedEvent().OnTrigger(func() {
 			// attaching the transaction failed for some reason => store the error
 			// HINT: we treat the transaction as unsigned here, because we don't know if it was signed or not.
 			// This should not be a problem, because the error reason will still be stored and visible to the user,
@@ -245,15 +243,8 @@ func NewProvider(opts ...options.Option[TransactionRetainer]) module.Provider[*e
 			}, asyncOpt)
 		})
 
-		r.TriggerInitialized()
-
 		return r
 	})
-}
-
-// Shutdown shuts down the TransactionRetainer.
-func (r *TransactionRetainer) Shutdown() {
-	r.workerPool.Shutdown()
 }
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
@@ -374,4 +365,11 @@ func (r *TransactionRetainer) TransactionMetadata(txID iotago.TransactionID) (*a
 	}
 
 	return response, nil
+}
+
+// Shutdown shuts down the TransactionRetainer.
+func (r *TransactionRetainer) shutdown() {
+	r.workerPool.Shutdown()
+
+	r.StoppedEvent().Trigger()
 }

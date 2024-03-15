@@ -35,20 +35,20 @@ type Attestations struct {
 // newAttestations creates a new attestation protocol instance for the given protocol.
 func newAttestations(protocol *Protocol) *Attestations {
 	a := &Attestations{
-		Logger:              lo.Return1(protocol.Logger.NewChildLogger("Attestations")),
+		Logger:              protocol.NewChildLogger("Attestations"),
 		protocol:            protocol,
 		workerPool:          protocol.Workers.CreatePool("Attestations"),
 		requester:           eventticker.New[iotago.SlotIndex, iotago.CommitmentID](protocol.Options.AttestationRequesterOptions...),
 		commitmentVerifiers: shrinkingmap.New[iotago.CommitmentID, *CommitmentVerifier](),
 	}
 
-	protocol.Constructed.OnTrigger(func() {
+	protocol.ConstructedEvent().OnTrigger(func() {
 		shutdown := lo.BatchReverse(
 			a.initCommitmentVerifiers(),
 			a.initRequester(),
 		)
 
-		protocol.Shutdown.OnTrigger(shutdown)
+		protocol.ShutdownEvent().OnTrigger(shutdown)
 	})
 
 	return a

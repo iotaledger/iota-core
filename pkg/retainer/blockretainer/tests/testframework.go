@@ -8,6 +8,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
+	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -77,7 +78,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		require.NoError(test, err)
 	}
 
-	tf.Instance = blockretainer.New(workers, storeFunc, lastFinalizedSlotFunc, errorHandlerFunc)
+	tf.Instance = blockretainer.New(module.NewTestModule(test), workers, storeFunc, lastFinalizedSlotFunc, errorHandlerFunc)
 
 	return tf
 }

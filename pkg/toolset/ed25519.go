@@ -82,11 +82,11 @@ func generateEd25519Key(args []string) error {
 	}
 
 	if len(*hrpFlag) == 0 {
-		return fmt.Errorf("'%s' not specified", FlagToolHRP)
+		return ierrors.Errorf("'%s' not specified", FlagToolHRP)
 	}
 
 	if len(*bip32Path) == 0 {
-		return fmt.Errorf("'%s' not specified", FlagToolBIP32Path)
+		return ierrors.Errorf("'%s' not specified", FlagToolBIP32Path)
 	}
 
 	var err error

@@ -5,30 +5,31 @@ go 1.22.0
 replace github.com/goccy/go-graphviz => github.com/alexsporn/go-graphviz v0.0.0-20231011102718-04f10f0a9b59
 
 require (
+	github.com/VictoriaMetrics/fastcache v1.12.2
 	github.com/fjl/memsize v0.0.2
 	github.com/goccy/go-graphviz v0.1.2
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.1
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/iotaledger/hive.go/ads v0.0.0-20240307102857-7e23a3c59bd2
-	github.com/iotaledger/hive.go/app v0.0.0-20240307102857-7e23a3c59bd2
-	github.com/iotaledger/hive.go/constraints v0.0.0-20240307102857-7e23a3c59bd2
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20240307102857-7e23a3c59bd2
-	github.com/iotaledger/hive.go/crypto v0.0.0-20240307102857-7e23a3c59bd2
-	github.com/iotaledger/hive.go/db v0.0.0-20240307102857-7e23a3c59bd2
-	github.com/iotaledger/hive.go/ds v0.0.0-20240307102857-7e23a3c59bd2
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20240307102857-7e23a3c59bd2
-	github.com/iotaledger/hive.go/kvstore v0.0.0-20240307102857-7e23a3c59bd2
-	github.com/iotaledger/hive.go/lo v0.0.0-20240307102857-7e23a3c59bd2
-	github.com/iotaledger/hive.go/log v0.0.0-20240307102857-7e23a3c59bd2
-	github.com/iotaledger/hive.go/runtime v0.0.0-20240307102857-7e23a3c59bd2
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20240307102857-7e23a3c59bd2
-	github.com/iotaledger/hive.go/sql v0.0.0-20240307102857-7e23a3c59bd2
-	github.com/iotaledger/hive.go/stringify v0.0.0-20240307102857-7e23a3c59bd2
+	github.com/iotaledger/hive.go/ads v0.0.0-20240312125539-658ef8b73c89
+	github.com/iotaledger/hive.go/app v0.0.0-20240312125539-658ef8b73c89
+	github.com/iotaledger/hive.go/constraints v0.0.0-20240312125539-658ef8b73c89
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20240312125539-658ef8b73c89
+	github.com/iotaledger/hive.go/crypto v0.0.0-20240312125539-658ef8b73c89
+	github.com/iotaledger/hive.go/db v0.0.0-20240312125539-658ef8b73c89
+	github.com/iotaledger/hive.go/ds v0.0.0-20240312125539-658ef8b73c89
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20240312125539-658ef8b73c89
+	github.com/iotaledger/hive.go/kvstore v0.0.0-20240312125539-658ef8b73c89
+	github.com/iotaledger/hive.go/lo v0.0.0-20240312125539-658ef8b73c89
+	github.com/iotaledger/hive.go/log v0.0.0-20240312125539-658ef8b73c89
+	github.com/iotaledger/hive.go/runtime v0.0.0-20240312125539-658ef8b73c89
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20240312125539-658ef8b73c89
+	github.com/iotaledger/hive.go/sql v0.0.0-20240312125539-658ef8b73c89
+	github.com/iotaledger/hive.go/stringify v0.0.0-20240312125539-658ef8b73c89
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20240307101848-db58eb9353ec
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20240307100839-48553e1d2022
-	github.com/iotaledger/iota.go/v4 v4.0.0-20240307175623-0904c71fcb38
+	github.com/iotaledger/iota.go/v4 v4.0.0-20240313065735-74f8cf10c361
 	github.com/labstack/echo/v4 v4.11.4
 	github.com/labstack/gommon v0.4.2
 	github.com/libp2p/go-libp2p v0.33.0
@@ -79,6 +80,7 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
+	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
 	github.com/google/go-github v17.0.0+incompatible // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/gopacket v1.1.19 // indirect

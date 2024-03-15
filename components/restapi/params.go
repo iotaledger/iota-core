@@ -16,10 +16,8 @@ type ParametersRestAPI struct {
 	DebugRequestLoggerEnabled bool `default:"false" usage:"whether the debug logging for requests should be enabled"`
 	// MaxPageSize defines the maximum number of results per page.
 	MaxPageSize uint32 `default:"100" usage:"the maximum number of results per page"`
-	// RequestsMemoryCacheGranularity defines per how many slots a cache is created for big API requests.
-	RequestsMemoryCacheGranularity uint32 `default:"10" usage:"defines per how many slots a cache is created for big API requests"`
-	// MaxRequestedSlotAge defines the maximum age of a request that will be processed.
-	MaxRequestedSlotAge uint32 `default:"10" usage:"the maximum age of a request that will be processed"`
+	// MaxCacheSize defines the maximum size of cache for results.
+	MaxCacheSize string `default:"50MB" usage:"the maximum size of cache for results"`
 
 	JWTAuth struct {
 		// salt used inside the JWT tokens for the REST API. Change this to a different value to invalidate JWT tokens not matching this new value
@@ -47,7 +45,7 @@ var ParamsRestAPI = &ParametersRestAPI{
 		"/api/core/v3/accounts*",
 		"/api/core/v3/validators*",
 		"/api/core/v3/rewards*",
-		"/api/core/v3/committee",
+		"/api/core/v3/committee*",
 		"/api/debug/v2/*",
 		"/api/indexer/v2/*",
 		"/api/mqtt/v2",

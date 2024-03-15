@@ -63,13 +63,14 @@ type TipSelection struct {
 	// acceptanceTimeMutex is used to synchronize access to the acceptance time.
 	acceptanceTimeMutex syncutils.RWMutex
 
-	// Module embeds the required methods of the module.Interface.
+	// Module embeds the required methods of the modular framework.
 	module.Module
 }
 
 // New is the constructor for the TipSelection.
-func New(opts ...options.Option[TipSelection]) *TipSelection {
+func New(module module.Module, opts ...options.Option[TipSelection]) *TipSelection {
 	return options.Apply(&TipSelection{
+		Module:                                module,
 		livenessThresholdQueue:                timed.NewPriorityQueue[tipmanager.TipMetadata](true),
 		acceptanceTime:                        reactive.NewVariable[time.Time](monotonicallyIncreasing),
 		optMaxStrongParents:                   8,
@@ -91,17 +92,13 @@ func (t *TipSelection) Construct(tipManager tipmanager.TipManager, spendDAG spen
 	t.rootBlock = rootBlockRetriever
 	t.livenessThreshold = livenessThresholdFunc
 
-	t.TriggerConstructed()
-
 	t.acceptanceTime.OnUpdate(func(_ time.Time, acceptanceTime time.Time) {
 		t.triggerLivenessThreshold(acceptanceTime)
 	})
 
 	tipManager.OnBlockAdded(t.classifyTip)
 
-	t.TriggerInitialized()
-
-	return t
+	return module.InitSimpleLifecycle(t)
 }
 
 // SelectTips selects the tips that should be used as references for a new block.
@@ -164,12 +161,6 @@ func (t *TipSelection) SetAcceptanceTime(acceptanceTime time.Time) (previousValu
 func (t *TipSelection) Reset() {
 	t.resetAcceptanceTime()
 	t.resetLivenessThresholdQueue()
-}
-
-// Shutdown triggers the shutdown of the TipSelection.
-func (t *TipSelection) Shutdown() {
-	t.TriggerShutdown()
-	t.TriggerStopped()
 }
 
 // classifyTip determines the initial tip pool of the given tip.

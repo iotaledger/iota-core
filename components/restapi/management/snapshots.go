@@ -14,7 +14,7 @@ func createSnapshots(_ echo.Context) (*api.CreateSnapshotResponse, error) {
 
 		request := &createSnapshotsRequest{}
 		if err := c.Bind(request); err != nil {
-			return nil, ierrors.WithMessagef(httpserver.ErrInvalidParameter, "invalid request, error: %s", err)
+			return nil, ierrors.WithMessagef(httpserver.ErrInvalidParameter, "invalid request: %w", err)
 		}
 
 		if request.Slot == 0 {
@@ -23,7 +23,7 @@ func createSnapshots(_ echo.Context) (*api.CreateSnapshotResponse, error) {
 
 		filePath := filepath.Join(filepath.Dir(deps.SnapshotsFullPath), fmt.Sprintf("full_snapshot_%d.bin", request.Slot))
 		if err := deps.SnapshotManager.CreateFullSnapshot(Component.Daemon().ContextStopped(), request.Slot, filePath, false); err != nil {
-			return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "creating snapshot failed: %s", err)
+			return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "creating snapshot failed: %w", err)
 		}
 
 		return &createSnapshotsResponse{

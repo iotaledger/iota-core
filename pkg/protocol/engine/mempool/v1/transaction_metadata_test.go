@@ -15,10 +15,8 @@ func TestAttachments(t *testing.T) {
 		"2": iotago.BlockIDRepresentingData(2, []byte("block2")),
 	}
 
-	transactionMetadata, err := NewTransactionMetadata(mempooltests.NewTransaction(2), nil)
-	require.NoError(t, err)
-
-	signedTransactionMetadata, err := NewSignedTransactionMetadata(mempooltests.NewSignedTransaction(transactionMetadata.Transaction()), transactionMetadata)
+	transactionMetadata := NewTransactionMetadata(mempooltests.NewTransaction(2), nil)
+	signedTransactionMetadata := NewSignedTransactionMetadata(mempooltests.NewSignedTransaction(transactionMetadata.Transaction()), transactionMetadata)
 
 	require.True(t, signedTransactionMetadata.addAttachment(blockIDs["1"]))
 	require.True(t, signedTransactionMetadata.addAttachment(blockIDs["2"]))

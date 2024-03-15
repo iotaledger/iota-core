@@ -6,7 +6,7 @@ import (
 )
 
 type Gadget interface {
-	module.Interface
+	module.Module
 
 	TrackWitnessWeight(votingBlock *blocks.Block)
 	SetAccepted(block *blocks.Block) bool

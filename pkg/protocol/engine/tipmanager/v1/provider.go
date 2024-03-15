@@ -14,9 +14,9 @@ import (
 // NewProvider creates a new TipManager provider, that can be used to inject the component into an engine.
 func NewProvider() module.Provider[*engine.Engine, tipmanager.TipManager] {
 	return module.Provide(func(e *engine.Engine) tipmanager.TipManager {
-		t := New(e.BlockCache.Block, e.SybilProtection.SeatManager().CommitteeInSlot)
+		t := New(e.NewSubModule("TipManager"), e.BlockCache.Block, e.SybilProtection.SeatManager().CommitteeInSlot)
 
-		e.Constructed.OnTrigger(func() {
+		e.ConstructedEvent().OnTrigger(func() {
 			tipWorker := e.Workers.CreatePool("AddTip", workerpool.WithWorkerCount(2))
 
 			e.Events.Scheduler.BlockScheduled.Hook(lo.Void(t.AddBlock), event.WithWorkerPool(tipWorker))
@@ -29,13 +29,10 @@ func NewProvider() module.Provider[*engine.Engine, tipmanager.TipManager] {
 			e.Events.SeatManager.OnlineCommitteeSeatRemoved.Hook(t.RemoveSeat)
 
 			e.Events.TipManager.BlockAdded.LinkTo(t.blockAdded)
-
-			t.TriggerInitialized()
 		})
 
-		e.Shutdown.OnTrigger(func() {
-			t.TriggerShutdown()
-			t.TriggerStopped()
+		e.ShutdownEvent().OnTrigger(func() {
+			t.ShutdownEvent().Trigger()
 		})
 
 		return t

@@ -36,7 +36,7 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 		m.applyToPendingAttestations(a, attestationSlotIndex)
 	}
 
-	m.TriggerInitialized()
+	m.InitializedEvent().Trigger()
 
 	return nil
 }

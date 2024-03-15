@@ -35,12 +35,12 @@ type BlockRetainer struct {
 
 	workerPool *workerpool.WorkerPool
 	sync.RWMutex
-
 	module.Module
 }
 
-func New(workersGroup *workerpool.Group, retainerStoreFunc StoreFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *BlockRetainer {
-	return &BlockRetainer{
+func New(module module.Module, workersGroup *workerpool.Group, retainerStoreFunc StoreFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *BlockRetainer {
+	b := &BlockRetainer{
+		Module:            module,
 		events:            retainer.NewEvents(),
 		workerPool:        workersGroup.CreatePool("Retainer", workerpool.WithWorkerCount(1)),
 		store:             retainerStoreFunc,
@@ -48,12 +48,20 @@ func New(workersGroup *workerpool.Group, retainerStoreFunc StoreFunc, finalizedS
 		finalizedSlotFunc: finalizedSlotFunc,
 		errorHandler:      errorHandler,
 	}
+
+	b.ShutdownEvent().OnTrigger(func() {
+		b.StoppedEvent().Trigger()
+	})
+
+	b.ConstructedEvent().Trigger()
+
+	return b
 }
 
 // NewProvider creates a new BlockRetainer provider.
 func NewProvider() module.Provider[*engine.Engine, retainer.BlockRetainer] {
 	return module.Provide(func(e *engine.Engine) retainer.BlockRetainer {
-		r := New(e.Workers.CreateGroup("Retainer"),
+		r := New(e.NewSubModule("BlockRetainer"), e.Workers.CreateGroup("Retainer"),
 			e.Storage.BlockMetadata,
 			func() iotago.SlotIndex {
 				return e.SyncManager.LatestFinalizedSlot()
@@ -95,7 +103,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.BlockRetainer] {
 
 		e.Events.Retainer.BlockRetained.LinkTo(r.events.BlockRetained)
 
-		r.TriggerInitialized()
+		r.InitializedEvent().Trigger()
 
 		return r
 	})
@@ -134,7 +142,7 @@ func (r *BlockRetainer) BlockMetadata(blockID iotago.BlockID) (*api.BlockMetadat
 
 	blockStatus, err := r.blockState(blockID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "block %s not found", blockID.ToHex())
+		return nil, ierrors.Wrapf(err, "block %s not found", blockID)
 	}
 
 	return &api.BlockMetadataResponse{
