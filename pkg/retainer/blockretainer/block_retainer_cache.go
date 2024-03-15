@@ -7,18 +7,18 @@ import (
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
-type BlockRetainerCache struct {
+type cache struct {
 	uncommittedBlockMetadataChanges *shrinkingmap.ShrinkingMap[iotago.SlotIndex, map[iotago.BlockID]api.BlockState]
 }
 
-func NewBlockRetainerCache(opts ...options.Option[BlockRetainerCache]) *BlockRetainerCache {
-	return options.Apply(&BlockRetainerCache{
+func newCache(opts ...options.Option[cache]) *cache {
+	return options.Apply(&cache{
 		uncommittedBlockMetadataChanges: shrinkingmap.New[iotago.SlotIndex, map[iotago.BlockID]api.BlockState](),
 	}, opts)
 }
 
 // blockMetadataByID returns the block metadata of a block by its ID.
-func (c *BlockRetainerCache) blockMetadataByID(blockID iotago.BlockID) (api.BlockState, bool) {
+func (c *cache) blockMetadataByID(blockID iotago.BlockID) (api.BlockState, bool) {
 	slotMap, exists := c.uncommittedBlockMetadataChanges.Get(blockID.Slot())
 	if exists {
 		blockMetadata, found := slotMap[blockID]
@@ -30,7 +30,7 @@ func (c *BlockRetainerCache) blockMetadataByID(blockID iotago.BlockID) (api.Bloc
 	return api.BlockStateUnknown, false
 }
 
-func (c *BlockRetainerCache) setBlockMetadata(blockID iotago.BlockID, state api.BlockState) {
+func (c *cache) setBlockMetadata(blockID iotago.BlockID, state api.BlockState) {
 	blocks, exists := c.uncommittedBlockMetadataChanges.Get(blockID.Slot())
 	if !exists {
 		blocks = make(map[iotago.BlockID]api.BlockState)

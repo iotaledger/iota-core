@@ -27,7 +27,7 @@ var ErrEntryNotFound = ierrors.New("block metadatanot found")
 type BlockRetainer struct {
 	events *retainer.Events
 	store  StoreFunc
-	cache  *BlockRetainerCache
+	cache  *cache
 
 	latestCommittedSlot iotago.SlotIndex
 	finalizedSlotFunc   FinalizedSlotFunc
@@ -44,7 +44,7 @@ func New(module module.Module, workersGroup *workerpool.Group, retainerStoreFunc
 		events:            retainer.NewEvents(),
 		workerPool:        workersGroup.CreatePool("Retainer", workerpool.WithWorkerCount(1)),
 		store:             retainerStoreFunc,
-		cache:             NewBlockRetainerCache(),
+		cache:             newCache(),
 		finalizedSlotFunc: finalizedSlotFunc,
 		errorHandler:      errorHandler,
 	}
