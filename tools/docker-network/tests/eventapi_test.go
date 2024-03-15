@@ -187,6 +187,8 @@ func test_DelegationTransactionBlocks(t *testing.T, e *EventAPIDockerTestFramewo
 		func() { e.AssertBasicBlocks(ctx, eventClt, expectedBlocks) },
 		func() { e.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks) },
 		func() { e.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks) },
+		func() { e.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID()) },
+		func() { e.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID()) },
 		func() { e.AssertDelegationOutput(ctx, eventClt, delegationId) },
 		func() { e.AssertOutput(ctx, eventClt, outputId) },
 		func() {
@@ -201,9 +203,6 @@ func test_DelegationTransactionBlocks(t *testing.T, e *EventAPIDockerTestFramewo
 	for _, assert := range asserts {
 		assert()
 	}
-
-	// e.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID())
-	// e.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID())
 
 	// wait until all topics starts listening
 	err := e.AwaitEventAPITopics(t, cancel, totalTopics)
@@ -244,6 +243,8 @@ func test_AccountTransactionBlocks(t *testing.T, e *EventAPIDockerTestFramework)
 			func() { e.AssertBasicBlocks(ctx, eventClt, expectedBlocks) },
 			func() { e.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks) },
 			func() { e.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks) },
+			func() { e.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID()) },
+			func() { e.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID()) },
 			func() { e.AssertAccountOutput(ctx, eventClt, fullAccount.ID) },
 			func() { e.AssertOutput(ctx, eventClt, outputId) },
 			func() {
@@ -258,10 +259,6 @@ func test_AccountTransactionBlocks(t *testing.T, e *EventAPIDockerTestFramework)
 		for _, assertion := range assertions {
 			assertion()
 		}
-
-		// TODO test transactioMetadataTopics
-		// e.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID())
-		// e.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID())
 
 		// wait until all topics starts listening
 		err := e.AwaitEventAPITopics(t, cancel, totalTopics)
@@ -306,6 +303,8 @@ func test_FoundryTransactionBlocks(t *testing.T, e *EventAPIDockerTestFramework)
 			func() { e.AssertBasicBlocks(ctx, eventClt, expectedBlocks) },
 			func() { e.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks) },
 			func() { e.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks) },
+			func() { e.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID()) },
+			func() { e.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID()) },
 			func() { e.AssertAccountOutput(ctx, eventClt, account.ID) },
 			func() { e.AssertFoundryOutput(ctx, eventClt, foundryId) },
 			func() { e.AssertOutput(ctx, eventClt, outputId) },
@@ -322,9 +321,6 @@ func test_FoundryTransactionBlocks(t *testing.T, e *EventAPIDockerTestFramework)
 		for _, assertion := range assertions {
 			assertion()
 		}
-
-		// e.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID())
-		// e.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID())
 
 		// wait until all topics starts listening
 		err := e.AwaitEventAPITopics(t, cancel, totalTopics)
@@ -366,6 +362,8 @@ func test_NFTTransactionBlocks(t *testing.T, e *EventAPIDockerTestFramework) {
 			func() { e.AssertBasicBlocks(ctx, eventClt, expectedBlocks) },
 			func() { e.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks) },
 			func() { e.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks) },
+			func() { e.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID()) },
+			func() { e.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID()) },
 			func() { e.AssertNFTOutput(ctx, eventClt, nftId) },
 			func() { e.AssertOutput(ctx, eventClt, outputId) },
 			func() {
@@ -380,9 +378,6 @@ func test_NFTTransactionBlocks(t *testing.T, e *EventAPIDockerTestFramework) {
 		for _, assertion := range assertions {
 			assertion()
 		}
-
-		// e.AssertTransactionMetadataByTransactionID(ctx, eventClt, outputId.TransactionID())
-		// e.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, outputId.TransactionID())
 
 		// wait until all topics starts listening
 		err := e.AwaitEventAPITopics(t, cancel, totalTopics)

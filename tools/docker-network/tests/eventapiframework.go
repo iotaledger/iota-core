@@ -247,48 +247,35 @@ func (e *EventAPIDockerTestFramework) AssertTransactionBlocksByTag(ctx context.C
 	}()
 }
 
-/*
-TODO: Fix after merging the retainer PR
 func (e *EventAPIDockerTestFramework) AssertTransactionMetadataIncludedBlocks(ctx context.Context, eventClt *nodeclient.EventAPIClient, txID iotago.TransactionID) {
 	acceptedChan, subInfo := eventClt.BlockMetadataTransactionIncludedBlocksByTransactionID(txID)
 	require.Nil(e.Testing, subInfo.Error())
-	counter := 0
 
 	go func() {
-		defer fmt.Println("AssertTransactionMetadataIncludedBlocks finished")
 		defer subInfo.Close()
 		// in order to inform that the channel is listened
 		e.finishChan <- struct{}{}
 
 		for {
 			select {
-			case metadata := <-acceptedChan:
-				if txID.Compare(metadata.TransactionMetadata.TransactionID) == 0 {
-					counter++
-					fmt.Println(metadata.TransactionMetadata.TransactionState)
-					// we should get 2 times of the same transaction, one for accepted and one for confirmed
-					if counter == 2 {
-						e.finishChan <- struct{}{}
-						return
-					}
-				}
+			case <-acceptedChan:
+				e.finishChan <- struct{}{}
+				return
 
 			case <-ctx.Done():
-
+				fmt.Println("topic AssertTransactionMetadataIncludedBlocks does not get expected BlockMetadata")
 				return
 			}
 		}
 
 	}()
 }
-*/
 
 func (e *EventAPIDockerTestFramework) AssertTransactionMetadataByTransactionID(ctx context.Context, eventClt *nodeclient.EventAPIClient, txID iotago.TransactionID) {
 	acceptedChan, subInfo := eventClt.TransactionMetadataByTransactionID(txID)
 	require.Nil(e.Testing, subInfo.Error())
 
 	go func() {
-		defer fmt.Println("AssertTransactionMetadataByTransactionID finished")
 		defer subInfo.Close()
 		// in order to inform that the channel is listened
 		e.finishChan <- struct{}{}
@@ -297,12 +284,12 @@ func (e *EventAPIDockerTestFramework) AssertTransactionMetadataByTransactionID(c
 			select {
 			case metadata := <-acceptedChan:
 				if txID.Compare(metadata.TransactionID) == 0 {
-					fmt.Println(metadata.TransactionState)
 					e.finishChan <- struct{}{}
 					return
 				}
 
 			case <-ctx.Done():
+				fmt.Println("topic AssertTransactionMetadataByTransactionID does not get expected transaction metadata")
 				return
 			}
 		}
