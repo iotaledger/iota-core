@@ -20,7 +20,7 @@ func (s *Server) ReadTransactionMetadata(_ context.Context, transactionID *inx.T
 			return nil, status.Errorf(codes.NotFound, "transaction metadata not found: %s", txID.ToHex())
 		}
 
-		return nil, ierrors.WithMessagef(err, "error when retrieving transaction metadata: %s", txID.ToHex())
+		return nil, ierrors.Wrapf(err, "error when retrieving transaction metadata: %s", txID.ToHex())
 	}
 
 	return inx.WrapTransactionMetadata(txMetadata), nil

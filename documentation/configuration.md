@@ -166,17 +166,16 @@ Example:
 
 ## <a id="restapi"></a> 5. RestAPI
 
-| Name                           | Description                                                                                    | Type    | Default value                                                                                                                                                                                                                                                                                                                                                                             |
-| ------------------------------ | ---------------------------------------------------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| bindAddress                    | The bind address on which the REST API listens on                                              | string  | "0.0.0.0:14265"                                                                                                                                                                                                                                                                                                                                                                           |
-| publicRoutes                   | The HTTP REST routes which can be called without authorization. Wildcards using \* are allowed  | array   | /health<br/>/api/routes<br/>/api/core/v3/info<br/>/api/core/v3/network\*<br/>/api/core/v3/blocks\*<br/>/api/core/v3/transactions\*<br/>/api/core/v3/commitments\*<br/>/api/core/v3/outputs\*<br/>/api/core/v3/accounts\*<br/>/api/core/v3/validators\*<br/>/api/core/v3/rewards\*<br/>/api/core/v3/committee<br/>/api/debug/v2/\*<br/>/api/indexer/v2/\*<br/>/api/mqtt/v2<br/>/api/blockissuer/v1/\* |
-| protectedRoutes                | The HTTP REST routes which need to be called with authorization. Wildcards using \* are allowed | array   | /api/\*                                                                                                                                                                                                                                                                                                                                                                                    |
-| debugRequestLoggerEnabled      | Whether the debug logging for requests should be enabled                                       | boolean | false                                                                                                                                                                                                                                                                                                                                                                                     |
-| maxPageSize                    | The maximum number of results per page                                                         | uint    | 100                                                                                                                                                                                                                                                                                                                                                                                       |
-| requestsMemoryCacheGranularity | Defines per how many slots a cache is created for big API requests                             | uint    | 10                                                                                                                                                                                                                                                                                                                                                                                        |
-| maxRequestedSlotAge            | The maximum age of a request that will be processed                                            | uint    | 10                                                                                                                                                                                                                                                                                                                                                                                        |
-| [jwtAuth](#restapi_jwtauth)    | Configuration for jwtAuth                                                                      | object  |                                                                                                                                                                                                                                                                                                                                                                                           |
-| [limits](#restapi_limits)      | Configuration for limits                                                                       | object  |                                                                                                                                                                                                                                                                                                                                                                                           |
+| Name                        | Description                                                                                    | Type    | Default value                                                                                                                                                                                                                                                                                                                                                                              |
+| --------------------------- | ---------------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| bindAddress                 | The bind address on which the REST API listens on                                              | string  | "0.0.0.0:14265"                                                                                                                                                                                                                                                                                                                                                                            |
+| publicRoutes                | The HTTP REST routes which can be called without authorization. Wildcards using \* are allowed  | array   | /health<br/>/api/routes<br/>/api/core/v3/info<br/>/api/core/v3/network\*<br/>/api/core/v3/blocks\*<br/>/api/core/v3/transactions\*<br/>/api/core/v3/commitments\*<br/>/api/core/v3/outputs\*<br/>/api/core/v3/accounts\*<br/>/api/core/v3/validators\*<br/>/api/core/v3/rewards\*<br/>/api/core/v3/committee\*<br/>/api/debug/v2/\*<br/>/api/indexer/v2/\*<br/>/api/mqtt/v2<br/>/api/blockissuer/v1/\* |
+| protectedRoutes             | The HTTP REST routes which need to be called with authorization. Wildcards using \* are allowed | array   | /api/\*                                                                                                                                                                                                                                                                                                                                                                                     |
+| debugRequestLoggerEnabled   | Whether the debug logging for requests should be enabled                                       | boolean | false                                                                                                                                                                                                                                                                                                                                                                                      |
+| maxPageSize                 | The maximum number of results per page                                                         | uint    | 100                                                                                                                                                                                                                                                                                                                                                                                        |
+| maxCacheSize                | The maximum size of cache for results                                                          | string  | "50MB"                                                                                                                                                                                                                                                                                                                                                                                     |
+| [jwtAuth](#restapi_jwtauth) | Configuration for jwtAuth                                                                      | object  |                                                                                                                                                                                                                                                                                                                                                                                            |
+| [limits](#restapi_limits)   | Configuration for limits                                                                       | object  |                                                                                                                                                                                                                                                                                                                                                                                            |
 
 ### <a id="restapi_jwtauth"></a> JwtAuth
 
@@ -209,7 +208,7 @@ Example:
         "/api/core/v3/accounts*",
         "/api/core/v3/validators*",
         "/api/core/v3/rewards*",
-        "/api/core/v3/committee",
+        "/api/core/v3/committee*",
         "/api/debug/v2/*",
         "/api/indexer/v2/*",
         "/api/mqtt/v2",
@@ -220,8 +219,7 @@ Example:
       ],
       "debugRequestLoggerEnabled": false,
       "maxPageSize": 100,
-      "requestsMemoryCacheGranularity": 10,
-      "maxRequestedSlotAge": 10,
+      "maxCacheSize": "50MB",
       "jwtAuth": {
         "salt": "IOTA"
       },
@@ -337,12 +335,13 @@ Example:
 
 ## <a id="protocol"></a> 9. Protocol
 
-| Name                             | Description                              | Type   | Default value                      |
-| -------------------------------- | ---------------------------------------- | ------ | ---------------------------------- |
-| [snapshot](#protocol_snapshot)   | Configuration for snapshot               | object |                                    |
-| [filter](#protocol_filter)       | Configuration for filter                 | object |                                    |
-| protocolParametersPath           | The path of the protocol parameters file | string | "testnet/protocol_parameters.json" |
-| [baseToken](#protocol_basetoken) | Configuration for baseToken              | object |                                    |
+| Name                             | Description                                                      | Type    | Default value                      |
+| -------------------------------- | ---------------------------------------------------------------- | ------- | ---------------------------------- |
+| [snapshot](#protocol_snapshot)   | Configuration for snapshot                                       | object  |                                    |
+| commitmentCheck                  | Specifies whether commitment and ledger checks should be enabled | boolean | true                               |
+| [filter](#protocol_filter)       | Configuration for filter                                         | object  |                                    |
+| protocolParametersPath           | The path of the protocol parameters file                         | string  | "testnet/protocol_parameters.json" |
+| [baseToken](#protocol_basetoken) | Configuration for baseToken                                      | object  |                                    |
 
 ### <a id="protocol_snapshot"></a> Snapshot
 
@@ -376,6 +375,7 @@ Example:
         "path": "testnet/snapshot.bin",
         "depth": 5
       },
+      "commitmentCheck": true,
       "filter": {
         "maxAllowedClockDrift": "5s"
       },

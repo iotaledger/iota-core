@@ -113,11 +113,11 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer) error {
 	}
 
 	if m.NeighborExists(peer.ID) {
-		return ierrors.Wrapf(network.ErrDuplicatePeer, "peer %s already exists", peer.ID)
+		return ierrors.WithMessagef(network.ErrDuplicatePeer, "peer %s already exists", peer.ID.String())
 	}
 
 	if !m.allowPeer(peer.ID) {
-		return ierrors.Wrapf(network.ErrMaxAutopeeringPeersReached, "peer %s is not allowed", peer.ID)
+		return ierrors.WithMessagef(network.ErrMaxAutopeeringPeersReached, "peer %s is not allowed", peer.ID.String())
 	}
 
 	// Adds the peer's multiaddresses to the peerstore, so that they can be used for dialing.
@@ -126,14 +126,14 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer) error {
 
 	stream, err := m.P2PHost().NewStream(cancelCtx, peer.ID, network.CoreProtocolID)
 	if err != nil {
-		return ierrors.Wrapf(err, "dial %s / %s failed to open stream for proto %s", peer.PeerAddresses, peer.ID, network.CoreProtocolID)
+		return ierrors.Wrapf(err, "dial %s / %s failed to open stream for proto %s", peer.PeerAddresses, peer.ID.String(), network.CoreProtocolID)
 	}
 
 	ps := NewPacketsStream(stream, m.protocolHandler.PacketFactory)
 	if err := ps.sendNegotiation(); err != nil {
 		m.closeStream(stream)
 
-		return ierrors.Wrapf(err, "dial %s / %s failed to send negotiation for proto %s", peer.PeerAddresses, peer.ID, network.CoreProtocolID)
+		return ierrors.Wrapf(err, "dial %s / %s failed to send negotiation for proto %s", peer.PeerAddresses, peer.ID.String(), network.CoreProtocolID)
 	}
 
 	m.logger.LogDebugf("outgoing stream negotiated, id: %s, addr: %s, proto: %s", peer.ID, ps.Conn().RemoteMultiaddr(), network.CoreProtocolID)
@@ -141,13 +141,13 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer) error {
 	if err := m.peerDB.UpdatePeer(peer); err != nil {
 		m.closeStream(stream)
 
-		return ierrors.Wrapf(err, "failed to update peer %s", peer.ID)
+		return ierrors.Wrapf(err, "failed to update peer %s", peer.ID.String())
 	}
 
 	if err := m.addNeighbor(ctx, peer, ps); err != nil {
 		m.closeStream(stream)
 
-		return ierrors.Errorf("failed to add neighbor %s: %s", peer.ID, err)
+		return ierrors.Wrapf(err, "failed to add neighbor %s", peer.ID.String())
 	}
 
 	return nil
@@ -177,11 +177,11 @@ func (m *Manager) Shutdown() {
 	m.isShutdown = true
 
 	if err := m.autoPeering.Stop(); err != nil {
-		m.logger.LogErrorf("failed to stop autopeering: %s", err)
+		m.logger.LogErrorf("failed to stop autopeering: %s", err.Error())
 	}
 
 	if err := m.manualPeering.Stop(); err != nil {
-		m.logger.LogErrorf("failed to stop manualpeering: %s", err)
+		m.logger.LogErrorf("failed to stop manualpeering: %s", err.Error())
 	}
 
 	m.dropAllNeighbors()
@@ -189,7 +189,7 @@ func (m *Manager) Shutdown() {
 	m.UnregisterProtocol()
 
 	if err := m.libp2pHost.Close(); err != nil {
-		m.logger.LogErrorf("failed to close libp2p host: %s", err)
+		m.logger.LogErrorf("failed to close libp2p host: %s", err.Error())
 	}
 }
 
@@ -290,7 +290,7 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 	peerID := stream.Conn().RemotePeer()
 
 	if !m.allowPeer(peerID) {
-		m.logger.LogDebugf("peer %s is not allowed", peerID)
+		m.logger.LogDebugf("peer %s is not allowed", peerID.String())
 		m.closeStream(stream)
 
 		return
@@ -311,14 +311,14 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 
 	networkPeer := network.NewPeerFromAddrInfo(peerAddrInfo)
 	if err := m.peerDB.UpdatePeer(networkPeer); err != nil {
-		m.logger.LogErrorf("failed to update peer in peer database, peerID: %s, error: %s", peerID, err)
+		m.logger.LogErrorf("failed to update peer in peer database, peerID: %s, error: %s", peerID.String(), err.Error())
 		m.closeStream(stream)
 
 		return
 	}
 
 	if err := m.addNeighbor(m.ctx, networkPeer, ps); err != nil {
-		m.logger.LogErrorf("failed to add neighbor, peerID: %s, error: %s", peerID, err)
+		m.logger.LogErrorf("failed to add neighbor, peerID: %s, error: %s", peerID.String(), err.Error())
 		m.closeStream(stream)
 
 		return
@@ -327,7 +327,7 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 
 func (m *Manager) closeStream(s p2pnetwork.Stream) {
 	if err := s.Reset(); err != nil {
-		m.logger.LogWarnf("close error, error: %s", err)
+		m.logger.LogWarnf("close error, error: %s", err.Error())
 	}
 }
 
@@ -367,10 +367,10 @@ func (m *Manager) addNeighbor(ctx context.Context, peer *network.Peer, ps *Packe
 			return
 		}
 		if err := m.protocolHandler.PacketHandler(nbr.Peer().ID, packet); err != nil {
-			nbr.logger.LogDebugf("Can't handle packet, error: %s", err)
+			nbr.logger.LogDebugf("Can't handle packet, error: %s", err.Error())
 		}
 	}, func(nbr *neighbor) {
-		nbr.logger.LogInfof("Neighbor connected: %s", nbr.Peer().ID)
+		nbr.logger.LogInfof("Neighbor connected: %s", nbr.Peer().ID.String())
 		nbr.Peer().SetConnStatus(network.ConnStatusConnected)
 		firstPacketReceivedCancel()
 		m.neighborAdded.Trigger(nbr)
@@ -380,7 +380,7 @@ func (m *Manager) addNeighbor(ctx context.Context, peer *network.Peer, ps *Packe
 	})
 	if err := m.setNeighbor(nbr); err != nil {
 		if resetErr := ps.Reset(); resetErr != nil {
-			nbr.logger.LogErrorf("error closing stream, error: %s", resetErr)
+			nbr.logger.LogErrorf("error closing stream, error: %s", resetErr.Error())
 		}
 
 		return ierrors.WithStack(err)
@@ -437,19 +437,19 @@ func (m *Manager) dropAllNeighbors() {
 func (m *Manager) allowPeer(id peer.ID) (allow bool) {
 	// Always allow manual peers
 	if m.manualPeering.IsPeerKnown(id) {
-		m.logger.LogDebugf("Allow manual peer %s", id)
+		m.logger.LogDebugf("Allow manual peer %s", id.String())
 		return true
 	}
 
 	// Only allow up to the maximum number of autopeered neighbors
 	autopeeredNeighborsCount := len(m.AutopeeringNeighbors())
 	if autopeeredNeighborsCount < m.autoPeering.MaxNeighbors() {
-		m.logger.LogDebugf("Allow autopeered peer %s. Max %d has not been reached: %d", id, m.autoPeering.MaxNeighbors(), autopeeredNeighborsCount)
+		m.logger.LogDebugf("Allow autopeered peer %s. Max %d has not been reached: %d", id.String(), m.autoPeering.MaxNeighbors(), autopeeredNeighborsCount)
 		return true
 	}
 
 	// Don't allow new peers
-	m.logger.LogDebugf("Disallow autopeered peer %s. Max %d has been reached", id, m.autoPeering.MaxNeighbors())
+	m.logger.LogDebugf("Disallow autopeered peer %s. Max %d has been reached", id.String(), m.autoPeering.MaxNeighbors())
 
 	return false
 }

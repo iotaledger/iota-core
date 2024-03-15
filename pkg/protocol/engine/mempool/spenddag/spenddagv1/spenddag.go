@@ -113,7 +113,7 @@ func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) UpdateSpentResources(id Spen
 
 		spender, exists := c.spendersByID.Get(id)
 		if !exists {
-			return nil, ierrors.Errorf("spender already evicted: %w", spenddag.ErrEntityEvicted)
+			return nil, ierrors.WithMessage(spenddag.ErrEntityEvicted, "spender already evicted")
 		}
 
 		existingSpendSets := c.spendSets(resourceIDs)
@@ -122,7 +122,7 @@ func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) UpdateSpentResources(id Spen
 	}()
 
 	if err != nil {
-		return ierrors.Errorf("spender %s failed to join spend sets: %w", id, err)
+		return ierrors.Wrapf(err, "spender %s failed to join spend sets", id)
 	}
 
 	if !joinedSpendSets.IsEmpty() {
@@ -152,7 +152,7 @@ func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) UpdateSpenderParents(spender
 
 		currentSpender, currentSpendExists := c.spendersByID.Get(spenderID)
 		if !currentSpendExists {
-			return false, ierrors.Errorf("tried to modify evicted spend with %s: %w", spenderID, spenddag.ErrEntityEvicted)
+			return false, ierrors.WithMessagef(spenddag.ErrEntityEvicted, "tried to modify evicted spend with %s", spenderID)
 		}
 
 		addedParents := ds.NewSet[*Spender[SpenderID, ResourceID, VoteRank]]()
@@ -170,7 +170,7 @@ func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) UpdateSpenderParents(spender
 
 		removedParents, err := c.spenders(removedParentIDs, !currentSpender.IsRejected())
 		if err != nil {
-			return false, ierrors.Errorf("failed to update spend parents: %w", err)
+			return false, ierrors.Wrap(err, "failed to update spend parents")
 		}
 
 		updated := currentSpender.UpdateParents(addedParents, removedParents)
@@ -326,7 +326,7 @@ func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) CastVotes(vote *vote.Vote[Vo
 
 	supportedSpenders, revokedSpenders, err := c.determineVotes(spenderIDs)
 	if err != nil {
-		return ierrors.Errorf("failed to determine votes: %w", err)
+		return ierrors.Wrap(err, "failed to determine votes")
 	}
 
 	for supportedSpender := supportedSpenders.Iterator(); supportedSpender.HasNext(); {
@@ -345,7 +345,7 @@ func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) AcceptanceState(spenderIDs d
 	if err := spenderIDs.ForEach(func(spenderID SpenderID) error {
 		spender, exists := c.spendersByID.Get(spenderID)
 		if !exists {
-			return ierrors.Errorf("tried to retrieve non-existing spend: %w", spenddag.ErrFatal)
+			return ierrors.WithMessage(spenddag.ErrFatal, "tried to retrieve non-existing spend")
 		}
 
 		if spender.IsRejected() {
@@ -435,7 +435,7 @@ func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) spenders(ids ds.Set[SpenderI
 			spenders.Add(existingSpend)
 		}
 
-		return lo.Cond(exists || ignoreMissing, nil, ierrors.Errorf("tried to retrieve a non-existing spend with %s: %w", id, spenddag.ErrEntityEvicted))
+		return lo.Cond(exists || ignoreMissing, nil, ierrors.WithMessagef(spenddag.ErrEntityEvicted, "tried to retrieve a non-existing spend with %s", id))
 	})
 }
 
@@ -473,7 +473,7 @@ func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) determineVotes(spenderIDs ds
 	supportSpender := func(supportedSpender *Spender[SpenderID, ResourceID, VoteRank]) error {
 		if supportedSpenders.Add(supportedSpender) {
 			if err := supportedSpender.ConflictingSpenders.ForEach(revokeSpend); err != nil {
-				return ierrors.Errorf("failed to collect conflicting spenders: %w", err)
+				return ierrors.Wrap(err, "failed to collect conflicting spenders")
 			}
 
 			supportedWalker.PushAll(supportedSpender.Parents.ToSlice()...)
@@ -484,7 +484,7 @@ func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) determineVotes(spenderIDs ds
 
 	for supportedWalker.PushAll(lo.Return1(c.spenders(spenderIDs, true)).ToSlice()...); supportedWalker.HasNext(); {
 		if err := supportSpender(supportedWalker.Next()); err != nil {
-			return nil, nil, ierrors.Errorf("failed to collect supported spenders: %w", err)
+			return nil, nil, ierrors.Wrap(err, "failed to collect supported spenders")
 		}
 	}
 

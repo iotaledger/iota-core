@@ -98,11 +98,11 @@ func (r *BlockMetadataStore) StoreBlockDropped(blockID iotago.BlockID) error {
 	return r.blockMetadataStore.Set(blockID, blockMetadata)
 }
 
-func (r *BlockMetadataStore) BlockMetadata(blockID iotago.BlockID) (*BlockMetadata, bool) {
+func (r *BlockMetadataStore) BlockMetadata(blockID iotago.BlockID) (*BlockMetadata, error) {
 	blockMetadata, err := r.blockMetadataStore.Get(blockID)
 	if err != nil {
-		return nil, false
+		return nil, err
 	}
 
-	return blockMetadata, true
+	return blockMetadata, nil
 }

@@ -28,31 +28,31 @@ func (v *VM) Inputs(transaction mempool.Transaction) (inputReferences []mempool.
 	}
 
 	for _, input := range iotagoTransaction.TransactionEssence.Inputs {
-		switch input.Type() {
-		case iotago.InputUTXO:
-			//nolint:forcetypeassert // we can safely assume that this is a UTXOInput
+		switch castedInput := input.(type) {
+		case *iotago.UTXOInput:
 			inputReferences = append(inputReferences, mempool.UTXOInputStateRefFromInput(
-				input.(*iotago.UTXOInput),
+				castedInput,
 			))
 		default:
-			return nil, ierrors.Errorf("unrecognized input type %d", input.Type())
+			// We're switching on the Go input type here, so we can only run into the default case
+			// if we added a new input type and have not handled it above. In this case we want to panic.
+			panic("all supported input types should be handled above")
 		}
 	}
 
 	for _, contextInput := range iotagoTransaction.TransactionEssence.ContextInputs {
-		switch contextInput.Type() {
-		case iotago.ContextInputCommitment:
-			//nolint:forcetypeassert // we can safely assume that this is a CommitmentInput
+		switch castedContextInput := contextInput.(type) {
+		case *iotago.CommitmentInput:
 			inputReferences = append(inputReferences, mempool.CommitmentInputStateRefFromInput(
-				contextInput.(*iotago.CommitmentInput),
+				castedContextInput,
 			))
 		// These context inputs do not need to be resolved.
-		case iotago.ContextInputBlockIssuanceCredit:
-			continue
-		case iotago.ContextInputReward:
+		case *iotago.BlockIssuanceCreditInput, *iotago.RewardInput:
 			continue
 		default:
-			return nil, ierrors.Errorf("unrecognized context input type %d", contextInput.Type())
+			// We're switching on the Go context input type here, so we can only run into the default case
+			// if we added a new context input type and have not handled it above. In this case we want to panic.
+			panic("all supported context input types should be handled above")
 		}
 	}
 
@@ -65,11 +65,7 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 		return nil, iotago.ErrTxTypeInvalid
 	}
 
-	contextInputs, err := iotagoSignedTransaction.Transaction.ContextInputs()
-	if err != nil {
-		return nil, ierrors.Wrapf(err, "unable to retrieve context inputs from transaction")
-	}
-
+	contextInputs := iotagoSignedTransaction.Transaction.ContextInputs()
 	utxoInputSet := iotagovm.InputSet{}
 	commitmentInput := (*iotago.Commitment)(nil)
 	bicInputs := make([]*iotago.BlockIssuanceCreditInput, 0)
@@ -104,7 +100,7 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 			return nil, ierrors.Join(iotago.ErrBICInputReferenceInvalid, ierrors.Wrapf(accountErr, "could not get BIC input for account %s in slot %d", inp.AccountID, commitmentInput.Slot))
 		}
 		if !exists {
-			return nil, ierrors.Join(iotago.ErrBICInputReferenceInvalid, ierrors.Errorf("BIC input does not exist for account %s in slot %d", inp.AccountID, commitmentInput.Slot))
+			return nil, ierrors.WithMessagef(iotago.ErrBICInputReferenceInvalid, "BIC input does not exist for account %s in slot %d", inp.AccountID, commitmentInput.Slot)
 		}
 
 		bicInputSet[inp.AccountID] = accountData.Credits.Value
@@ -114,7 +110,7 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 	for _, inp := range rewardInputs {
 		output, ok := resolvedInputStates[inp.Index].(*utxoledger.Output)
 		if !ok {
-			return nil, ierrors.Wrapf(iotago.ErrRewardInputReferenceInvalid, "input at index %d is not an UTXO output", inp.Index)
+			return nil, ierrors.WithMessagef(iotago.ErrRewardInputReferenceInvalid, "input at index %d is not a UTXO output", inp.Index)
 		}
 		outputID := output.OutputID()
 
@@ -122,7 +118,7 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 		case *iotago.AccountOutput:
 			stakingFeature := castOutput.FeatureSet().Staking()
 			if stakingFeature == nil {
-				return nil, ierrors.Wrapf(iotago.ErrRewardInputReferenceInvalid, "cannot claim rewards from an AccountOutput %s at index %d without staking feature", outputID, inp.Index)
+				return nil, ierrors.Wrapf(iotago.ErrRewardInputReferenceInvalid, "cannot claim rewards from a Account with output id %s at index %d without a staking feature", outputID.ToHex(), inp.Index)
 			}
 			accountID := castOutput.AccountID
 			if accountID.Empty() {
@@ -135,7 +131,7 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 
 			reward, _, _, rewardErr := v.ledger.sybilProtection.ValidatorReward(accountID, stakingFeature, claimingEpoch)
 			if rewardErr != nil {
-				return nil, ierrors.Wrapf(iotago.ErrStakingRewardCalculationFailure, "failed to get Validator reward for AccountOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d, claimingEpoch: %d", outputID, inp.Index, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch, claimingEpoch)
+				return nil, ierrors.Join(iotago.ErrStakingRewardCalculationFailure, ierrors.Wrapf(rewardErr, "failed to get validator reward for account with output id %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d, claimingEpoch: %d)", outputID.ToHex(), inp.Index, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch, claimingEpoch))
 			}
 
 			rewardInputSet[accountID] = reward
@@ -158,12 +154,12 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 
 			reward, _, _, rewardErr := v.ledger.sybilProtection.DelegatorReward(castOutput.ValidatorAddress.AccountID(), castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd, claimingEpoch)
 			if rewardErr != nil {
-				return nil, ierrors.Wrapf(iotago.ErrDelegationRewardCalculationFailure, "failed to get Delegator reward for DelegationOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
+				return nil, ierrors.Join(iotago.ErrDelegationRewardCalculationFailure, ierrors.Wrapf(rewardErr, "failed to get delegator reward for DelegationOutput with output id %s at index %d (DelegatedAmount: %d, StartEpoch: %d, EndEpoch: %d)", outputID, inp.Index, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch))
 			}
 
 			rewardInputSet[delegationID] = reward
 		default:
-			return nil, ierrors.Wrapf(iotago.ErrRewardInputReferenceInvalid, "reward input cannot point to %s", output.Output().Type())
+			return nil, ierrors.WithMessagef(iotago.ErrRewardInputReferenceInvalid, "reward input cannot point to %s", output.Output().Type())
 		}
 	}
 
@@ -176,7 +172,7 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 
 	unlockedAddresses, err := nova.NewVirtualMachine().ValidateUnlocks(iotagoSignedTransaction, resolvedInputs)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrap(err, "failed to validate unlocks in signed transaction")
 	}
 
 	executionContext = context.Background()
@@ -192,19 +188,16 @@ func (v *VM) Execute(executionContext context.Context, transaction mempool.Trans
 		return nil, iotago.ErrTxTypeInvalid
 	}
 
-	transactionID, err := iotagoTransaction.ID()
-	if err != nil {
-		return nil, err
-	}
+	transactionID := iotagoTransaction.MustID()
 
 	unlockedAddresses, ok := executionContext.Value(ExecutionContextKeyUnlockedAddresses).(iotagovm.UnlockedAddresses)
 	if !ok {
-		return nil, ierrors.Errorf("unlockedAddresses not found in execution context")
+		panic("unlockedAddresses should be present in execution context")
 	}
 
 	resolvedInputs, ok := executionContext.Value(ExecutionContextKeyResolvedInputs).(iotagovm.ResolvedInputs)
 	if !ok {
-		return nil, ierrors.Errorf("resolvedInputs not found in execution context")
+		panic("resolvedInputs should be present in execution context")
 	}
 
 	createdOutputs, err := nova.NewVirtualMachine().Execute(iotagoTransaction, resolvedInputs, unlockedAddresses)

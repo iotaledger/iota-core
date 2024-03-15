@@ -21,7 +21,7 @@ func blockIDFromTransactionID(c echo.Context) (iotago.BlockID, error) {
 func blockFromTransactionID(c echo.Context) (*iotago.Block, error) {
 	blockID, err := blockIDFromTransactionID(c)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to get block ID by transaction ID: %s", err)
+		return nil, ierrors.WithMessagef(echo.ErrBadRequest, "failed to get block ID by transaction ID: %w", err)
 	}
 
 	block, err := deps.RequestHandler.BlockByID(blockID)
@@ -35,7 +35,7 @@ func blockFromTransactionID(c echo.Context) (*iotago.Block, error) {
 func blockMetadataFromTransactionID(c echo.Context) (*api.BlockMetadataResponse, error) {
 	blockID, err := blockIDFromTransactionID(c)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to get block ID by transaction ID: %s", err)
+		return nil, ierrors.WithMessagef(echo.ErrBadRequest, "failed to get block ID by transaction ID: %w", err)
 	}
 
 	return deps.RequestHandler.BlockMetadataByBlockID(blockID)

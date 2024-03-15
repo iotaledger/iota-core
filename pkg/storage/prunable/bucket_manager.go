@@ -64,7 +64,7 @@ func (b *BucketManager) IsTooOld(epoch iotago.EpochIndex) (isTooOld bool) {
 
 func (b *BucketManager) Get(epoch iotago.EpochIndex, realm kvstore.Realm) (kvstore.KVStore, error) {
 	if b.IsTooOld(epoch) {
-		return nil, ierrors.Wrapf(database.ErrEpochPruned, "epoch %d", epoch)
+		return nil, ierrors.WithMessagef(database.ErrEpochPruned, "epoch %d", epoch)
 	}
 
 	kv := b.getDBInstance(epoch).KVStore()
@@ -132,7 +132,7 @@ func (b *BucketManager) TotalSize() int64 {
 	b.openDBs.ForEach(func(key iotago.EpochIndex, _ *database.DBInstance) bool {
 		size, err := dbPrunableDirectorySize(b.dbConfig.Directory, key)
 		if err != nil {
-			b.errorHandler(ierrors.Wrapf(err, "dbPrunableDirectorySize failed for key %s: %s", b.dbConfig.Directory, key))
+			b.errorHandler(ierrors.Wrapf(err, "dbPrunableDirectorySize failed for epoch %d in directory %s", key, b.dbConfig.Directory))
 		}
 		sum += size
 
@@ -157,7 +157,7 @@ func (b *BucketManager) BucketSize(epoch iotago.EpochIndex) (int64, error) {
 
 	size, err := dbPrunableDirectorySize(b.dbConfig.Directory, epoch)
 	if err != nil {
-		return 0, ierrors.Wrapf(err, "dbPrunableDirectorySize failed for epoch %s: %s", b.dbConfig.Directory, epoch)
+		return 0, ierrors.Wrapf(err, "dbPrunableDirectorySize failed for epoch %d in directory %s", epoch, b.dbConfig.Directory)
 	}
 
 	return size, nil
@@ -247,7 +247,7 @@ func (b *BucketManager) Prune(epoch iotago.EpochIndex) error {
 	defer b.lastPrunedMutex.Unlock()
 
 	if epoch < lo.Return1(b.lastPrunedEpoch.Index()) {
-		return ierrors.Wrapf(database.ErrNoPruningNeeded, "epoch %d is already pruned", epoch)
+		return ierrors.WithMessagef(database.ErrNoPruningNeeded, "epoch %d is already pruned", epoch)
 	}
 
 	b.DeleteBucket(epoch)

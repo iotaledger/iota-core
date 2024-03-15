@@ -127,9 +127,7 @@ func (o *Orchestrator) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex
 		for epoch := o.signalingWindowStart(currentEpoch, apiForSlot); epoch <= currentEpoch; epoch++ {
 			versionAndHash, err := o.decidedUpgradeSignals.Load(epoch)
 			if err != nil {
-				if err != nil {
-					return 0, ierrors.Wrapf(err, "failed to get permanent upgrade signals for epoch %d", epoch)
-				}
+				return 0, ierrors.Wrapf(err, "failed to get permanent upgrade signals for epoch %d", epoch)
 			}
 			if versionAndHash.Version == 0 {
 				// We don't write anything to the storage if no supermajority was reached (or no signaling was going on).

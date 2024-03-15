@@ -22,7 +22,6 @@ import (
 
 type TestSuite struct {
 	T                    *testing.T
-	stores               map[iotago.SlotIndex]kvstore.KVStore
 	accounts             map[string]iotago.AccountID
 	poolRewards          map[iotago.EpochIndex]map[string]*model.PoolRewards
 	epochStats           map[iotago.EpochIndex]*model.PoolsStats
@@ -30,8 +29,7 @@ type TestSuite struct {
 
 	api iotago.API
 
-	Instance              *Tracker
-	performanceFactorFunc func(iotago.SlotIndex) *model.ValidatorPerformance
+	Instance *Tracker
 }
 
 func NewTestSuite(t *testing.T) *TestSuite {
@@ -183,9 +181,9 @@ func (t *TestSuite) AssertEpochRewards(epoch iotago.EpochIndex, actions map[stri
 		require.NoError(t.T, err)
 		require.Equal(t.T, expectedValidatorReward, actualValidatorReward)
 
-		for delegatedAmount := range action.Delegators {
+		for _, delegatedAmount := range action.Delegators {
 			expectedDelegatorReward := t.delegatorReward(epoch, t.epochStats[epoch].ProfitMargin, uint64(poolRewards), uint64(delegatedAmount), uint64(action.PoolStake), uint64(action.FixedCost), action)
-			actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accountID, iotago.BaseToken(delegatedAmount), epoch, epoch, epoch)
+			actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accountID, delegatedAmount, epoch, epoch, epoch)
 			require.NoError(t.T, err)
 			require.Equal(t.T, expectedDelegatorReward, actualDelegatorReward)
 		}
@@ -274,7 +272,7 @@ func (t *TestSuite) delegatorReward(epoch iotago.EpochIndex, profitMargin, poolR
 	if poolRewardWithFixedCost >= fixedCost {
 		poolRewards = poolRewardWithFixedCost - fixedCost
 	}
-	unDecayedEpochRewards := (((profitMarginComplement * poolRewards) >> profitMarginExponent) * delegatedAmount) / poolStake
+	unDecayedEpochRewards := (((profitMarginComplement * poolRewards) >> profitMarginExponent) / poolStake) * delegatedAmount
 
 	decayProvider := t.api.ManaDecayProvider()
 	decayedEpochRewards, err := decayProvider.DecayManaByEpochs(iotago.Mana(unDecayedEpochRewards), epoch, epoch)

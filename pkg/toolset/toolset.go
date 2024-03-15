@@ -148,7 +148,7 @@ func loadConfigFile(filePath string, parameters map[string]any) error {
 	}
 
 	if err := config.LoadFile(filePath); err != nil {
-		return fmt.Errorf("loading config file failed: %w", err)
+		return ierrors.Wrap(err, "loading config file failed")
 	}
 
 	config.UpdateBoundParameters()

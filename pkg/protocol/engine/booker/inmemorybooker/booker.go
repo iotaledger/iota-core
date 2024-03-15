@@ -99,7 +99,7 @@ func (b *Booker) Queue(block *blocks.Block) error {
 
 		return nil
 	} else if signedTransactionMetadata == nil {
-		return ierrors.Errorf("transaction in %s was not attached", block.ID())
+		return ierrors.Errorf("transaction in block %s was not attached", block.ID())
 	}
 	block.SignedTransactionMetadata.Set(signedTransactionMetadata)
 
@@ -159,7 +159,7 @@ func (b *Booker) setupBlock(block *blocks.Block) {
 
 		parentBlock.Invalid().OnUpdateOnce(func(_ bool, _ bool) {
 			if block.SetInvalid() {
-				b.events.BlockInvalid.Trigger(block, ierrors.Errorf("block marked as invalid in Booker because parent block is invalid %s", parentBlock.ID()))
+				b.events.BlockInvalid.Trigger(block, ierrors.Errorf("block marked as invalid in Booker because parent block %s is invalid", parentBlock.ID()))
 			}
 		})
 	})

@@ -88,7 +88,7 @@ func (m *Manager) RemovePeer(peerID peer.ID) error {
 	m.networkManager.P2PHost().ConnManager().Unprotect(peerID, manualPeerProtectionTag)
 
 	if err := m.networkManager.DropNeighbor(peerID); err != nil && !ierrors.Is(err, network.ErrUnknownPeer) {
-		return ierrors.Wrapf(err, "failed to drop known peer %s in the gossip layer", peerID)
+		return ierrors.Wrapf(err, "failed to drop known peer %s in the gossip layer", peerID.String())
 	}
 
 	return nil
@@ -252,7 +252,7 @@ func (m *Manager) keepPeerConnected(peer *network.Peer) {
 
 			var err error
 			if err = m.networkManager.DialPeer(ctx, peer); err != nil && !ierrors.Is(err, network.ErrDuplicatePeer) && !ierrors.Is(err, context.Canceled) {
-				m.logger.LogErrorf("Failed to connect a neighbor in the gossip layer, peerID: %s, error: %s", peer.ID, err)
+				m.logger.LogErrorf("Failed to connect a neighbor in the gossip layer, peerID: %s, error: %s", peer.ID.String(), err.Error())
 			}
 		}
 		select {

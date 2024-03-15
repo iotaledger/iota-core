@@ -222,7 +222,7 @@ func configure() error {
 		}
 
 		return responseByHeader(c, resp)
-	})
+	}, checkNodeSynced())
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointOutputWithMetadata), func(c echo.Context) error {
 		resp, err := outputWithMetadataFromOutputID(c)
@@ -231,7 +231,7 @@ func configure() error {
 		}
 
 		return responseByHeader(c, resp)
-	})
+	}, checkNodeSynced())
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointTransactionsIncludedBlock), func(c echo.Context) error {
 		block, err := blockFromTransactionID(c)
@@ -312,7 +312,7 @@ func checkNodeSynced() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			if !deps.RequestHandler.IsNodeSynced() {
-				return ierrors.Wrap(echo.ErrServiceUnavailable, "node is not synced")
+				return ierrors.WithMessage(echo.ErrServiceUnavailable, "node is not synced")
 			}
 
 			return next(c)

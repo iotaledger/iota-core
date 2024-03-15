@@ -4,6 +4,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
@@ -12,7 +13,11 @@ import (
 func (r *RequestHandler) OutputFromOutputID(outputID iotago.OutputID) (*api.OutputResponse, error) {
 	output, err := r.protocol.Engines.Main.Get().Ledger.Output(outputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %s", outputID.ToHex(), err)
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+			return nil, ierrors.WithMessagef(echo.ErrNotFound, "output %s not found in the Ledger", outputID.ToHex())
+		}
+
+		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to get output %s from the ledger: %w", outputID.ToHex(), err)
 	}
 
 	return &api.OutputResponse{
@@ -24,7 +29,11 @@ func (r *RequestHandler) OutputFromOutputID(outputID iotago.OutputID) (*api.Outp
 func (r *RequestHandler) OutputMetadataFromOutputID(outputID iotago.OutputID) (*api.OutputMetadata, error) {
 	output, spent, err := r.protocol.Engines.Main.Get().Ledger.OutputOrSpent(outputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %s", outputID.ToHex(), err)
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+			return nil, ierrors.WithMessagef(echo.ErrNotFound, "output %s not found in the Ledger", outputID.ToHex())
+		}
+
+		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %w", outputID.ToHex(), err)
 	}
 
 	if spent != nil {
@@ -37,13 +46,17 @@ func (r *RequestHandler) OutputMetadataFromOutputID(outputID iotago.OutputID) (*
 func (r *RequestHandler) OutputWithMetadataFromOutputID(outputID iotago.OutputID) (*api.OutputWithMetadataResponse, error) {
 	output, spent, err := r.protocol.Engines.Main.Get().Ledger.OutputOrSpent(outputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %s", outputID.ToHex(), err)
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+			return nil, ierrors.WithMessagef(echo.ErrNotFound, "output %s not found in the Ledger", outputID.ToHex())
+		}
+
+		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %w", outputID.ToHex(), err)
 	}
 
 	if spent != nil {
 		metadata, err := r.newSpentMetadataResponse(spent)
 		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load spent output metadata: %s", err)
+			return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to load spent output metadata: %w", err)
 		}
 
 		return &api.OutputWithMetadataResponse{
@@ -75,7 +88,7 @@ func (r *RequestHandler) newOutputMetadataResponse(output *utxoledger.Output) (*
 		includedSlot >= r.protocol.Engines.Main.Get().CommittedAPI().ProtocolParameters().GenesisSlot() {
 		includedCommitment, err := r.protocol.Engines.Main.Get().Storage.Commitments().Load(includedSlot)
 		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", includedSlot, err)
+			return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", includedSlot, err)
 		}
 		includedCommitmentID = includedCommitment.ID()
 	}
@@ -105,7 +118,7 @@ func (r *RequestHandler) newSpentMetadataResponse(spent *utxoledger.Spent) (*api
 		spentSlot >= r.protocol.Engines.Main.Get().CommittedAPI().ProtocolParameters().GenesisSlot() {
 		spentCommitment, err := r.protocol.Engines.Main.Get().Storage.Commitments().Load(spentSlot)
 		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", spentSlot, err)
+			return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to load commitment with index %d: %w", spentSlot, err)
 		}
 		spentCommitmentID = spentCommitment.ID()
 	}

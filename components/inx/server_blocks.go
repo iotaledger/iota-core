@@ -197,7 +197,7 @@ func (s *Server) attachBlock(ctx context.Context, block *iotago.Block) (*inx.Blo
 func getINXBlockMetadata(blockID iotago.BlockID) (*inx.BlockMetadata, error) {
 	blockMetadata, err := deps.Protocol.Engines.Main.Get().BlockRetainer.BlockMetadata(blockID)
 	if err != nil {
-		return nil, ierrors.Errorf("failed to get BlockMetadata: %v", err)
+		return nil, ierrors.Wrap(err, "failed to get BlockMetadata")
 	}
 
 	return inx.WrapBlockMetadata(blockMetadata)
