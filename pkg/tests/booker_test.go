@@ -16,8 +16,6 @@ import (
 )
 
 func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
-	t.Skip("This test is currently disabled because it is not yet clear how to handle this case.")
-
 	ts := testsuite.NewTestSuite(t)
 	defer ts.Shutdown()
 
@@ -26,30 +24,46 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	tx1 := wallet.CreateBasicOutputsEquallyFromInput("tx1", 1, "Genesis:0")
-
 	tx2 := wallet.CreateBasicOutputsEquallyFromInput("tx2", 1, "tx1:0")
 
-	ts.IssueBasicBlockWithOptions("block1", wallet, tx2)
+	// issue block1 that contains an unsolid transaction
+	{
+		ts.IssueBasicBlockWithOptions("block1", wallet, tx2)
 
-	ts.AssertTransactionsExist(wallet.Transactions("tx2"), true, node1)
-	ts.AssertTransactionsExist(wallet.Transactions("tx1"), false, node1)
+		ts.AssertTransactionsExist(wallet.Transactions("tx2"), true, node1)
+		ts.AssertTransactionsExist(wallet.Transactions("tx1"), false, node1)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx2"), false, node1)
+		// make sure that the block is not booked
+	}
 
-	ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx2"), false, node1)
-	// make sure that the block is not booked
+	// issue block2 that makes block1 solid (but not booked yet)
+	{
+		ts.IssueBasicBlockWithOptions("block2", wallet, tx1)
 
-	ts.IssueBasicBlockWithOptions("block2", wallet, tx1)
+		ts.AssertTransactionsExist(wallet.Transactions("tx1", "tx2"), true, node1)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1", "tx2"), true, node1)
+		ts.AssertBlocksInCacheBooked(ts.Blocks("block2"), true, node1)
+		ts.AssertBlocksInCacheBooked(ts.Blocks("block1"), false, node1)
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("block2"): {"tx1"},
+		}, node1)
+		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
+			wallet.Transaction("tx2"): {"tx2"},
+			wallet.Transaction("tx1"): {"tx1"},
+		}, node1)
+	}
 
-	ts.AssertTransactionsExist(wallet.Transactions("tx1", "tx2"), true, node1)
-	ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1", "tx2"), true, node1)
-	ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
-		ts.Block("block1"): {"tx2"},
-		ts.Block("block2"): {"tx1"},
-	}, node1)
+	// confirm 2nd block so block1 gets booked
+	{
+		ts.IssueValidationBlockWithHeaderOptions("block3", node1, mock.WithStrongParents(ts.BlockID("block2")))
 
-	ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
-		wallet.Transaction("tx2"): {"tx2"},
-		wallet.Transaction("tx1"): {"tx1"},
-	}, node1)
+		ts.AssertBlocksInCacheBooked(ts.Blocks("block1", "block2", "block3"), true, node1)
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("block1"): {"tx2"},
+			ts.Block("block2"): {"tx1"},
+			ts.Block("block3"): {"tx1"},
+		}, node1)
+	}
 }
 
 func Test_WeightPropagation(t *testing.T) {
