@@ -66,6 +66,7 @@ type TestSuite struct {
 
 	snapshotPath string
 	blocks       *shrinkingmap.ShrinkingMap[string, *blocks.Block]
+	attachments  *shrinkingmap.ShrinkingMap[string, []*blocks.Block]
 
 	API                      iotago.API
 	ProtocolParameterOptions []options.Option[iotago.V3ProtocolParameters]
@@ -94,6 +95,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		nodes:                               orderedmap.New[string, *mock.Node](),
 		wallets:                             orderedmap.New[string, *mock.Wallet](),
 		blocks:                              shrinkingmap.New[string, *blocks.Block](),
+		attachments:                         shrinkingmap.New[string, []*blocks.Block](),
 		automaticTransactionIssuingCounters: *shrinkingmap.New[string, int](),
 
 		optsWaitFor: durationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
