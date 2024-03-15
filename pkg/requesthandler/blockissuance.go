@@ -71,15 +71,15 @@ func (r *RequestHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *mo
 	defer lo.BatchReverse(evtUnhook, prefilteredUnhook, postfilteredUnhook)()
 
 	if err := r.submitBlock(block); err != nil {
-		return ierrors.Wrapf(err, "failed to issue block %s", blockID.ToHex())
+		return ierrors.Wrapf(err, "failed to issue block %s", blockID)
 	}
 
 	select {
 	case <-processingCtx.Done():
-		return ierrors.Errorf("context canceled whilst waiting for event on block %s", blockID.ToHex())
+		return ierrors.Errorf("context canceled whilst waiting for event on block %s", blockID)
 	case err := <-filtered:
 		if err != nil {
-			return ierrors.Wrapf(err, "block filtered %s", blockID.ToHex())
+			return ierrors.Wrapf(err, "block filtered %s", blockID)
 		}
 
 		return nil

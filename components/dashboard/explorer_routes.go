@@ -75,14 +75,14 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 func findBlock(blockID iotago.BlockID) (explorerBlk *ExplorerBlock, err error) {
 	block, exists := deps.Protocol.Engines.Main.Get().Block(blockID)
 	if !exists {
-		return nil, ierrors.Errorf("block %s not found", blockID.ToHex())
+		return nil, ierrors.Errorf("block %s not found", blockID)
 	}
 
 	cachedBlock, _ := deps.Protocol.Engines.Main.Get().BlockCache.Block(blockID)
 
 	blockMetadata, err := deps.Protocol.Engines.Main.Get().BlockRetainer.BlockMetadata(blockID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get block metadata for block %s", blockID.ToHex())
+		return nil, ierrors.Wrapf(err, "failed to get block metadata for block %s", blockID)
 	}
 
 	return createExplorerBlock(block, cachedBlock, blockMetadata), nil

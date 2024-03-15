@@ -352,7 +352,7 @@ func (m *MemPool[VoteRank]) storeTransaction(signedTransaction mempool.SignedTra
 
 	if m.lastCommittedSlot >= blockID.Slot() {
 		// block will be retained as invalid, we do not store tx failure as it was block's fault
-		return nil, false, false, ierrors.Errorf("blockID %d is older than last evicted slot %d", blockID, m.lastCommittedSlot)
+		return nil, false, false, ierrors.Errorf("blockID %s is older than last evicted slot %d", blockID, m.lastCommittedSlot)
 	}
 
 	inputReferences, err := m.vm.Inputs(transaction)
