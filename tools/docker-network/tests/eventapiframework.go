@@ -167,7 +167,6 @@ func (e *EventAPIDockerTestFramework) AssertValidationBlocks(ctx context.Context
 	require.Nil(e.Testing, subInfo.Error())
 
 	go func() {
-		defer fmt.Println("AssertValidationBlocks finished")
 		defer subInfo.Close()
 		blkIDs := make([]string, 0)
 		counter := 0
