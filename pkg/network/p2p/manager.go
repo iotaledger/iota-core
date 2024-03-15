@@ -113,11 +113,11 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer) error {
 	}
 
 	if m.NeighborExists(peer.ID) {
-		return ierrors.Wrapf(network.ErrDuplicatePeer, "peer %s already exists", peer.ID.String())
+		return ierrors.WithMessagef(network.ErrDuplicatePeer, "peer %s already exists", peer.ID.String())
 	}
 
 	if !m.allowPeer(peer.ID) {
-		return ierrors.Wrapf(network.ErrMaxAutopeeringPeersReached, "peer %s is not allowed", peer.ID.String())
+		return ierrors.WithMessagef(network.ErrMaxAutopeeringPeersReached, "peer %s is not allowed", peer.ID.String())
 	}
 
 	// Adds the peer's multiaddresses to the peerstore, so that they can be used for dialing.
@@ -147,7 +147,7 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer) error {
 	if err := m.addNeighbor(ctx, peer, ps); err != nil {
 		m.closeStream(stream)
 
-		return ierrors.Errorf("failed to add neighbor %s: %s", peer.ID.String(), err.Error())
+		return ierrors.Wrapf(err, "failed to add neighbor %s", peer.ID.String())
 	}
 
 	return nil
