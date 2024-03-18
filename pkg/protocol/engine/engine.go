@@ -274,7 +274,7 @@ func (e *Engine) Reset() {
 	e.PostSolidFilter.Reset()
 	e.BlockDAG.Reset()
 	e.PreSolidFilter.Reset()
-	e.BlockRetainer.Reset(latestCommittedSlot)
+	e.BlockRetainer.Reset()
 	e.TxRetainer.Reset(latestCommittedSlot)
 	e.EvictionState.Reset()
 	e.BlockCache.Reset()

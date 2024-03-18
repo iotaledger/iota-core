@@ -88,10 +88,6 @@ func (tf *TestFramework) commitSlot(slot iotago.SlotIndex) {
 	require.NoError(tf.test, err)
 }
 
-func (tf *TestFramework) resetToSlot(slot iotago.SlotIndex) {
-	tf.Instance.Reset(slot)
-}
-
 func (tf *TestFramework) finalizeSlot(slot iotago.SlotIndex) {
 	tf.lastFinalizedSlot = slot
 }
@@ -173,7 +169,6 @@ func (tf *TestFramework) assertBlockMetadata(testActions []*BlockRetainerAction)
 			require.Error(tf.test, err)
 			continue
 		}
-
 		require.NoError(tf.test, err)
 		require.Equal(tf.test, expectedResp, res, "block metadata mismatch for alias %s", act.Alias)
 	}

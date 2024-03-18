@@ -110,26 +110,11 @@ func NewProvider() module.Provider[*engine.Engine, retainer.BlockRetainer] {
 }
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
-func (r *BlockRetainer) Reset(targetSlot iotago.SlotIndex) {
+func (r *BlockRetainer) Reset() {
 	r.Lock()
 	defer r.Unlock()
 
-	r.latestCommittedSlot = targetSlot
 	r.cache.uncommittedBlockMetadataChanges.Clear()
-	r.resetConfirmations(targetSlot)
-}
-
-func (r *BlockRetainer) resetConfirmations(targetSlot iotago.SlotIndex) {
-	for slot := r.finalizedSlotFunc(); slot <= targetSlot; slot++ {
-		store, err := r.store(slot)
-		if err != nil {
-			r.errorHandler(ierrors.Wrapf(err, "could not get retainer store for slot %d", slot))
-			continue
-		}
-
-		// reset all block confirmations
-		store.ResetConfirmations()
-	}
 }
 
 func (r *BlockRetainer) Shutdown() {

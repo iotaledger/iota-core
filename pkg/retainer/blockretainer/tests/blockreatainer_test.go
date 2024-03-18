@@ -232,6 +232,7 @@ func TestBlockRetainer_Dropped(t *testing.T) {
 	}
 }
 
+// TestBlockRetainer_Reset makes sure that the BlockRetainer cleares all cache on Reset.
 func TestBlockRetainer_Reset(t *testing.T) {
 	tf := NewTestFramework(t)
 
@@ -239,8 +240,7 @@ func TestBlockRetainer_Reset(t *testing.T) {
 		tf.commitSlot(2)
 		tf.finalizeSlot(0)
 		tf.initiateRetainerBlockFlow(5, []string{"A", "B"})
-		tf.initiateRetainerBlockFlow(6, []string{"C"})
-		tf.initiateRetainerBlockFlow(7, []string{"D"})
+		tf.initiateRetainerBlockFlow(6, []string{"C", "D"})
 
 	}
 	{
@@ -259,6 +259,11 @@ func TestBlockRetainer_Reset(t *testing.T) {
 			},
 			{
 				"C",
+				eventAccepted,
+				api.BlockStateAccepted,
+			},
+			{
+				"D",
 				eventAccepted,
 				api.BlockStateAccepted,
 			},
@@ -291,46 +296,21 @@ func TestBlockRetainer_Reset(t *testing.T) {
 		})
 	}
 	{
-		tf.commitSlot(6)
+		tf.Instance.Reset()
 		tf.assertBlockMetadata([]*BlockRetainerAction{
 			{
-				"A", // is committed
+				"A",
 				none,
 				api.BlockStateConfirmed,
 			},
 			{
-				"B", // is committed
+				"B",
 				none,
 				api.BlockStateConfirmed,
 			},
 			{
 				"C",
-				eventConfirmed, // is committed
-				api.BlockStateConfirmed,
-			},
-			{
-				"D",
-				eventAccepted,
-				api.BlockStateAccepted,
-			},
-		})
-	}
-	{
-		tf.resetToSlot(5)
-		tf.assertBlockMetadata([]*BlockRetainerAction{
-			{
-				"A", // still committed, but confirmation is reset
-				none,
-				api.BlockStateAccepted,
-			},
-			{
-				"B", // still committed, but confirmation is reset
-				none,
-				api.BlockStateAccepted,
-			},
-			{
-				"C",
-				none, // bd cleared
+				none, // cache cleared
 				api.BlockStateUnknown,
 			},
 			{

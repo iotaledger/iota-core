@@ -71,19 +71,3 @@ func (r *BlockMetadataStore) BlockMetadata(blockID iotago.BlockID) (*BlockMetada
 
 	return blockMetadata, nil
 }
-
-func (r *BlockMetadataStore) ResetConfirmations() {
-	err := r.blockMetadataStore.Iterate(kvstore.EmptyPrefix, func(key iotago.BlockID, value *BlockMetadata) bool {
-		// we can safely assum the status is accepted for the committed bocks
-		// but we are not sure if the confirmation would still hold if the proceeding slots were cleared out
-		if value.State == api.BlockStateConfirmed {
-			_ = r.blockMetadataStore.Set(key, &BlockMetadata{State: api.BlockStateAccepted})
-		}
-
-		return true
-	})
-
-	if err != nil {
-		panic(ierrors.Wrapf(err, "failed to reset confirmations for a slot %d in the BlockRetainer store", r.slot))
-	}
-}
