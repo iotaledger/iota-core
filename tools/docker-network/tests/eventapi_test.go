@@ -428,8 +428,6 @@ func test_BlockMetadataMatchedCoreAPI(t *testing.T, e *EventAPIDockerTestFramewo
 		// issue blocks
 		e.SubmitDataBlockStream(account, 5*time.Minute)
 
-		// time's up, cancel the context
-		time.Sleep(5 * time.Minute)
 		cancel()
 	}
 }

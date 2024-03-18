@@ -443,7 +443,7 @@ func (e *EventAPIDockerTestFramework) AssertAnchorOutput(ctx context.Context, ev
 
 	go func() {
 		defer subInfo.Close()
-		e.assertOutputMetadataTopics(ctx, "AssertNFTOutput", outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
+		e.assertOutputMetadataTopics(ctx, "AssertAnchorOutput", outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
 			if resp.Output.Type() == iotago.OutputAnchor {
 				o, ok := resp.Output.(*iotago.AnchorOutput)
 				require.True(e.Testing, ok)
@@ -593,7 +593,7 @@ func (e *EventAPIDockerTestFramework) AwaitEventAPITopics(t *testing.T, cancleFu
 		select {
 		case <-timer.C:
 			cancleFunc()
-			return ierrors.New("Timeout, did not receive signals from all  topics")
+			return ierrors.New("Timeout, did not receive signals from all topics")
 		case <-e.finishChan:
 			counter++
 			if counter == numOfTopics {
