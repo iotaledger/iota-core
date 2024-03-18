@@ -572,7 +572,7 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 				txID := tpkg.RandTransactionID()
 				resp, err := d.wallet.Clients[nodeAlias].TransactionIncludedBlock(context.Background(), txID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusInternalServerError))
+				require.True(t, isStatusCode(err, http.StatusBadRequest))
 				require.Nil(t, resp)
 			},
 		},
@@ -583,7 +583,7 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 
 				resp, err := d.wallet.Clients[nodeAlias].TransactionIncludedBlockMetadata(context.Background(), txID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusInternalServerError))
+				require.True(t, isStatusCode(err, http.StatusBadRequest))
 				require.Nil(t, resp)
 			},
 		},
