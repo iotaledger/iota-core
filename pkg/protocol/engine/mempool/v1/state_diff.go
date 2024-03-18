@@ -77,7 +77,7 @@ func (s *StateDiff) updateCompactedStateChanges(transaction *TransactionMetadata
 	}
 }
 
-func (s *StateDiff) AddTransaction(transaction *TransactionMetadata, errorHandler func(error)) error {
+func (s *StateDiff) AddTransaction(transaction *TransactionMetadata) error {
 	if _, exists := s.executedTransactions.Set(transaction.ID(), transaction); !exists {
 		if err := s.mutations.Add(transaction.ID()); err != nil {
 			return ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID())

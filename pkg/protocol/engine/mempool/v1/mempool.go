@@ -522,7 +522,7 @@ func (m *MemPool[VoteRank]) updateStateDiffs(transaction *TransactionMetadata, p
 			return ierrors.Wrapf(err, "failed to get state diff for slot %d", newIndex)
 		}
 
-		if err = stateDiff.AddTransaction(transaction, m.errorHandler); err != nil {
+		if err = stateDiff.AddTransaction(transaction); err != nil {
 			return ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID())
 		}
 	}
@@ -552,7 +552,7 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 				return
 			}
 
-			if err := stateDiff.AddTransaction(transaction, m.errorHandler); err != nil {
+			if err := stateDiff.AddTransaction(transaction); err != nil {
 				m.errorHandler(ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID()))
 			}
 		}
