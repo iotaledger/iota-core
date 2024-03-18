@@ -87,9 +87,16 @@ func WithProtocolVersion(version iotago.Version) func(builder *BlockHeaderParams
 		builder.ProtocolVersion = &version
 	}
 }
+
 func WithIssuer(issuer wallet.Account) func(builder *BlockHeaderParams) {
 	return func(builder *BlockHeaderParams) {
 		builder.Issuer = issuer
+	}
+}
+
+func WithReferenceValidation(referenceValidation bool) func(builder *BlockHeaderParams) {
+	return func(builder *BlockHeaderParams) {
+		builder.ReferenceValidation = referenceValidation
 	}
 }
 

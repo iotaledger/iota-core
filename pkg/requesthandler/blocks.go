@@ -70,7 +70,7 @@ func (r *RequestHandler) BlockIssuance() (*api.IssuanceBlockHeaderResponse, erro
 			// or a root block
 			rootBlocks, err := r.protocol.Engines.Main.Get().Storage.RootBlocks(parentBlockID.Slot())
 			if err != nil {
-				return ierrors.Wrapf(echo.ErrInternalServerError, "failed to get root blocks for slot %d: %w", parentBlockID.Slot(), err)
+				return ierrors.WithMessagef(echo.ErrInternalServerError, "failed to get root blocks for slot %d: %s", parentBlockID.Slot(), err)
 			}
 
 			isRootBlock, err := rootBlocks.Has(parentBlockID)

@@ -53,8 +53,6 @@ func (t *TestSuite) AssertLatestCommitment(commitment *iotago.Commitment, nodes 
 }
 
 func (t *TestSuite) AssertCommitmentSlotIndexExists(slot iotago.SlotIndex, clients ...mock.Client) {
-	//mustNodes(nodes)
-
 	for _, client := range clients {
 		t.Eventually(func() error {
 			latestCommitment, err := client.CommitmentByID(context.Background(), iotago.EmptyCommitmentID)

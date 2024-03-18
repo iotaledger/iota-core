@@ -81,7 +81,7 @@ func NewBlockIssuer(t *testing.T, name string, keyManager *wallet.KeyManager, cl
 }
 
 func (i *BlockIssuer) BlockIssuerKey() iotago.BlockIssuerKey {
-	_, pub := i.keyManager.KeyPair()
+	_, pub := i.keyManager.KeyPair(i.AccountData.AddressIndex)
 	return iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(hiveEd25519.PublicKey(pub))
 }
 
@@ -90,7 +90,7 @@ func (i *BlockIssuer) BlockIssuerKeys() iotago.BlockIssuerKeys {
 }
 
 func (i *BlockIssuer) Address() iotago.Address {
-	_, pub := i.keyManager.KeyPair()
+	_, pub := i.keyManager.KeyPair(i.AccountData.AddressIndex)
 	return iotago.Ed25519AddressFromPubKey(pub)
 }
 
@@ -113,7 +113,6 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, n
 			var parentID iotago.BlockID
 			var err error
 			commitment, parentID, err = i.reviveChain(*blockParams.BlockHeader.IssuingTime, node)
-			fmt.Printf("revive chain commitment: slot %d, parentID %s\n", commitment.Slot, parentID)
 			if err != nil {
 				return nil, ierrors.Wrap(err, "failed to revive chain")
 			}
@@ -358,8 +357,9 @@ func (i *BlockIssuer) validateReferences(ctx context.Context, issuingTime time.T
 }
 
 func (i *BlockIssuer) SubmitBlock(ctx context.Context, block *model.Block) error {
-	defer i.mutex.Unlock()
 	i.mutex.Lock()
+	defer i.mutex.Unlock()
+
 	// mark the response as used so that the next time we query the node for the latest block issuance.
 	i.blockIssuanceResponseUsed = true
 
@@ -397,8 +397,8 @@ func (i *BlockIssuer) retrieveAPI(blockParams *BlockHeaderParams) iotago.API {
 }
 
 func (i *BlockIssuer) GetNewBlockIssuanceResponse() *api.IssuanceBlockHeaderResponse {
-	defer i.mutex.Unlock()
 	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	i.blockIssuanceResponseUsed = false
 	resp, err := i.Client.BlockIssuance(context.Background())
@@ -409,8 +409,8 @@ func (i *BlockIssuer) GetNewBlockIssuanceResponse() *api.IssuanceBlockHeaderResp
 }
 
 func (i *BlockIssuer) LatestBlockIssuanceResponse(context context.Context) *api.IssuanceBlockHeaderResponse {
-	defer i.mutex.Unlock()
 	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	if i.blockIssuanceResponseUsed {
 		i.blockIssuanceResponseUsed = false

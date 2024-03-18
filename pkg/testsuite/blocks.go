@@ -31,8 +31,6 @@ func (t *TestSuite) AssertBlock(block *blocks.Block, client mock.Client) *iotago
 }
 
 func (t *TestSuite) AssertBlocksExist(blocks []*blocks.Block, expectedExist bool, clients ...mock.Client) {
-	//mustNodes(nodes)
-
 	for _, client := range clients {
 		for _, block := range blocks {
 			if block.ID() == iotago.EmptyBlockID {

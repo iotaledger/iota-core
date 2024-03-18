@@ -118,7 +118,7 @@ func (r *RequestHandler) RewardsByOutputID(outputID iotago.OutputID, optSlot ...
 	if len(optSlot) > 0 {
 		genesisSlot := r.LatestAPI().ProtocolParameters().GenesisSlot()
 		if optSlot[0] < genesisSlot {
-			return nil, ierrors.Wrapf(echo.ErrBadRequest, "slot index (%d) before genesis slot (%d)", slot, genesisSlot)
+			return nil, ierrors.WithMessagef(echo.ErrBadRequest, "slot index (%d) before genesis slot (%d)", slot, genesisSlot)
 		}
 		slot = optSlot[0]
 	} else {

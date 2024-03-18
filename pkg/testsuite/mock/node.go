@@ -47,6 +47,11 @@ type InvalidSignedTransactionEvent struct {
 	Error    error
 }
 
+// Nodes is a helper function that creates a slice of nodes.
+func Nodes(nodes ...*Node) []*Node {
+	return nodes
+}
+
 type Node struct {
 	Testing *testing.T
 	logger  log.Logger
@@ -356,13 +361,4 @@ func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...o
 	}
 
 	return n.Validator.IssueValidationBlock(ctx, alias, n, opts...)
-}
-
-func ClientsForNodes(nodes []*Node) []Client {
-	clients := make([]Client, len(nodes))
-	for i, node := range nodes {
-		clients[i] = node.Client
-	}
-
-	return clients
 }

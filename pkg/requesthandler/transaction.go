@@ -35,6 +35,15 @@ func (r *RequestHandler) BlockFromTransactionID(transactionID iotago.Transaction
 	return r.BlockFromBlockID(blockID)
 }
 
+func (r *RequestHandler) BlockMetadataFromTransactionID(txID iotago.TransactionID) (*api.BlockMetadataResponse, error) {
+	blockID, err := r.BlockIDFromTransactionID(txID)
+	if err != nil {
+		return nil, ierrors.WithMessagef(echo.ErrNotFound, "failed to get block ID from transaction ID: %v", err)
+	}
+
+	return r.BlockMetadataFromBlockID(blockID)
+}
+
 func (r *RequestHandler) TransactionMetadataFromTransactionID(txID iotago.TransactionID) (*api.TransactionMetadataResponse, error) {
 	txMetadata, err := r.protocol.Engines.Main.Get().TxRetainer.TransactionMetadata(txID)
 	if err != nil {
@@ -46,13 +55,4 @@ func (r *RequestHandler) TransactionMetadataFromTransactionID(txID iotago.Transa
 	}
 
 	return txMetadata, nil
-}
-
-func (r *RequestHandler) BlockMetadataFromTransactionID(txID iotago.TransactionID) (*api.BlockMetadataResponse, error) {
-	blockID, err := r.BlockIDFromTransactionID(txID)
-	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrNotFound, "failed to get block ID from transaction ID: %v", err)
-	}
-
-	return r.BlockMetadataFromBlockID(blockID)
 }

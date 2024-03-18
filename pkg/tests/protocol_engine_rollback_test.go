@@ -152,7 +152,7 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 			ts.AssertAttestationsForSlot(slot, attestationBlocks, ts.Nodes()...)
 		}
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, mock.ClientsForNodes(ts.Nodes())...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.ClientsForNodes()...)
 	}
 
 	{
@@ -168,7 +168,7 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 			testsuite.WithEvictedSlot(14),
 		)
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, mock.ClientsForNodes(ts.Nodes())...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.ClientsForNodes()...)
 	}
 
 	newEngine, err := node3.Protocol.Engines.ForkAtSlot(13)
@@ -339,7 +339,7 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 			ts.AssertAttestationsForSlot(slot, attestationBlocks, ts.Nodes()...)
 		}
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, mock.ClientsForNodes(ts.Nodes())...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.ClientsForNodes()...)
 	}
 
 	// Update online committee.
@@ -362,7 +362,7 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 			testsuite.WithEvictedSlot(14),
 		)
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, mock.ClientsForNodes(ts.Nodes())...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.ClientsForNodes()...)
 	}
 
 	newEngine, err := node3.Protocol.Engines.ForkAtSlot(13)
@@ -533,7 +533,7 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 			ts.AssertAttestationsForSlot(slot, attestationBlocks, ts.Nodes()...)
 		}
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, mock.ClientsForNodes(ts.Nodes())...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.ClientsForNodes()...)
 	}
 
 	// Update online committee.
@@ -556,7 +556,7 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 			testsuite.WithEvictedSlot(17),
 		)
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, mock.ClientsForNodes(ts.Nodes())...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.ClientsForNodes()...)
 	}
 
 	newEngine, err := node3.Protocol.Engines.ForkAtSlot(15)
@@ -727,7 +727,7 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 			ts.AssertAttestationsForSlot(slot, attestationBlocks, ts.Nodes()...)
 		}
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, mock.ClientsForNodes(ts.Nodes())...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.ClientsForNodes()...)
 	}
 
 	// Update online committee.
@@ -750,7 +750,7 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 			testsuite.WithEvictedSlot(13),
 		)
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, mock.ClientsForNodes(ts.Nodes())...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.ClientsForNodes()...)
 	}
 
 	newEngine, err := node3.Protocol.Engines.ForkAtSlot(9)

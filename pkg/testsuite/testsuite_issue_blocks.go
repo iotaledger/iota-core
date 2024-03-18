@@ -222,7 +222,7 @@ func (t *TestSuite) IssueBlocksAtSlots(prefix string, slots []iotago.SlotIndex, 
 				if useCommitmentAtMinCommittableAge {
 					// Make sure that all nodes create blocks throughout the slot that commit to the same commitment at slot-minCommittableAge-1.
 					commitmentSlot := slot - t.API.ProtocolParameters().MinCommittableAge()
-					t.AssertCommitmentSlotIndexExists(commitmentSlot, mock.ClientsForNodes(nodes)...)
+					t.AssertCommitmentSlotIndexExists(commitmentSlot, t.ClientsForNodes(nodes...)...)
 					for _, node := range nodes {
 						commitment, err := node.Protocol.Engines.Main.Get().Storage.Commitments().Load(commitmentSlot)
 						require.NoError(t.Testing, err)
@@ -233,7 +233,7 @@ func (t *TestSuite) IssueBlocksAtSlots(prefix string, slots []iotago.SlotIndex, 
 					}
 				}
 			}
-			t.AssertBlocksExist(blocksInSlot, true, mock.ClientsForNodes(nodes)...)
+			t.AssertBlocksExist(blocksInSlot, true, t.ClientsForNodes(nodes...)...)
 		}
 	}
 
