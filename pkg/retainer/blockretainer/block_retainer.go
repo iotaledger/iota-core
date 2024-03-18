@@ -112,7 +112,7 @@ func (r *BlockRetainer) Reset() {
 	r.Lock()
 	defer r.Unlock()
 
-	r.cache.uncommittedBlockMetadataChanges.Clear()
+	r.cache.uncommittedBlockMetadata.Clear()
 }
 
 func (r *BlockRetainer) Shutdown() {
@@ -235,32 +235,29 @@ func (r *BlockRetainer) CommitSlot(committedSlot iotago.SlotIndex) error {
 	r.Lock()
 	defer r.Unlock()
 
-	slots := make(map[iotago.SlotIndex]map[iotago.BlockID]api.BlockState)
-	r.cache.uncommittedBlockMetadataChanges.ForEach(func(cacheSlot iotago.SlotIndex, blocks map[iotago.BlockID]api.BlockState) bool {
+	var innerErr error
+	r.cache.uncommittedBlockMetadata.ForEach(func(cacheSlot iotago.SlotIndex, blocks map[iotago.BlockID]api.BlockState) bool {
 		if cacheSlot <= committedSlot {
-			slots[committedSlot] = blocks
+			store, err := r.store(cacheSlot)
+			if err != nil {
+				innerErr = ierrors.Wrapf(err, "could not get retainer store for slot %d", cacheSlot)
+				return false
+			}
+
+			for blockID, state := range blocks {
+				if err = store.StoreBlockMetadata(blockID, state); err != nil {
+					innerErr = ierrors.Wrapf(err, "could not store block metadata for block %s", blockID.String())
+					return false
+				}
+			}
+
+			r.cache.uncommittedBlockMetadata.Delete(cacheSlot)
 		}
 
 		return true
 	})
-
-	// save committed changes to the database
-	for slotIndex, blockStates := range slots {
-		store, err := r.store(slotIndex)
-		if err != nil {
-			return ierrors.Wrapf(err, "could not get retainer store for slot %d", slotIndex)
-		}
-
-		for blockID, state := range blockStates {
-			if err := store.StoreBlockMetadata(blockID, state); err != nil {
-				return ierrors.Wrapf(err, "could not store block metadata for block %s", blockID.String())
-			}
-		}
-	}
-
-	// delete committed changes from the cache
-	for slotIndex := range slots {
-		r.cache.uncommittedBlockMetadataChanges.Delete(slotIndex)
+	if innerErr != nil {
+		return innerErr
 	}
 
 	r.latestCommittedSlot = committedSlot

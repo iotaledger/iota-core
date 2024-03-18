@@ -2,24 +2,23 @@ package blockretainer
 
 import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
-	"github.com/iotaledger/hive.go/runtime/options"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type cache struct {
-	uncommittedBlockMetadataChanges *shrinkingmap.ShrinkingMap[iotago.SlotIndex, map[iotago.BlockID]api.BlockState]
+	uncommittedBlockMetadata *shrinkingmap.ShrinkingMap[iotago.SlotIndex, map[iotago.BlockID]api.BlockState]
 }
 
-func newCache(opts ...options.Option[cache]) *cache {
-	return options.Apply(&cache{
-		uncommittedBlockMetadataChanges: shrinkingmap.New[iotago.SlotIndex, map[iotago.BlockID]api.BlockState](),
-	}, opts)
+func newCache() *cache {
+	return &cache{
+		uncommittedBlockMetadata: shrinkingmap.New[iotago.SlotIndex, map[iotago.BlockID]api.BlockState](),
+	}
 }
 
 // blockMetadataByID returns the block metadata of a block by its ID.
 func (c *cache) blockMetadataByID(blockID iotago.BlockID) (api.BlockState, bool) {
-	slotMap, exists := c.uncommittedBlockMetadataChanges.Get(blockID.Slot())
+	slotMap, exists := c.uncommittedBlockMetadata.Get(blockID.Slot())
 	if exists {
 		blockMetadata, found := slotMap[blockID]
 		if found {
@@ -31,10 +30,9 @@ func (c *cache) blockMetadataByID(blockID iotago.BlockID) (api.BlockState, bool)
 }
 
 func (c *cache) setBlockMetadata(blockID iotago.BlockID, state api.BlockState) {
-	blocks, exists := c.uncommittedBlockMetadataChanges.Get(blockID.Slot())
-	if !exists {
-		blocks = make(map[iotago.BlockID]api.BlockState)
-	}
+	blocks, _ := c.uncommittedBlockMetadata.GetOrCreate(blockID.Slot(), func() map[iotago.BlockID]api.BlockState {
+		return make(map[iotago.BlockID]api.BlockState)
+	})
 
 	prevState, ok := blocks[blockID]
 	if ok && state == api.BlockStateDropped {
@@ -45,5 +43,4 @@ func (c *cache) setBlockMetadata(blockID iotago.BlockID, state api.BlockState) {
 	}
 
 	blocks[blockID] = state
-	c.uncommittedBlockMetadataChanges.Set(blockID.Slot(), blocks)
 }
