@@ -75,6 +75,7 @@ type Orchestrator struct {
 func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.Engine, upgrade.Orchestrator] {
 	return module.Provide(func(e *engine.Engine) upgrade.Orchestrator {
 		o := NewOrchestrator(
+			e.NewSubModule("UpgradeOrchestrator"),
 			e.ErrorHandler("upgradegadget"),
 			e.Storage.DecidedUpgradeSignals(),
 			e.Storage.UpgradeSignals,
@@ -103,13 +104,13 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 			}
 		}
 
-		o.TriggerInitialized()
+		o.InitializedEvent().Trigger()
 
 		return o
 	})
 }
 
-func NewOrchestrator(errorHandler func(error),
+func NewOrchestrator(module module.Module, errorHandler func(error),
 	decidedUpgradeSignals epochstore.Store[model.VersionAndHash],
 	upgradeSignalsFunc func(slot iotago.SlotIndex) (*slotstore.Store[account.SeatIndex, *model.SignaledBlock], error),
 	apiProvider iotago.APIProvider,
@@ -118,6 +119,7 @@ func NewOrchestrator(errorHandler func(error),
 	epochForVersionFunc func(iotago.Version) (iotago.EpochIndex, bool),
 	seatManager seatmanager.SeatManager, opts ...options.Option[Orchestrator]) *Orchestrator {
 	return options.Apply(&Orchestrator{
+		Module:                    module,
 		errorHandler:              errorHandler,
 		latestSignals:             memstorage.NewIndexedStorage[iotago.SlotIndex, account.SeatIndex, *model.SignaledBlock](),
 		decidedUpgradeSignals:     decidedUpgradeSignals,
@@ -129,9 +131,13 @@ func NewOrchestrator(errorHandler func(error),
 
 		apiProvider: apiProvider,
 		seatManager: seatManager,
-	}, opts,
-		(*Orchestrator).TriggerConstructed,
-	)
+	}, opts, func(o *Orchestrator) {
+		o.ShutdownEvent().OnTrigger(func() {
+			o.StoppedEvent().Trigger()
+		})
+
+		o.ConstructedEvent().Trigger()
+	})
 }
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
@@ -139,10 +145,6 @@ func (o *Orchestrator) Reset() {
 	// latestSignals are evicted upon commitment,
 	// so we can safely clear the whole structure as it only contains data from uncommitted slots.
 	o.latestSignals.Clear()
-}
-
-func (o *Orchestrator) Shutdown() {
-	o.TriggerStopped()
 }
 
 func (o *Orchestrator) TrackValidationBlock(block *blocks.Block) {

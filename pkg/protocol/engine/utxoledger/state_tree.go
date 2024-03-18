@@ -52,7 +52,7 @@ func (m *Manager) CheckStateTree() bool {
 
 	if err := m.ForEachUnspentOutput(func(output *Output) bool {
 		if err := comparisonTree.Set(output.OutputID(), newStateMetadata(output)); err != nil {
-			panic(ierrors.Wrapf(err, "failed to set output in comparison tree, outputID: %s", output.OutputID()))
+			panic(ierrors.Wrapf(err, "failed to set output in comparison tree, outputID: %s", output.OutputID().ToHex()))
 		}
 
 		return true

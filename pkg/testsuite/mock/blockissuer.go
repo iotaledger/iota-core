@@ -45,7 +45,8 @@ type BlockIssuer struct {
 
 	keyManager *wallet.KeyManager
 	Client     Client
-	// LatestBlockIssuanceResp is the cached response from the latest query to the block issuance endpoint.
+
+	// latestBlockIssuanceResp is the cached response from the latest query to the block issuance endpoint.
 	latestBlockIssuanceResp   *api.IssuanceBlockHeaderResponse
 	blockIssuanceResponseUsed bool
 	mutex                     syncutils.RWMutex

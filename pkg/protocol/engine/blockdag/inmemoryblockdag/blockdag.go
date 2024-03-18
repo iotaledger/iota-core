@@ -4,7 +4,6 @@ import (
 	"sync/atomic"
 
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -35,15 +34,15 @@ type BlockDAG struct {
 	errorHandler func(error)
 
 	module.Module
-
-	log.Logger
 }
 
 func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engine, blockdag.BlockDAG] {
 	return module.Provide(func(e *engine.Engine) blockdag.BlockDAG {
-		b := New(e.Logger.NewChildLogger("BlockDAG"), e.Workers.CreateGroup("BlockDAG"), int(e.Storage.Settings().APIProvider().CommittedAPI().ProtocolParameters().MaxCommittableAge())*2, e.EvictionState, e.BlockCache, e.ErrorHandler("blockdag"), opts...)
+		b := New(e.NewSubModule("BlockDAG"), e.Workers.CreateGroup("BlockDAG"), int(e.Storage.Settings().APIProvider().CommittedAPI().ProtocolParameters().MaxCommittableAge())*2, e.EvictionState, e.BlockCache, e.ErrorHandler("blockdag"), opts...)
 
-		e.Constructed.OnTrigger(func() {
+		e.ConstructedEvent().OnTrigger(func() {
+			b.Init(e.SyncManager.LatestCommitment)
+
 			wp := b.workers.CreatePool("BlockDAG.Append", workerpool.WithWorkerCount(2))
 
 			e.Events.PreSolidFilter.BlockPreAllowed.Hook(func(block *model.Block) {
@@ -59,59 +58,35 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 				}
 			}, event.WithWorkerPool(wp))
 
-			b.latestCommitmentFunc = e.SyncManager.LatestCommitment
-
 			e.Events.BlockDAG.LinkTo(b.events)
-
-			b.TriggerInitialized()
 		})
 
 		return b
 	})
 }
 
-func (b *BlockDAG) setupBlock(block *blocks.Block) {
-	var unsolidParentsCount atomic.Int32
-	unsolidParentsCount.Store(int32(len(block.Parents())))
-
-	block.ForEachParent(func(parent iotago.Parent) {
-		parentBlock, exists := b.blockCache.Block(parent.ID)
-		if !exists {
-			b.errorHandler(ierrors.Errorf("failed to setup block %s, parent %s is missing", block.ID(), parent.ID))
-
-			return
-		}
-
-		parentBlock.Solid().OnUpdateOnce(func(_ bool, _ bool) {
-			if unsolidParentsCount.Add(-1) == 0 {
-				if block.SetSolid() {
-					b.events.BlockSolid.Trigger(block)
-				}
-			}
-		})
-
-		parentBlock.Invalid().OnUpdateOnce(func(_ bool, _ bool) {
-			if block.SetInvalid() {
-				b.events.BlockInvalid.Trigger(block, ierrors.Errorf("parent block %s is marked as invalid", parent.ID))
-			}
-		})
-	})
-}
-
 // New is the constructor for the BlockDAG and creates a new BlockDAG instance.
-func New(logger log.Logger, workers *workerpool.Group, unsolidCommitmentBufferSize int, evictionState *eviction.State, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
+func New(subModule module.Module, workers *workerpool.Group, unsolidCommitmentBufferSize int, evictionState *eviction.State, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
 	return options.Apply(&BlockDAG{
-		Logger:                logger,
+		Module:                subModule,
 		events:                blockdag.NewEvents(),
 		evictionState:         evictionState,
 		blockCache:            blockCache,
 		workers:               workers,
 		errorHandler:          errorHandler,
 		uncommittedSlotBlocks: buffer.NewUnsolidCommitmentBuffer[*blocks.Block](unsolidCommitmentBufferSize),
-	}, opts, (*BlockDAG).TriggerConstructed, (*BlockDAG).TriggerInitialized)
+	}, opts, func(b *BlockDAG) {
+		b.ShutdownEvent().OnTrigger(b.shutdown)
+
+		b.ConstructedEvent().Trigger()
+	})
 }
 
-var _ blockdag.BlockDAG = new(BlockDAG)
+func (b *BlockDAG) Init(latestCommitmentFunc func() *model.Commitment) {
+	b.latestCommitmentFunc = latestCommitmentFunc
+
+	b.InitializedEvent().Trigger()
+}
 
 // Append is used to append new Blocks to the BlockDAG. It is the main function of the BlockDAG that triggers Events.
 func (b *BlockDAG) Append(modelBlock *model.Block) (block *blocks.Block, wasAppended bool, err error) {
@@ -158,9 +133,32 @@ func (b *BlockDAG) Reset() {
 	b.uncommittedSlotBlocks.Reset()
 }
 
-func (b *BlockDAG) Shutdown() {
-	b.TriggerStopped()
-	b.workers.Shutdown()
+func (b *BlockDAG) setupBlock(block *blocks.Block) {
+	var unsolidParentsCount atomic.Int32
+	unsolidParentsCount.Store(int32(len(block.Parents())))
+
+	block.ForEachParent(func(parent iotago.Parent) {
+		parentBlock, exists := b.blockCache.Block(parent.ID)
+		if !exists {
+			b.errorHandler(ierrors.Errorf("failed to setup block %s, parent %s is missing", block.ID(), parent.ID))
+
+			return
+		}
+
+		parentBlock.Solid().OnUpdateOnce(func(_ bool, _ bool) {
+			if unsolidParentsCount.Add(-1) == 0 {
+				if block.SetSolid() {
+					b.events.BlockSolid.Trigger(block)
+				}
+			}
+		})
+
+		parentBlock.Invalid().OnUpdateOnce(func(_ bool, _ bool) {
+			if block.SetInvalid() {
+				b.events.BlockInvalid.Trigger(block, ierrors.Errorf("parent block %s is marked as invalid", parent.ID))
+			}
+		})
+	})
 }
 
 // append tries to append the given Block to the BlockDAG.
@@ -236,4 +234,10 @@ func (b *BlockDAG) registerChild(child *blocks.Block, parent iotago.Parent) {
 	if parentBlock, _ := b.GetOrRequestBlock(parent.ID); parentBlock != nil {
 		parentBlock.AppendChild(child, parent.Type)
 	}
+}
+
+func (b *BlockDAG) shutdown() {
+	b.workers.Shutdown()
+
+	b.StoppedEvent().Trigger()
 }

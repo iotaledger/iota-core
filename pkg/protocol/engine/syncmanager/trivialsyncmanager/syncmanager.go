@@ -55,7 +55,7 @@ type SyncManager struct {
 // NewProvider creates a new SyncManager provider.
 func NewProvider(opts ...options.Option[SyncManager]) module.Provider[*engine.Engine, syncmanager.SyncManager] {
 	return module.Provide(func(e *engine.Engine) syncmanager.SyncManager {
-		s := New(e, e.Storage.Settings().LatestCommitment(), e.Storage.Settings().LatestFinalizedSlot(), opts...)
+		s := New(e.NewSubModule("SyncManager"), e, e.Storage.Settings().LatestCommitment(), e.Storage.Settings().LatestFinalizedSlot(), opts...)
 		asyncOpt := event.WithWorkerPool(e.Workers.CreatePool("SyncManager", workerpool.WithWorkerCount(1)))
 
 		e.Events.BlockGadget.BlockAccepted.Hook(func(b *blocks.Block) {
@@ -75,10 +75,10 @@ func NewProvider(opts ...options.Option[SyncManager]) module.Provider[*engine.En
 				s.updateBootstrappedStatus()
 			}
 
-			syncChaged := s.updateSyncStatus()
+			syncChanged := s.updateSyncStatus()
 			commitmentChanged := s.updateLatestCommitment(commitment)
 
-			if syncChaged || commitmentChanged {
+			if syncChanged || commitmentChanged {
 				s.triggerUpdate()
 			}
 		}, asyncOpt)
@@ -96,14 +96,14 @@ func NewProvider(opts ...options.Option[SyncManager]) module.Provider[*engine.En
 		}, asyncOpt)
 
 		e.Events.SyncManager.LinkTo(s.events)
-		s.TriggerInitialized()
 
 		return s
 	})
 }
 
-func New(e *engine.Engine, latestCommitment *model.Commitment, finalizedSlot iotago.SlotIndex, opts ...options.Option[SyncManager]) *SyncManager {
-	return options.Apply(&SyncManager{
+func New(subModule module.Module, e *engine.Engine, latestCommitment *model.Commitment, finalizedSlot iotago.SlotIndex, opts ...options.Option[SyncManager]) *SyncManager {
+	return module.InitSimpleLifecycle(options.Apply(&SyncManager{
+		Module:                 subModule,
 		events:                 syncmanager.NewEvents(),
 		engine:                 e,
 		syncThreshold:          10 * time.Second,
@@ -122,7 +122,7 @@ func New(e *engine.Engine, latestCommitment *model.Commitment, finalizedSlot iot
 				return time.Since(e.Clock.Accepted().RelativeTime()) < s.optsBootstrappedThreshold && e.Notarization.IsBootstrapped()
 			}
 		}
-	})
+	}))
 }
 
 func (s *SyncManager) SyncStatus() *syncmanager.SyncStatus {
@@ -165,10 +165,6 @@ func (s *SyncManager) Reset() {
 	// Mark the synced flag as false,
 	// because we clear the latest accepted blocks and return the whole state to the last committed slot.
 	s.isSynced = false
-}
-
-func (s *SyncManager) Shutdown() {
-	s.TriggerStopped()
 }
 
 func (s *SyncManager) updateLastAcceptedBlock(id iotago.BlockID) (changed bool) {

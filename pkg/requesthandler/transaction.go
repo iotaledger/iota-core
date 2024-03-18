@@ -16,7 +16,7 @@ func (r *RequestHandler) BlockIDFromTransactionID(transactionID iotago.Transacti
 
 	output, spent, err := r.protocol.Engines.Main.Get().Ledger.OutputOrSpent(outputID)
 	if err != nil {
-		return iotago.EmptyBlockID, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s: %s", outputID.ToHex(), err)
+		return iotago.EmptyBlockID, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to get output %s: %w", outputID.ToHex(), err)
 	}
 
 	if output != nil {
@@ -39,10 +39,10 @@ func (r *RequestHandler) TransactionMetadataFromTransactionID(txID iotago.Transa
 	txMetadata, err := r.protocol.Engines.Main.Get().TxRetainer.TransactionMetadata(txID)
 	if err != nil {
 		if ierrors.Is(err, txretainer.ErrEntryNotFound) {
-			return nil, ierrors.WithMessagef(echo.ErrNotFound, "transaction metadata not found: %s", txID.ToHex())
+			return nil, ierrors.WithMessagef(echo.ErrNotFound, "transaction metadata for transaction %s not found", txID.ToHex())
 		}
 
-		return nil, ierrors.Join(echo.ErrInternalServerError, ierrors.Wrapf(err, "error when retrieving transaction metadata: %s", txID.ToHex()))
+		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to retrieve transaction metadata for transaction %s: %w", txID.ToHex(), err)
 	}
 
 	return txMetadata, nil

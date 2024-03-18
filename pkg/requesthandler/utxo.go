@@ -14,10 +14,10 @@ func (r *RequestHandler) OutputFromOutputID(outputID iotago.OutputID) (*api.Outp
 	output, err := r.protocol.Engines.Main.Get().Ledger.Output(outputID)
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			return nil, ierrors.Wrapf(echo.ErrNotFound, "output %s not found in the Ledger", outputID.ToHex())
+			return nil, ierrors.WithMessagef(echo.ErrNotFound, "output %s not found in the Ledger", outputID.ToHex())
 		}
 
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %s", outputID.ToHex(), err)
+		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to get output %s from the ledger: %w", outputID.ToHex(), err)
 	}
 
 	return &api.OutputResponse{
@@ -30,10 +30,10 @@ func (r *RequestHandler) OutputMetadataFromOutputID(outputID iotago.OutputID) (*
 	output, spent, err := r.protocol.Engines.Main.Get().Ledger.OutputOrSpent(outputID)
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			return nil, ierrors.Wrapf(echo.ErrNotFound, "output %s not found in the Ledger", outputID.ToHex())
+			return nil, ierrors.WithMessagef(echo.ErrNotFound, "output %s not found in the Ledger", outputID.ToHex())
 		}
 
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %s", outputID.ToHex(), err)
+		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %w", outputID.ToHex(), err)
 	}
 
 	if spent != nil {
@@ -47,16 +47,16 @@ func (r *RequestHandler) OutputWithMetadataFromOutputID(outputID iotago.OutputID
 	output, spent, err := r.protocol.Engines.Main.Get().Ledger.OutputOrSpent(outputID)
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			return nil, ierrors.Wrapf(echo.ErrNotFound, "output %s not found in the Ledger", outputID.ToHex())
+			return nil, ierrors.WithMessagef(echo.ErrNotFound, "output %s not found in the Ledger", outputID.ToHex())
 		}
 
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %s", outputID.ToHex(), err)
+		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %w", outputID.ToHex(), err)
 	}
 
 	if spent != nil {
 		metadata, err := r.newSpentMetadataResponse(spent)
 		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load spent output metadata: %s", err)
+			return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to load spent output metadata: %w", err)
 		}
 
 		return &api.OutputWithMetadataResponse{
@@ -88,7 +88,7 @@ func (r *RequestHandler) newOutputMetadataResponse(output *utxoledger.Output) (*
 		includedSlot >= r.protocol.Engines.Main.Get().CommittedAPI().ProtocolParameters().GenesisSlot() {
 		includedCommitment, err := r.protocol.Engines.Main.Get().Storage.Commitments().Load(includedSlot)
 		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", includedSlot, err)
+			return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", includedSlot, err)
 		}
 		includedCommitmentID = includedCommitment.ID()
 	}
@@ -118,7 +118,7 @@ func (r *RequestHandler) newSpentMetadataResponse(spent *utxoledger.Spent) (*api
 		spentSlot >= r.protocol.Engines.Main.Get().CommittedAPI().ProtocolParameters().GenesisSlot() {
 		spentCommitment, err := r.protocol.Engines.Main.Get().Storage.Commitments().Load(spentSlot)
 		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", spentSlot, err)
+			return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to load commitment with index %d: %w", spentSlot, err)
 		}
 		spentCommitmentID = spentCommitment.ID()
 	}

@@ -41,6 +41,7 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 	return module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
 		return options.Apply(
 			&SeatManager{
+				Module:         e.NewSubModule("SeatManager"),
 				apiProvider:    e,
 				events:         seatmanager.NewEvents(),
 				committeeStore: e.Storage.Committee(),
@@ -52,9 +53,7 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 
 				e.Events.SeatManager.LinkTo(s.events)
 
-				e.Constructed.OnTrigger(func() {
-					s.TriggerConstructed()
-
+				e.ConstructedEvent().OnTrigger(func() {
 					// We need to mark validators as active upon solidity of blocks as otherwise we would not be able to
 					// recover if no node was part of the online committee anymore.
 					e.Events.PostSolidFilter.BlockAllowed.Hook(func(block *blocks.Block) {
@@ -71,7 +70,15 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 
 						s.events.BlockProcessed.Trigger(block)
 					})
+
+					s.ShutdownEvent().OnTrigger(func() {
+						s.StoppedEvent().Trigger()
+					})
+
+					s.InitializedEvent().Trigger()
 				})
+
+				s.ConstructedEvent().Trigger()
 			})
 	})
 }
@@ -173,7 +180,7 @@ func (s *SeatManager) SeatCountInEpoch(epoch iotago.EpochIndex) int {
 }
 
 func (s *SeatManager) Shutdown() {
-	s.TriggerStopped()
+	s.StoppedEvent().Trigger()
 }
 
 func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex, activityTime time.Time) error {

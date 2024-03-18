@@ -87,19 +87,19 @@ func (c *CommitmentAPI) Mutations() (acceptedBlocksBySlotCommitment map[iotago.C
 // Roots returns the roots of the slot.
 func (c *CommitmentAPI) Roots() (committedRoots *iotago.Roots, err error) {
 	if c.engine.SyncManager.LatestCommitment().Slot() < c.CommitmentID.Slot() {
-		return nil, ierrors.Errorf("slot %d is not committed yet", c.CommitmentID)
+		return nil, ierrors.Errorf("slot %d is not committed yet", c.CommitmentID.Slot())
 	}
 
 	rootsStorage, err := c.engine.Storage.Roots(c.CommitmentID.Slot())
 	if err != nil {
-		return nil, ierrors.Errorf("no roots storage for slot %d", c.CommitmentID)
+		return nil, ierrors.Errorf("no roots storage for slot %d", c.CommitmentID.Slot())
 	}
 
 	roots, _, err := rootsStorage.Load(c.CommitmentID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to load roots for slot %d", c.CommitmentID)
+		return nil, ierrors.Wrapf(err, "failed to load roots for slot %d", c.CommitmentID.Slot())
 	} else if roots == nil {
-		return nil, ierrors.Errorf("roots for slot %d are not known, yet", c.CommitmentID)
+		return nil, ierrors.Errorf("roots for slot %d are not known, yet", c.CommitmentID.Slot())
 	}
 
 	return roots, nil
@@ -108,7 +108,7 @@ func (c *CommitmentAPI) Roots() (committedRoots *iotago.Roots, err error) {
 // BlocksIDsBySlotCommitmentID returns the accepted block IDs of the slot grouped by their SlotCommitmentID.
 func (c *CommitmentAPI) BlocksIDsBySlotCommitmentID() (map[iotago.CommitmentID]iotago.BlockIDs, error) {
 	if c.engine.SyncManager.LatestCommitment().Slot() < c.CommitmentID.Slot() {
-		return nil, ierrors.Errorf("slot %d is not committed yet", c.CommitmentID)
+		return nil, ierrors.Errorf("slot %d is not committed yet", c.CommitmentID.Slot())
 	}
 
 	store, err := c.engine.Storage.Blocks(c.CommitmentID.Slot())
@@ -129,7 +129,7 @@ func (c *CommitmentAPI) BlocksIDsBySlotCommitmentID() (map[iotago.CommitmentID]i
 
 func (c *CommitmentAPI) TransactionIDs() (iotago.TransactionIDs, error) {
 	if c.engine.SyncManager.LatestCommitment().Slot() < c.CommitmentID.Slot() {
-		return nil, ierrors.Errorf("slot %d is not committed yet", c.CommitmentID)
+		return nil, ierrors.Errorf("slot %d is not committed yet", c.CommitmentID.Slot())
 	}
 
 	store, err := c.engine.Storage.Mutations(c.CommitmentID.Slot())

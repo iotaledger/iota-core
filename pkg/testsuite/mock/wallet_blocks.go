@@ -8,7 +8,5 @@ import (
 )
 
 func (w *Wallet) IssueBasicBlock(ctx context.Context, blockName string, opts ...options.Option[BasicBlockParams]) (*blocks.Block, error) {
-	block, err := w.BlockIssuer.IssueBasicBlock(ctx, blockName, opts...)
-
-	return block, err
+	return w.BlockIssuer.IssueBasicBlock(ctx, blockName, opts...)
 }

@@ -338,6 +338,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				nodeD := ts.AddNode("nodeD")
 				nodeD.Initialize(true, append(nodeOptions,
 					protocol.WithSnapshotPath(snapshotPath),
+					protocol.WithCommitmentCheck(true),
 					protocol.WithBaseDirectory(ts.Directory.PathWithCreate(nodeD.Name)),
 					protocol.WithEngineOptions(
 						engine.WithBlockRequesterOptions(
@@ -487,6 +488,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		nodeD := ts.AddNode("nodeE")
 		nodeD.Initialize(true, append(nodeOptions,
 			protocol.WithSnapshotPath(snapshotPath),
+			protocol.WithCommitmentCheck(true),
 			protocol.WithBaseDirectory(ts.Directory.PathWithCreate(nodeD.Name)),
 			protocol.WithEngineOptions(
 				engine.WithBlockRequesterOptions(

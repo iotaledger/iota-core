@@ -126,7 +126,7 @@ func (c *Commitment) String() string {
 		panic(err)
 	}
 	var out bytes.Buffer
-	if json.Indent(&out, encode, "", "  ") != nil {
+	if err = json.Indent(&out, encode, "", "  "); err != nil {
 		panic(err)
 	}
 

@@ -14,7 +14,7 @@ import (
 func (r *RequestHandler) BlockFromBlockID(blockID iotago.BlockID) (*iotago.Block, error) {
 	block, exists := r.protocol.Engines.Main.Get().Block(blockID)
 	if !exists {
-		return nil, ierrors.Wrapf(echo.ErrNotFound, "block not found: %s", blockID.ToHex())
+		return nil, ierrors.WithMessagef(echo.ErrNotFound, "block %s not found", blockID)
 	}
 
 	return block.ProtocolBlock(), nil
@@ -24,10 +24,10 @@ func (r *RequestHandler) BlockMetadataFromBlockID(blockID iotago.BlockID) (*api.
 	blockMetadata, err := r.protocol.Engines.Main.Get().BlockRetainer.BlockMetadata(blockID)
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			return nil, ierrors.Wrapf(echo.ErrNotFound, "block not found: %s", blockID.ToHex())
+			return nil, ierrors.WithMessagef(echo.ErrNotFound, "block %s not found", blockID)
 		}
 
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get block metadata %s: %s", blockID.ToHex(), err)
+		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to get block metadata %s: %w", blockID, err)
 	}
 
 	return blockMetadata, nil
@@ -36,7 +36,7 @@ func (r *RequestHandler) BlockMetadataFromBlockID(blockID iotago.BlockID) (*api.
 func (r *RequestHandler) BlockWithMetadataFromBlockID(blockID iotago.BlockID) (*api.BlockWithMetadataResponse, error) {
 	block, exists := r.protocol.Engines.Main.Get().Block(blockID)
 	if !exists {
-		return nil, ierrors.Wrapf(echo.ErrNotFound, "no transaction found for block ID %s", blockID.ToHex())
+		return nil, ierrors.WithMessagef(echo.ErrNotFound, "no transaction found for block ID %s", blockID)
 	}
 
 	blockMetadata, err := r.BlockMetadataFromBlockID(blockID)
@@ -53,38 +53,49 @@ func (r *RequestHandler) BlockWithMetadataFromBlockID(blockID iotago.BlockID) (*
 func (r *RequestHandler) BlockIssuance() (*api.IssuanceBlockHeaderResponse, error) {
 	references := r.protocol.Engines.Main.Get().TipSelection.SelectTips(iotago.BasicBlockMaxParents)
 	if len(references[iotago.StrongParentType]) == 0 {
-		return nil, ierrors.Wrap(echo.ErrServiceUnavailable, "no strong parents available")
+		return nil, ierrors.WithMessage(echo.ErrServiceUnavailable, "no strong parents available")
 	}
 
 	// get the latest parent block issuing time
 	var latestParentBlockIssuingTime time.Time
-	for _, parentType := range []iotago.ParentsType{iotago.StrongParentType, iotago.WeakParentType, iotago.ShallowLikeParentType} {
-		for _, blockID := range references[parentType] {
 
-			block, exists := r.protocol.Engines.Main.Get().Block(blockID)
-			if !exists {
-				// check if this is genesis block
-				if blockID == r.CommittedAPI().ProtocolParameters().GenesisBlockID() {
-					continue
-				}
-				// or root block
-				rootBlocks, err := r.protocol.Engines.Main.Get().Storage.RootBlocks(blockID.Slot())
-				if err != nil {
-					return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get root blocks for slot %d: %s", blockID.Slot(), err)
-				}
-				isRootBlock, err := rootBlocks.Has(blockID)
-				if err != nil {
-					return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to check if block %s is root block: %s", blockID.ToHex(), err)
-				}
-				if isRootBlock {
-					continue
-				}
-
-				return nil, ierrors.Wrapf(echo.ErrNotFound, "no block found for parent, block ID: %s", blockID.ToHex())
+	checkParent := func(parentBlockID iotago.BlockID) error {
+		parentBlock, exists := r.protocol.Engines.Main.Get().Block(parentBlockID)
+		if !exists {
+			// check if this is the genesis block
+			if parentBlockID == r.CommittedAPI().ProtocolParameters().GenesisBlockID() {
+				return nil
 			}
 
-			if latestParentBlockIssuingTime.Before(block.ProtocolBlock().Header.IssuingTime) {
-				latestParentBlockIssuingTime = block.ProtocolBlock().Header.IssuingTime
+			// or a root block
+			rootBlocks, err := r.protocol.Engines.Main.Get().Storage.RootBlocks(parentBlockID.Slot())
+			if err != nil {
+				return ierrors.Wrapf(echo.ErrInternalServerError, "failed to get root blocks for slot %d: %w", parentBlockID.Slot(), err)
+			}
+
+			isRootBlock, err := rootBlocks.Has(parentBlockID)
+			if err != nil {
+				return ierrors.WithMessagef(echo.ErrInternalServerError, "failed to check if block %s is a root block: %w", parentBlockID, err)
+			}
+
+			if isRootBlock {
+				return nil
+			}
+
+			return ierrors.WithMessagef(echo.ErrNotFound, "no block found for block ID %s", parentBlockID)
+		}
+
+		if latestParentBlockIssuingTime.Before(parentBlock.ProtocolBlock().Header.IssuingTime) {
+			latestParentBlockIssuingTime = parentBlock.ProtocolBlock().Header.IssuingTime
+		}
+
+		return nil
+	}
+
+	for _, parentType := range []iotago.ParentsType{iotago.StrongParentType, iotago.WeakParentType, iotago.ShallowLikeParentType} {
+		for _, parentBlockID := range references[parentType] {
+			if err := checkParent(parentBlockID); err != nil {
+				return nil, ierrors.Wrap(err, "failed to retrieve parents")
 			}
 		}
 	}

@@ -16,18 +16,20 @@ import (
 // NewProvider creates a new TipSelection provider, that can be used to inject the component into an engine.
 func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.Engine, tipselection.TipSelection] {
 	return module.Provide(func(e *engine.Engine) tipselection.TipSelection {
-		t := New(opts...)
+		t := New(e.NewSubModule("TipSelection"), opts...)
 
-		e.Constructed.OnTrigger(func() {
+		e.ConstructedEvent().OnTrigger(func() {
 			// wait for submodules to be constructed (so all of their properties are available)
-			module.OnAllConstructed(func() {
+			module.WaitAll(module.Module.ConstructedEvent, e.TipManager, e.Ledger, e.SybilProtection).OnTrigger(func() {
 				t.Construct(e.TipManager, e.Ledger.SpendDAG(), e.Ledger.MemPool().TransactionMetadata, func() iotago.BlockID { return lo.Return1(e.EvictionState.LatestActiveRootBlock()) }, DynamicLivenessThreshold(func() int {
 					return e.SybilProtection.SeatManager().OnlineCommittee().Size()
 				}))
-			}, e.TipManager, e.Ledger, e.SybilProtection)
+			})
 		})
 
-		e.Shutdown.OnTrigger(t.Shutdown)
+		e.ShutdownEvent().OnTrigger(func() {
+			t.ShutdownEvent().Trigger()
+		})
 
 		return t
 	})

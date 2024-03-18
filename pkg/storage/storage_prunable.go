@@ -1,8 +1,11 @@
 package storage
 
 import (
+	"io"
+
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
@@ -107,6 +110,141 @@ func (s *Storage) Roots(slot iotago.SlotIndex) (*slotstore.Store[iotago.Commitme
 	}
 
 	return s.prunable.Roots(slot)
+}
+
+func (s *Storage) ExportRoots(writer io.WriteSeeker, targetCommitment *iotago.Commitment) error {
+
+	slotIndex := targetCommitment.Slot
+
+	if slotIndex <= s.Settings().APIProvider().CommittedAPI().ProtocolParameters().GenesisSlot() {
+		return nil
+	}
+
+	commitmentID, err := targetCommitment.ID()
+
+	if err != nil {
+		return ierrors.Wrap(err, "can not retrieve commitment id")
+	}
+	// Load root storage from prunable storage
+	rootsStorage, errRoots := s.Roots(slotIndex)
+
+	if errRoots != nil {
+		return ierrors.Wrap(err, "failed to load roots storage")
+	}
+
+	roots, exists, errLoad := rootsStorage.Load(commitmentID)
+	if errLoad != nil {
+		return ierrors.Wrap(err, "failed to load roots from prunable storage")
+	} else if !exists {
+		return ierrors.Wrap(err, "roots not found")
+	}
+
+	if errWrite := stream.Write(writer, roots.AccountRoot); errWrite != nil {
+		return ierrors.Wrapf(err, "failed to write account root bytes")
+	}
+	if errWrite := stream.Write(writer, roots.AttestationsRoot); errWrite != nil {
+		return ierrors.Wrapf(err, "failed to write attestation root bytes")
+	}
+	if errWrite := stream.Write(writer, roots.CommitteeRoot); errWrite != nil {
+		return ierrors.Wrapf(err, "failed to write committee root bytes")
+	}
+	if errWrite := stream.Write(writer, roots.ProtocolParametersHash); errWrite != nil {
+		return ierrors.Wrapf(err, "failed to write protocol parameters hash root bytes")
+	}
+	if errWrite := stream.Write(writer, roots.RewardsRoot); errWrite != nil {
+		return ierrors.Wrapf(err, "failed to write rewards root bytes")
+	}
+	if errWrite := stream.Write(writer, roots.StateMutationRoot); errWrite != nil {
+		return ierrors.Wrapf(err, "failed to write state mutation root bytes")
+	}
+	if errWrite := stream.Write(writer, roots.StateRoot); errWrite != nil {
+		return ierrors.Wrapf(err, "failed to write state root bytes")
+	}
+	if errWrite := stream.Write(writer, roots.TangleRoot); errWrite != nil {
+		return ierrors.Wrapf(err, "failed to write tangle root bytes")
+	}
+
+	return err
+}
+
+func (s *Storage) ImportRoots(reader io.ReadSeeker, targetCommitment *model.Commitment) error {
+
+	slotIndex := targetCommitment.Commitment().Slot
+
+	if slotIndex <= s.Settings().APIProvider().CommittedAPI().ProtocolParameters().GenesisSlot() {
+		return nil
+	}
+
+	accountRoot, err := stream.Read[iotago.Identifier](reader)
+	if err != nil {
+		return ierrors.Wrap(err, "can not retrieve account root")
+	}
+
+	attestationRoot, err := stream.Read[iotago.Identifier](reader)
+	if err != nil {
+		return ierrors.Wrap(err, "can not retrieve attestation root")
+	}
+
+	committeeRoot, err := stream.Read[iotago.Identifier](reader)
+	if err != nil {
+		return ierrors.Wrap(err, "can not retrieve committee root")
+	}
+
+	protocolParametersHash, err := stream.Read[iotago.Identifier](reader)
+	if err != nil {
+		return ierrors.Wrap(err, "can not retrieve protocol parameters hash")
+	}
+
+	rewardsRoot, err := stream.Read[iotago.Identifier](reader)
+	if err != nil {
+		return ierrors.Wrap(err, "can not retrieve rewards root")
+	}
+
+	stateMutationRoot, err := stream.Read[iotago.Identifier](reader)
+	if err != nil {
+		return ierrors.Wrap(err, "can not retrieve state mutation root")
+	}
+
+	stateRoot, err := stream.Read[iotago.Identifier](reader)
+	if err != nil {
+		return ierrors.Wrap(err, "can not retrieve state root")
+	}
+
+	tangleRoot, err := stream.Read[iotago.Identifier](reader)
+	if err != nil {
+		return ierrors.Wrap(err, "can not retrieve tangle root")
+	}
+
+	commitmentID, err := targetCommitment.Commitment().ID()
+
+	if err != nil {
+		return ierrors.Wrap(err, "can not retrieve commitment id")
+	}
+	// Load root storage from prunable storage
+	rootsStorage, errRoots := s.Roots(slotIndex)
+
+	if errRoots != nil {
+		return ierrors.Wrap(err, "failed to load roots storage")
+	}
+
+	roots := iotago.NewRoots(
+		tangleRoot,
+		stateMutationRoot,
+		attestationRoot,
+		stateRoot,
+		accountRoot,
+		committeeRoot,
+		rewardsRoot,
+		protocolParametersHash,
+	)
+
+	errStore := rootsStorage.Store(commitmentID, roots)
+	if errStore != nil {
+		return ierrors.Wrap(err, "unable to store roots in storage")
+	}
+
+	return nil
+
 }
 
 func (s *Storage) BlockMetadata(slot iotago.SlotIndex) (*slotstore.BlockMetadataStore, error) {

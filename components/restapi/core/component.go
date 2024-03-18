@@ -290,7 +290,7 @@ func checkNodeSynced() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			if !deps.RequestHandler.IsNodeSynced() {
-				return ierrors.Wrap(echo.ErrServiceUnavailable, "node is not synced")
+				return ierrors.WithMessage(echo.ErrServiceUnavailable, "node is not synced")
 			}
 
 			return next(c)

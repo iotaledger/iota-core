@@ -106,6 +106,7 @@
       "path": "testnet/snapshot.bin",
       "depth": 5
     },
+    "commitmentCheck": true,
     "filter": {
       "maxAllowedClockDrift": "5s"
     },

@@ -119,7 +119,7 @@ func (r *transactionRetainerDatabase) TransactionMetadataByID(transactionID iota
 			Take(txMeta).Error
 	}); err != nil {
 		if !ierrors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ierrors.Wrapf(err, "failed to query transaction metadata for transaction ID %s", transactionID.ToHex())
+			return nil, ierrors.Wrapf(err, "failed to query transaction metadata for transaction ID %s", transactionID)
 		}
 
 		// no entry found

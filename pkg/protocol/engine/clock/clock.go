@@ -19,8 +19,8 @@ type Clock interface {
 	// Reset resets the time values tracked in the clock to the given time.
 	Reset(newTime time.Time)
 
-	// Interface embeds the required methods of the module.Interface.
-	module.Interface
+	// Module embeds the required methods of the modular framework.
+	module.Module
 }
 
 // Snapshot contains the snapshot of all time values tracked in the clock.

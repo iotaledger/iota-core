@@ -253,6 +253,7 @@ func (w *DockerWallet) TransitionImplicitAccountToAccountOutput(inputID iotago.O
 		SetCreationSlot(currentSlot).
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
 		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: accountID}).
+		AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("account")}).
 		AllotAllMana(currentSlot, accountID, 0).
 		Build()
 	require.NoError(w.Testing, err)
@@ -296,6 +297,7 @@ func (w *DockerWallet) CreateDelegationFromInput(issuerID iotago.AccountID, vali
 		AddOutput(delegationOutput).
 		SetCreationSlot(currentSlot).
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
+		AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("delegation")}).
 		AllotAllMana(currentSlot, issuerID, 0).
 		Build()
 	require.NoError(w.Testing, err)
@@ -353,6 +355,7 @@ func (w *DockerWallet) CreateFoundryAndNativeTokensFromInput(issuerID iotago.Acc
 		SetCreationSlot(currentSlot).
 		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: issuerID}).
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
+		AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("foundry")}).
 		AllotAllMana(currentSlot, issuerID, 0).
 		Build()
 	require.NoError(w.Testing, err)
@@ -425,6 +428,7 @@ func (w *DockerWallet) TransitionFoundry(issuerID iotago.AccountID, inputID iota
 		SetCreationSlot(currentSlot).
 		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: issuer.ID}).
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
+		AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("foundry")}).
 		AllotAllMana(currentSlot, issuerID, 0).
 		Build()
 	require.NoError(w.Testing, err)
@@ -469,6 +473,7 @@ func (w *DockerWallet) CreateNFTFromInput(issuerID iotago.AccountID, inputID iot
 		SetCreationSlot(currentSlot).
 		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: issuerID}).
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
+		AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("nft")}).
 		AllotAllMana(currentSlot, issuerID, 0).
 		Build()
 	require.NoError(w.Testing, err)
@@ -498,6 +503,7 @@ func (w *DockerWallet) CreateBasicOutputFromInput(input *mock.OutputData, issuer
 		AddOutput(basicOutput).
 		SetCreationSlot(currentSlot).
 		AllotAllMana(currentSlot, issuerAccountID, 0).
+		AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("basic")}).
 		Build()
 	require.NoError(w.Testing, err)
 

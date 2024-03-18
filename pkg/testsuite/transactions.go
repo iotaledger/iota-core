@@ -89,13 +89,13 @@ func (t *TestSuite) assertTransactionsInCacheWithFunc(expectedTransactions []*io
 			require.NoError(t.Testing, err)
 
 			t.Eventually(func() error {
-				blockFromCache, exists := node.Protocol.Engines.Main.Get().Ledger.TransactionMetadata(transactionID)
+				transactionFromCache, exists := node.Protocol.Engines.Main.Get().Ledger.TransactionMetadata(transactionID)
 				if !exists {
 					return ierrors.Errorf("assertTransactionsInCacheWithFunc: %s: transaction %s does not exist", node.Name, transactionID)
 				}
 
-				if expectedPropertyState != propertyFunc(blockFromCache) {
-					return ierrors.Errorf("assertTransactionsInCacheWithFunc: %s: transaction %s: expected %v, got %v", node.Name, blockFromCache.ID(), expectedPropertyState, propertyFunc(blockFromCache))
+				if expectedPropertyState != propertyFunc(transactionFromCache) {
+					return ierrors.Errorf("assertTransactionsInCacheWithFunc: %s: transaction %s: expected %v, got %v", node.Name, transactionFromCache.ID(), expectedPropertyState, propertyFunc(transactionFromCache))
 				}
 
 				return nil

@@ -88,7 +88,7 @@ func (s *Storage) PruneByDepth(epochDepth iotago.EpochIndex) (firstPruned iotago
 
 	latestPrunableEpoch := s.latestPrunableEpoch()
 	if epochDepth > latestPrunableEpoch {
-		return 0, 0, ierrors.Wrapf(database.ErrNoPruningNeeded, "epochDepth %d is too big, latest prunable epoch is %d", epochDepth, latestPrunableEpoch)
+		return 0, 0, ierrors.WithMessagef(database.ErrNoPruningNeeded, "epochDepth %d is too big, latest prunable epoch is %d", epochDepth, latestPrunableEpoch)
 	}
 
 	// We need to do (epochDepth-1) because latestPrunableEpoch is already making sure that we keep at least one full epoch.
@@ -100,7 +100,7 @@ func (s *Storage) PruneByDepth(epochDepth iotago.EpochIndex) (firstPruned iotago
 	// Make sure epoch is not already pruned.
 	start, canPrune := s.getPruningStart(end)
 	if !canPrune {
-		return 0, 0, ierrors.Wrapf(database.ErrEpochPruned, "epochDepth %d is too big, want to prune until %d but pruned epoch is already %d", epochDepth, end, lo.Return1(s.lastPrunedEpoch.Index()))
+		return 0, 0, ierrors.WithMessagef(database.ErrEpochPruned, "epochDepth %d is too big, want to prune until %d but pruned epoch is already %d", epochDepth, end, lo.Return1(s.lastPrunedEpoch.Index()))
 	}
 
 	s.setIsPruning(true)
@@ -123,7 +123,7 @@ func (s *Storage) PruneBySize(targetSizeMaxBytes ...int64) error {
 	defer s.pruningLock.Unlock()
 
 	if time.Since(s.lastPrunedSizeTime) < s.optsPruningSizeCooldownTime {
-		return ierrors.Wrapf(database.ErrNoPruningNeeded, "last pruning by size was %s ago, cooldown time is %s", time.Since(s.lastPrunedSizeTime), s.optsPruningSizeCooldownTime)
+		return ierrors.WithMessagef(database.ErrNoPruningNeeded, "last pruning by size was %s ago, cooldown time is %s", time.Since(s.lastPrunedSizeTime), s.optsPruningSizeCooldownTime)
 	}
 
 	// The target size is the maximum size of the database after pruning.
@@ -147,7 +147,7 @@ func (s *Storage) PruneBySize(targetSizeMaxBytes ...int64) error {
 	// Make sure epoch is not already pruned.
 	start, canPrune := s.getPruningStart(latestPrunableEpoch)
 	if !canPrune {
-		return ierrors.Wrapf(database.ErrEpochPruned, "can't prune any more data: latest prunable epoch is %d but pruned epoch is already %d", latestPrunableEpoch, lo.Return1(s.lastPrunedEpoch.Index()))
+		return ierrors.WithMessagef(database.ErrEpochPruned, "can't prune any more data: latest prunable epoch is %d but pruned epoch is already %d", latestPrunableEpoch, lo.Return1(s.lastPrunedEpoch.Index()))
 	}
 
 	s.setIsPruning(true)
@@ -181,7 +181,7 @@ func (s *Storage) PruneBySize(targetSizeMaxBytes ...int64) error {
 	// If the size of the database is still bigger than the max size, after we tried to prune everything possible,
 	// we return an error so that the user can be notified about a potentially full disk.
 	if currentDBSize = s.Size(); currentDBSize > dbMaxSize {
-		return ierrors.Wrapf(database.ErrDatabaseFull, "database size is still bigger than the start threshold size after pruning: %d > %d", currentDBSize, dbMaxSize)
+		return ierrors.WithMessagef(database.ErrDatabaseFull, "database size is still bigger than the start threshold size after pruning: %d > %d", currentDBSize, dbMaxSize)
 	}
 
 	return nil
@@ -213,11 +213,11 @@ func (s *Storage) latestPrunableEpoch() iotago.EpochIndex {
 func (s *Storage) pruneUntilEpoch(startEpoch iotago.EpochIndex, targetEpoch iotago.EpochIndex, pruningDelay iotago.EpochIndex) error {
 	for currentEpoch := startEpoch; currentEpoch <= targetEpoch; currentEpoch++ {
 		if err := s.prunable.Prune(currentEpoch, pruningDelay); err != nil {
-			return ierrors.Wrapf(err, "failed to prune epoch in prunable %d", currentEpoch)
+			return ierrors.Wrapf(err, "failed to prune epoch %d in prunable", currentEpoch)
 		}
 
 		if err := s.permanent.PruneUTXOLedger(currentEpoch); err != nil {
-			return ierrors.Wrapf(err, "failed to prune epoch in permanent %d", currentEpoch)
+			return ierrors.Wrapf(err, "failed to prune epoch %d in permanent", currentEpoch)
 		}
 	}
 

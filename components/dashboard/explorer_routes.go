@@ -28,12 +28,12 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 	routeGroup.GET("/block/:"+api.ParameterBlockID, func(c echo.Context) (err error) {
 		blockID, err := httpserver.ParseBlockIDParam(c, api.ParameterBlockID)
 		if err != nil {
-			return ierrors.Errorf("parse block ID error: %w", err)
+			return ierrors.Wrap(err, "failed to parse block ID")
 		}
 
 		t, err := findBlock(blockID)
 		if err != nil {
-			return ierrors.Errorf("find block error: %w", err)
+			return err
 		}
 
 		return c.JSON(http.StatusOK, t)
@@ -53,12 +53,12 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 
 		blockID, err := iotago.BlockIDFromHexString(search)
 		if err != nil {
-			return ierrors.Wrapf(ErrInvalidParameter, "search ID %s", search)
+			return ierrors.WithMessagef(ErrInvalidParameter, "search ID %s", search)
 		}
 
 		blk, err := findBlock(blockID)
 		if err != nil {
-			return ierrors.Errorf("can't find block %s: %w", search, err)
+			return err
 		}
 		result.Block = blk
 
@@ -75,14 +75,14 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 func findBlock(blockID iotago.BlockID) (explorerBlk *ExplorerBlock, err error) {
 	block, exists := deps.Protocol.Engines.Main.Get().Block(blockID)
 	if !exists {
-		return nil, ierrors.Errorf("block not found: %s", blockID.ToHex())
+		return nil, ierrors.Errorf("block %s not found", blockID)
 	}
 
 	cachedBlock, _ := deps.Protocol.Engines.Main.Get().BlockCache.Block(blockID)
 
 	blockMetadata, err := deps.Protocol.Engines.Main.Get().BlockRetainer.BlockMetadata(blockID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "block metadata %s", blockID.ToHex())
+		return nil, ierrors.Wrapf(err, "failed to get block metadata for block %s", blockID)
 	}
 
 	return createExplorerBlock(block, cachedBlock, blockMetadata), nil
@@ -201,12 +201,12 @@ func getTransaction(c echo.Context) error {
 
 	block, exists := deps.Protocol.Engines.Main.Get().Block(output.BlockID())
 	if !exists {
-		return ierrors.Errorf("block not found: %s", output.BlockID().ToHex())
+		return ierrors.Errorf("block %s not found", output.BlockID().ToHex())
 	}
 
 	iotaTX, isTX := block.SignedTransaction()
 	if !isTX {
-		return ierrors.Errorf("payload is not a signed transaction: %s", output.BlockID().ToHex())
+		return ierrors.Errorf("block payload of block %s is not a signed transaction", output.BlockID().ToHex())
 	}
 
 	return httpserver.JSONResponse(c, http.StatusOK, NewTransaction(iotaTX))
@@ -223,7 +223,7 @@ func getTransactionMetadata(c echo.Context) error {
 	copy(outputID[:], txID[:])
 	txMetadata, exists := deps.Protocol.Engines.Main.Get().Ledger.MemPool().TransactionMetadata(txID)
 	if !exists {
-		return ierrors.Errorf("tx metadata not found: %s", txID.ToHex())
+		return ierrors.Errorf("transaction metadata for transaction %s not found", txID.ToHex())
 	}
 
 	conflicts, _ := deps.Protocol.Engines.Main.Get().Ledger.SpendDAG().ConflictingSpenders(txID)
