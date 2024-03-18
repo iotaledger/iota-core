@@ -22,8 +22,6 @@ type (
 	FinalizedSlotFunc func() iotago.SlotIndex
 )
 
-var ErrEntryNotFound = ierrors.New("block metadatanot found")
-
 type BlockRetainer struct {
 	events *retainer.Events
 	store  StoreFunc
@@ -142,16 +140,11 @@ func (r *BlockRetainer) blockState(blockID iotago.BlockID) (api.BlockState, erro
 	if !found {
 		// block is not committed yet, should be in cache
 		if blockID.Slot() > r.latestCommittedSlot {
-			return api.BlockStateUnknown, ErrEntryNotFound
+			return api.BlockStateUnknown, kvstore.ErrKeyNotFound
 		}
 
 		blockMetadata, err := r.getBlockMetadata(blockID)
 		if err != nil {
-			// use custm error to align with the cache
-			if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-				err = ierrors.Join(err, ErrEntryNotFound)
-			}
-
 			return api.BlockStateUnknown, err
 		}
 

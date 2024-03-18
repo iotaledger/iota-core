@@ -6,8 +6,8 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
-	"github.com/iotaledger/iota-core/pkg/retainer/blockretainer"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
@@ -24,8 +24,8 @@ func (r *RequestHandler) BlockByID(blockID iotago.BlockID) (*iotago.Block, error
 func (r *RequestHandler) BlockMetadataByBlockID(blockID iotago.BlockID) (*api.BlockMetadataResponse, error) {
 	blockMetadata, err := r.protocol.Engines.Main.Get().BlockRetainer.BlockMetadata(blockID)
 	if err != nil {
-		if ierrors.Is(err, blockretainer.ErrEntryNotFound) {
-			return nil, ierrors.Wrapf(echo.ErrNotFound, "block not found: %s", blockID.ToHex())
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+			return nil, ierrors.WithMessagef(echo.ErrNotFound, "block not found: %s: %w", blockID.ToHex(), err)
 		}
 
 		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to get block metadata %s: %w", blockID, err)
