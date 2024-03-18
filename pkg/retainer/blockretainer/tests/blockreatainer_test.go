@@ -33,17 +33,17 @@ func TestBlockRetainer_RetainBlockNoFailures(t *testing.T) {
 			{
 				"A",
 				eventAccepted,
-				api.BlockStatePending, // we do not expose the accepted state
+				api.BlockStateAccepted,
 			},
 			{
 				"A2",
 				eventAccepted,
-				api.BlockStatePending,
+				api.BlockStateAccepted,
 			},
 			{
 				"B",
 				eventAccepted,
-				api.BlockStatePending,
+				api.BlockStateAccepted,
 			},
 			{
 				"C",
@@ -79,7 +79,7 @@ func TestBlockRetainer_RetainBlockNoFailures(t *testing.T) {
 			{
 				"B",
 				none,
-				api.BlockStatePending,
+				api.BlockStateAccepted,
 			},
 			{
 				"C",
@@ -89,7 +89,7 @@ func TestBlockRetainer_RetainBlockNoFailures(t *testing.T) {
 			{
 				"D",
 				eventAccepted,
-				api.BlockStatePending,
+				api.BlockStateAccepted,
 			},
 			{
 				"E",
@@ -127,7 +127,7 @@ func TestBlockRetainer_RetainBlockNoFailures(t *testing.T) {
 			{
 				"D",
 				none,
-				api.BlockStatePending,
+				api.BlockStateAccepted,
 			},
 			{
 				"E",

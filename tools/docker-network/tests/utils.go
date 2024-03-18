@@ -317,26 +317,6 @@ func createLogDirectory(testName string) string {
 	return dir
 }
 
-func AwaitEventAPITopics(duration time.Duration, cancleFunc context.CancelFunc, receiveChan chan struct{}, numOfTopics int) error {
-	counter := 0
-	timer := time.NewTimer(duration)
-	defer timer.Stop()
-
-	for {
-		select {
-		case <-timer.C:
-			cancleFunc()
-			return ierrors.New("Timeout, did not receive signals from all  topics")
-		case <-receiveChan:
-			counter++
-			if counter == numOfTopics {
-				fmt.Println("Received all signals from topics")
-				return nil
-			}
-		}
-	}
-}
-
 func getDelegationStartEpoch(api iotago.API, commitmentSlot iotago.SlotIndex) iotago.EpochIndex {
 	pastBoundedSlot := commitmentSlot + api.ProtocolParameters().MaxCommittableAge()
 	pastBoundedEpoch := api.TimeProvider().EpochFromSlot(pastBoundedSlot)

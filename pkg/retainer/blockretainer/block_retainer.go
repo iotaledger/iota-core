@@ -124,11 +124,6 @@ func (r *BlockRetainer) BlockMetadata(blockID iotago.BlockID) (*api.BlockMetadat
 		return nil, ierrors.Wrapf(err, "block %s not found", blockID)
 	}
 
-	// we do not expose accepted flag
-	if blockStatus == api.BlockStateAccepted {
-		blockStatus = api.BlockStatePending
-	}
-
 	return &api.BlockMetadataResponse{
 		BlockID:    blockID,
 		BlockState: blockStatus,
