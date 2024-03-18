@@ -25,7 +25,7 @@ func (r *RequestHandler) BlockMetadataByBlockID(blockID iotago.BlockID) (*api.Bl
 	blockMetadata, err := r.protocol.Engines.Main.Get().BlockRetainer.BlockMetadata(blockID)
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			return nil, ierrors.WithMessagef(echo.ErrNotFound, "block %s not found", blockID)
+			return nil, ierrors.WithMessagef(echo.ErrNotFound, "block not found: %s: %w", blockID.ToHex(), err)
 		}
 
 		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to get block metadata %s: %w", blockID, err)

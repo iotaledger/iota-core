@@ -173,7 +173,151 @@ func TestBlockRetainer_RetainBlockNoFailures(t *testing.T) {
 				api.BlockStateOrphaned,
 			},
 		})
+	}
+}
+
+// TestBlockRetainer_Dropped makes sure that it is not possible to overwrite Accepted or higher states with Dropped.
+// And also we return an error if we try to drop a block that is already committed, as this should never happen.
+func TestBlockRetainer_Dropped(t *testing.T) {
+	tf := NewTestFramework(t)
+
+	{
+		tf.commitSlot(2)
+		tf.finalizeSlot(0)
+		tf.initiateRetainerBlockFlow(5, []string{"A"})
+	}
+	{
+		tf.commitSlot(4)
+		tf.finalizeSlot(1)
+		tf.assertBlockMetadata([]*BlockRetainerAction{
+			{
+				"A",
+				eventAccepted,
+				api.BlockStateAccepted,
+			},
+		})
+	}
+	{
+		tf.assertBlockMetadata([]*BlockRetainerAction{
+			{
+				"A",
+				eventDropped,
+				api.BlockStateAccepted,
+			},
+		})
 
 	}
+	{
+		tf.commitSlot(10)
+		tf.finalizeSlot(5)
 
+		tf.assertBlockMetadata([]*BlockRetainerAction{
+			{
+				"A",
+				none,
+				api.BlockStateFinalized,
+			},
+		})
+	}
+
+	{
+		tf.commitSlot(11)
+		tf.finalizeSlot(6)
+
+		tf.assertError(&BlockRetainerAction{
+			"A",
+			eventDropped,
+			api.BlockStateFinalized,
+		})
+	}
+}
+
+// TestBlockRetainer_Reset makes sure that the BlockRetainer cleares all cache on Reset.
+func TestBlockRetainer_Reset(t *testing.T) {
+	tf := NewTestFramework(t)
+
+	{
+		tf.commitSlot(2)
+		tf.finalizeSlot(0)
+		tf.initiateRetainerBlockFlow(5, []string{"A", "B"})
+		tf.initiateRetainerBlockFlow(6, []string{"C", "D"})
+
+	}
+	{
+		tf.commitSlot(4)
+		tf.finalizeSlot(1)
+		tf.assertBlockMetadata([]*BlockRetainerAction{
+			{
+				"A",
+				eventConfirmed,
+				api.BlockStateConfirmed,
+			},
+			{
+				"B",
+				eventAccepted,
+				api.BlockStateAccepted,
+			},
+			{
+				"C",
+				eventAccepted,
+				api.BlockStateAccepted,
+			},
+			{
+				"D",
+				eventAccepted,
+				api.BlockStateAccepted,
+			},
+		})
+	}
+	{
+		tf.commitSlot(5)
+		tf.finalizeSlot(2)
+		tf.assertBlockMetadata([]*BlockRetainerAction{
+			{
+				"A", // is committed
+				none,
+				api.BlockStateConfirmed,
+			},
+			{
+				"B", // is committed
+				eventConfirmed,
+				api.BlockStateConfirmed,
+			},
+			{
+				"C",
+				eventConfirmed,
+				api.BlockStateConfirmed,
+			},
+			{
+				"D",
+				eventAccepted,
+				api.BlockStateAccepted,
+			},
+		})
+	}
+	{
+		tf.Instance.Reset()
+		tf.assertBlockMetadata([]*BlockRetainerAction{
+			{
+				"A",
+				none,
+				api.BlockStateConfirmed,
+			},
+			{
+				"B",
+				none,
+				api.BlockStateConfirmed,
+			},
+			{
+				"C",
+				none, // cache cleared
+				api.BlockStateUnknown,
+			},
+			{
+				"D",
+				none, // cache cleared
+				api.BlockStateUnknown,
+			},
+		})
+	}
 }
