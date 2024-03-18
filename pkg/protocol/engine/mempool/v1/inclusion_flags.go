@@ -56,15 +56,6 @@ func (s *inclusionFlags) OnAccepted(callback func()) {
 	})
 }
 
-// OnPending registers a callback that gets triggered when the entity gets pending.
-func (s *inclusionFlags) OnPending(callback func()) {
-	s.accepted.OnUpdate(func(wasAccepted bool, isAccepted bool) {
-		if !isAccepted && wasAccepted {
-			callback()
-		}
-	})
-}
-
 // IsRejected returns true if the entity was rejected.
 func (s *inclusionFlags) IsRejected() bool {
 	return s.rejected.WasTriggered()

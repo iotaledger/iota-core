@@ -83,12 +83,6 @@ func (s *StateDiff) AddTransaction(transaction *TransactionMetadata, errorHandle
 			return ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID())
 		}
 		s.updateCompactedStateChanges(transaction, 1)
-
-		transaction.OnPending(func() {
-			if err := s.RollbackTransaction(transaction); err != nil {
-				errorHandler(ierrors.Wrapf(err, "failed to rollback transaction, txID: %s", transaction.ID()))
-			}
-		})
 	}
 
 	return nil

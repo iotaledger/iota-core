@@ -53,8 +53,6 @@ type TransactionMetadata interface {
 type inclusionFlags interface {
 	IsPending() bool
 
-	OnPending(callback func())
-
 	IsAccepted() bool
 
 	OnAccepted(callback func())

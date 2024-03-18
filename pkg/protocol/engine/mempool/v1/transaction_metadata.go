@@ -259,12 +259,6 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 		}
 	})
 
-	input.OnPending(func() {
-		if atomic.AddUint64(&t.unacceptedInputsCount, 1) == 1 && t.allInputsAccepted.Set(false) {
-			t.accepted.Set(false)
-		}
-	})
-
 	input.OnAcceptedSpenderUpdated(func(spender mempool.TransactionMetadata) {
 		//nolint:forcetypeassert // we can be sure that the spender is a TransactionMetadata
 		if spender.(*TransactionMetadata) != nil && spender != t {
