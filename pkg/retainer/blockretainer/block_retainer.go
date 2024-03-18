@@ -135,7 +135,6 @@ func (r *BlockRetainer) BlockMetadata(blockID iotago.BlockID) (*api.BlockMetadat
 }
 
 func (r *BlockRetainer) blockState(blockID iotago.BlockID) (api.BlockState, error) {
-	var state api.BlockState
 	state, found := r.cache.blockMetadataByID(blockID)
 	if !found {
 		// block is not committed yet, should be in cache
@@ -168,7 +167,7 @@ func (r *BlockRetainer) blockState(blockID iotago.BlockID) (api.BlockState, erro
 func (r *BlockRetainer) getBlockMetadata(blockID iotago.BlockID) (*slotstore.BlockMetadata, error) {
 	store, err := r.store(blockID.Slot())
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Slot())
 	}
 
 	data, err := store.BlockMetadata(blockID)
