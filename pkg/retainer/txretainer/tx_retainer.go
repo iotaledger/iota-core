@@ -249,6 +249,12 @@ func NewProvider(opts ...options.Option[TransactionRetainer]) module.Provider[*e
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (r *TransactionRetainer) Reset(targetSlot iotago.SlotIndex) {
+	// In the TransactionRetainer, we rely on the fact that "Reset" is always called
+	// when a new engine is initialized (even during chain switching).
+	// This is the cleanest way to rollback the state on disc to the
+	// last committed slot without the need to initialize temporary
+	// components in the "ForkAtSlot" method.
+	//
 	// we need to rollback the transaction retainer to the target slot
 	// to delete all transactions that were committed after the target slot.
 	if err := r.txRetainerDatabase.Rollback(targetSlot); err != nil {
