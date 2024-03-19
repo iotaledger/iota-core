@@ -35,10 +35,6 @@ type TransactionMetadata interface {
 
 	OnBooked(func())
 
-	IsConflicting() bool
-
-	OnConflicting(func())
-
 	ValidAttachments() []iotago.BlockID
 
 	EarliestIncludedAttachment() iotago.BlockID
@@ -52,8 +48,6 @@ type TransactionMetadata interface {
 
 type inclusionFlags interface {
 	IsPending() bool
-
-	OnPending(callback func())
 
 	IsAccepted() bool
 

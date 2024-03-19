@@ -437,7 +437,21 @@ func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
 }
 
 func (m *MemPool[VoteRank]) forkTransaction(transactionMetadata *TransactionMetadata, resourceIDs ds.Set[mempool.StateID]) {
-	transactionMetadata.conflicting.Trigger()
+	m.spendDAG.CreateSpender(transactionMetadata.ID())
+
+	unsubscribe := transactionMetadata.parentSpenderIDs.OnUpdate(func(appliedMutations ds.SetMutations[iotago.TransactionID]) {
+		if err := m.spendDAG.UpdateSpenderParents(transactionMetadata.ID(), appliedMutations.AddedElements(), appliedMutations.DeletedElements()); err != nil {
+			panic(err)
+		}
+	})
+
+	transactionMetadata.OnEvicted(func() {
+		unsubscribe()
+
+		m.spendDAG.EvictSpender(transactionMetadata.ID())
+	})
+
+	transactionMetadata.spenderIDs.Replace(ds.NewSet(transactionMetadata.id))
 
 	if err := m.spendDAG.UpdateSpentResources(transactionMetadata.ID(), resourceIDs); err != nil {
 		// this is a hack, as with a reactive.Variable we cannot set it to 0 and still check if it was orphaned.
@@ -522,7 +536,7 @@ func (m *MemPool[VoteRank]) updateStateDiffs(transaction *TransactionMetadata, p
 			return ierrors.Wrapf(err, "failed to get state diff for slot %d", newIndex)
 		}
 
-		if err = stateDiff.AddTransaction(transaction, m.errorHandler); err != nil {
+		if err = stateDiff.AddTransaction(transaction); err != nil {
 			return ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID())
 		}
 	}
@@ -552,26 +566,10 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 				return
 			}
 
-			if err := stateDiff.AddTransaction(transaction, m.errorHandler); err != nil {
+			if err := stateDiff.AddTransaction(transaction); err != nil {
 				m.errorHandler(ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID()))
 			}
 		}
-	})
-
-	transaction.OnConflicting(func() {
-		m.spendDAG.CreateSpender(transaction.ID())
-
-		unsubscribe := transaction.parentSpenderIDs.OnUpdate(func(appliedMutations ds.SetMutations[iotago.TransactionID]) {
-			if err := m.spendDAG.UpdateSpenderParents(transaction.ID(), appliedMutations.AddedElements(), appliedMutations.DeletedElements()); err != nil {
-				panic(err)
-			}
-		})
-
-		transaction.OnEvicted(func() {
-			unsubscribe()
-
-			m.spendDAG.EvictSpender(transaction.ID())
-		})
 	})
 
 	transaction.OnEarliestIncludedAttachmentUpdated(func(prevBlock iotago.BlockID, newBlock iotago.BlockID) {
