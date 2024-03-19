@@ -45,30 +45,25 @@ func Test_MempoolInvalidSignatures(t *testing.T) {
 
 	// Make validTX invalid by replacing the first unlock with an empty signature unlock.
 	_, is := invalidTX.Unlocks[0].(*iotago.SignatureUnlock)
-	if !is {
-		panic("expected signature unlock as first unlock")
-	}
+	require.Truef(t, is, "expected signature unlock as first unlock")
 	invalidTX.Unlocks[0] = &iotago.SignatureUnlock{
 		Signature: &iotago.Ed25519Signature{},
 	}
 
-	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, d.wallet.DefaultClient(), account.ID.ToAddress().(*iotago.AccountAddress))
-	block1 := d.CreateBlock(invalidTX, account.ID, congestionResp, issuerResp)
 	fmt.Println("Submitting block with invalid TX")
-	d.SubmitBlock(context.Background(), block1)
+	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, d.wallet.DefaultClient(), account.ID.ToAddress().(*iotago.AccountAddress))
+	d.SubmitPayload(context.Background(), invalidTX, account.ID, congestionResp, issuerResp)
 
 	d.AwaitTransactionState(ctx, invalidTX.Transaction.MustID(), api.TransactionStateFailed)
 	d.AwaitTransactionFailure(ctx, invalidTX.Transaction.MustID(), api.TxFailureUnlockSignatureInvalid)
 
-	issuerResp, congestionResp = d.PrepareBlockIssuance(ctx, d.wallet.DefaultClient(), account.ID.ToAddress().(*iotago.AccountAddress))
-	block2 := d.CreateBlock(validTX, account.ID, congestionResp, issuerResp)
 	fmt.Println("Submitting block with valid TX")
-	d.SubmitBlock(context.Background(), block2)
-
 	issuerResp, congestionResp = d.PrepareBlockIssuance(ctx, d.wallet.DefaultClient(), account.ID.ToAddress().(*iotago.AccountAddress))
-	block3 := d.CreateBlock(invalidTX, account.ID, congestionResp, issuerResp)
+	d.SubmitPayload(context.Background(), validTX, account.ID, congestionResp, issuerResp)
+
 	fmt.Println("Submitting block with invalid TX (again)")
-	d.SubmitBlock(context.Background(), block3)
+	issuerResp, congestionResp = d.PrepareBlockIssuance(ctx, d.wallet.DefaultClient(), account.ID.ToAddress().(*iotago.AccountAddress))
+	d.SubmitPayload(context.Background(), invalidTX, account.ID, congestionResp, issuerResp)
 
 	d.AwaitTransactionPayloadAccepted(ctx, validTX.Transaction.MustID())
 }
