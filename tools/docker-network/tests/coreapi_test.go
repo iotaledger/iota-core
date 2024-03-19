@@ -10,12 +10,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/iotaledger/hive.go/lo"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/nodeclient"
 	"github.com/iotaledger/iota.go/v4/tpkg"
-	"github.com/stretchr/testify/require"
 )
 
 // Test_ValidatorsAPI tests if the validators API returns the expected validators.
@@ -498,7 +499,7 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 				resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesByID(context.Background(), committmentID)
 				require.Error(t, err)
 				// commitmentID is valid, but the UTXO changes does not exist in the storage
-				require.True(t, isStatusCode(err, http.StatusInternalServerError))
+				require.True(t, isStatusCode(err, http.StatusNotFound))
 				require.Nil(t, resp)
 			},
 		},
@@ -510,7 +511,7 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 				resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesFullByID(context.Background(), committmentID)
 				require.Error(t, err)
 				// commitmentID is valid, but the UTXO changes does not exist in the storage
-				require.True(t, isStatusCode(err, http.StatusInternalServerError))
+				require.True(t, isStatusCode(err, http.StatusNotFound))
 				require.Nil(t, resp)
 			},
 		},

@@ -38,7 +38,7 @@ func (r *RequestHandler) GetCommitmentByID(commitmentID iotago.CommitmentID) (*m
 
 	commitment, err := r.protocol.Engines.Main.Get().Storage.Commitments().Load(commitmentID.Slot())
 	if err != nil {
-		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to load commitment, commitmentID: %s, slot: %d, error: %w", commitmentID, commitmentID.Slot(), err)
+		return nil, ierrors.WithMessagef(echo.ErrNotFound, "failed to load commitment, commitmentID: %s, slot: %d, error: %w", commitmentID, commitmentID.Slot(), err)
 	}
 
 	if commitment.ID() != commitmentID {
