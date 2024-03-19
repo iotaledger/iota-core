@@ -137,7 +137,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, n
 	}
 
 	if blockParams.BlockHeader.References == nil {
-		blockParams.BlockHeader.References = referencesFromBlockIssuanceResponse(i.LatestBlockIssuanceResponse(ctx))
+		blockParams.BlockHeader.References = referencesFromBlockIssuanceResponse(i.latestBlockIssuanceResponse(ctx))
 	}
 
 	err = i.setDefaultBlockParams(ctx, blockParams.BlockHeader)
@@ -218,7 +218,7 @@ func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, opts .
 		issuingTime := time.Now().UTC()
 		blockParams.BlockHeader.IssuingTime = &issuingTime
 	}
-	blockIssuanceInfo := i.LatestBlockIssuanceResponse(ctx)
+	blockIssuanceInfo := i.latestBlockIssuanceResponse(ctx)
 
 	if blockParams.BlockHeader.References == nil {
 		blockParams.BlockHeader.References = referencesFromBlockIssuanceResponse(blockIssuanceInfo)
@@ -408,10 +408,14 @@ func (i *BlockIssuer) GetNewBlockIssuanceResponse() *api.IssuanceBlockHeaderResp
 	return i.latestBlockIssuanceResp
 }
 
-func (i *BlockIssuer) LatestBlockIssuanceResponse(context context.Context) *api.IssuanceBlockHeaderResponse {
+func (i *BlockIssuer) latestBlockIssuanceResponse(context context.Context) *api.IssuanceBlockHeaderResponse {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
+	// If the response was already used to issue a block, we need to get a new response from the node.
+	// Otherwise we can reuse the cached response. For transactions with commitment inputs, we want to get a fresh response
+	// for the transaction creation, and then reuse that response for the block issuance, so we only mark the response as used
+	// if it was used for block issuance.
 	if i.blockIssuanceResponseUsed {
 		i.blockIssuanceResponseUsed = false
 		resp, err := i.Client.BlockIssuance(context)
