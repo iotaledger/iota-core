@@ -44,6 +44,24 @@ type AccountData struct {
 	OutputID iotago.OutputID
 }
 
+// WalletClock is an interface that provides the current slot.
+type WalletClock interface {
+	SetCurrentSlot(slot iotago.SlotIndex)
+	CurrentSlot() iotago.SlotIndex
+}
+
+type TestSuiteWalletClock struct {
+	currentSlot iotago.SlotIndex
+}
+
+func (c *TestSuiteWalletClock) SetCurrentSlot(slot iotago.SlotIndex) {
+	c.currentSlot = slot
+}
+
+func (c *TestSuiteWalletClock) CurrentSlot() iotago.SlotIndex {
+	return c.currentSlot
+}
+
 // Wallet is an object representing a wallet (similar to a FireFly wallet) capable of the following:
 // - hierarchical deterministic key management
 // - signing transactions
@@ -63,7 +81,7 @@ type Wallet struct {
 
 	outputs      map[string]*OutputData
 	transactions map[string]*iotago.Transaction
-	currentSlot  iotago.SlotIndex
+	clock        WalletClock
 }
 
 func NewWallet(t *testing.T, name string, client Client, keyManager ...*wallet.KeyManager) *Wallet {
@@ -87,6 +105,7 @@ func NewWallet(t *testing.T, name string, client Client, keyManager ...*wallet.K
 		keyManager:    km,
 		IssuerAccount: issuerAccountData,
 		BlockIssuer:   NewBlockIssuer(t, name, km, client, issuerAccountData.AddressIndex, issuerAccountData.ID, false),
+		clock:         &TestSuiteWalletClock{},
 	}
 }
 
@@ -100,21 +119,11 @@ func (w *Wallet) SetDefaultClient(client Client) {
 }
 
 func (w *Wallet) SetCurrentSlot(slot iotago.SlotIndex) {
-	switch w.Client.(type) {
-	case *TestSuiteClient:
-		w.currentSlot = slot
-	default:
-		w.Testing.Fatalf("cannot set current slot for non-testsuite client")
-	}
+	w.clock.SetCurrentSlot(slot)
 }
 
 func (w *Wallet) CurrentSlot() iotago.SlotIndex {
-	switch w.Client.(type) {
-	case *TestSuiteClient:
-		return w.currentSlot
-	default:
-		return w.Client.LatestAPI().TimeProvider().CurrentSlot()
-	}
+	return w.clock.CurrentSlot()
 }
 
 func (w *Wallet) AddOutput(outputName string, output *OutputData) {
