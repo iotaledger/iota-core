@@ -214,6 +214,40 @@ func (d *DockerTestFramework) AwaitTransactionPayloadAccepted(ctx context.Contex
 	})
 }
 
+func (d *DockerTestFramework) AwaitTransactionState(ctx context.Context, txID iotago.TransactionID, expectedState api.TransactionState) {
+	clt := d.wallet.DefaultClient()
+
+	d.Eventually(func() error {
+		resp, err := clt.TransactionMetadata(ctx, txID)
+		if err != nil {
+			return err
+		}
+
+		if expectedState == resp.TransactionState {
+			return nil
+		} else {
+			return ierrors.Errorf("expected transaction %s to have state %s, got %s instead", txID, expectedState, resp.TransactionState)
+		}
+	})
+}
+
+func (d *DockerTestFramework) AwaitTransactionFailure(ctx context.Context, txID iotago.TransactionID, expectedReason api.TransactionFailureReason) {
+	clt := d.wallet.DefaultClient()
+
+	d.Eventually(func() error {
+		resp, err := clt.TransactionMetadata(ctx, txID)
+		if err != nil {
+			return err
+		}
+
+		if expectedReason == resp.TransactionFailureReason {
+			return nil
+		} else {
+			return ierrors.Errorf("expected transaction %s to have failure reason %T, got %s instead, failure details: %s", txID, expectedReason, resp.TransactionState, resp.TransactionFailureDetails)
+		}
+	})
+}
+
 func (d *DockerTestFramework) AwaitCommitment(targetSlot iotago.SlotIndex) {
 	currentCommittedSlot := d.NodeStatus("V1").LatestCommitmentID.Slot()
 
