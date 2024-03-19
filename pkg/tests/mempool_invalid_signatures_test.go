@@ -32,7 +32,7 @@ func Test_MempoolInvalidSignatures(t *testing.T) {
 	validTX := wallet.CreateBasicOutputsEquallyFromInput("TX", 1, "Genesis:0")
 	invalidTX := validTX.Clone().(*iotago.SignedTransaction)
 
-	// Make tx3 invalid by replacing the first unlock with an empty signature unlock.
+	// Make validTX invalid by replacing the first unlock with an empty signature unlock.
 	_, is := invalidTX.Unlocks[0].(*iotago.SignatureUnlock)
 	if !is {
 		panic("expected signature unlock as first unlock")
