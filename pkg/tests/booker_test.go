@@ -62,8 +62,8 @@ func Test_WeightPropagation(t *testing.T) {
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
-		node1.Validator.AccountID,
-		node2.Validator.AccountID,
+		node1.Validator.AccountData.ID,
+		node2.Validator.AccountData.ID,
 	}, ts.Nodes()...)
 
 	// Create and issue double spends
@@ -152,8 +152,8 @@ func Test_DoubleSpend(t *testing.T) {
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
-		node1.Validator.AccountID,
-		node2.Validator.AccountID,
+		node1.Validator.AccountData.ID,
+		node2.Validator.AccountData.ID,
 	}, ts.Nodes()...)
 
 	// Create and issue double spends
@@ -229,7 +229,7 @@ func Test_MultipleAttachments(t *testing.T) {
 
 		ts.IssueBasicBlockWithOptions("A.1", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssueValidationBlockWithHeaderOptions("A.1.1", nodeA, mock.WithStrongParents(ts.BlockID("A.1")))
-		wallet.SetDefaultNode(nodeB)
+		wallet.SetDefaultClient(nodeB.Client)
 		ts.IssueBasicBlockWithOptions("B.1", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssueValidationBlockWithHeaderOptions("B.1.1", nodeB, mock.WithStrongParents(ts.BlockID("B.1")))
 
@@ -256,7 +256,7 @@ func Test_MultipleAttachments(t *testing.T) {
 	{
 		tx2 := wallet.CreateBasicOutputsEquallyFromInput("tx2", 1, "tx1:1")
 
-		wallet.SetDefaultNode(nodeA)
+		wallet.SetDefaultClient(nodeA.Client)
 		ts.IssueBasicBlockWithOptions("A.3", wallet, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssueValidationBlockWithHeaderOptions("A.3.1", nodeA, mock.WithStrongParents(ts.BlockID("A.3")))
 		ts.IssueValidationBlockWithHeaderOptions("B.3", nodeB, mock.WithStrongParents(ts.BlockID("A.3.1")))
@@ -346,8 +346,8 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
-		node1.Validator.AccountID,
-		node2.Validator.AccountID,
+		node1.Validator.AccountData.ID,
+		node2.Validator.AccountData.ID,
 	}, ts.Nodes()...)
 
 	genesisCommitment := lo.PanicOnErr(node1.Protocol.Engines.Main.Get().Storage.Commitments().Load(0)).Commitment()
@@ -357,7 +357,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 		tx1 := wallet.CreateBasicOutputsEquallyFromInput("tx1", 1, "Genesis:0")
 		tx2 := wallet.CreateBasicOutputsEquallyFromInput("tx2", 1, "Genesis:0")
 
-		wallet.SetDefaultNode(node1)
+		wallet.SetDefaultClient(node1.Client)
 		ts.SetCurrentSlot(1)
 		ts.IssueBasicBlockWithOptions("block1.1", wallet, tx1, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssueBasicBlockWithOptions("block1.2", wallet, tx2, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockID("Genesis")))
@@ -428,7 +428,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{5}, 1, "4.0", ts.Nodes("node1"), false, false)
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("5.0"), true, ts.Nodes()...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("5.0"), true, ts.ClientsForNodes()...)
 	}
 
 	partitions := map[string][]*mock.Node{
@@ -466,7 +466,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 	// Issue TX3 on top of rejected TX1 and 1 commitment on node2 (committed to slot 1)
 	{
-		wallet.SetDefaultNode(node2)
+		wallet.SetDefaultClient(node2.Client)
 		ts.IssueBasicBlockWithOptions("n2-commit1", wallet, tx4, mock.WithSlotCommitment(commitment1))
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
@@ -500,7 +500,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 	// Issue TX4 on top of rejected TX1 but Genesis commitment on node2 (committed to slot 1)
 	{
-		wallet.SetDefaultNode(node2)
+		wallet.SetDefaultClient(node2.Client)
 		ts.IssueBasicBlockWithOptions("n2-genesis", wallet, tx4, mock.WithStrongParents(ts.BlockID("Genesis")), mock.WithSlotCommitment(genesisCommitment))
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
@@ -513,7 +513,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 	// Issue TX4 on top of rejected TX1 but Genesis commitment on node1 (committed to slot 0)
 	{
-		wallet.SetDefaultNode(node1)
+		wallet.SetDefaultClient(node1.Client)
 		ts.IssueBasicBlockWithOptions("n1-genesis", wallet, tx4, mock.WithStrongParents(ts.BlockID("Genesis")), mock.WithSlotCommitment(genesisCommitment))
 
 		ts.AssertTransactionsExist(wallet.Transactions("tx1"), true, node2)
@@ -543,10 +543,10 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 		)
 
 		// Exchange each-other blocks, ignoring invalidity
-		wallet.SetDefaultNode(node1)
+		wallet.SetDefaultClient(node1.Client)
 		ts.IssueExistingBlock("n2-genesis", wallet)
 		ts.IssueExistingBlock("n2-commit1", wallet)
-		wallet.SetDefaultNode(node2)
+		wallet.SetDefaultClient(node2.Client)
 		ts.IssueExistingBlock("n1-genesis", wallet)
 		ts.IssueExistingBlock("n1-rejected-genesis", wallet)
 
@@ -619,8 +619,8 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
-		node1.Validator.AccountID,
-		node2.Validator.AccountID,
+		node1.Validator.AccountData.ID,
+		node2.Validator.AccountData.ID,
 	}, ts.Nodes()...)
 
 	genesisCommitment := lo.PanicOnErr(node1.Protocol.Engines.Main.Get().Storage.Commitments().Load(0)).Commitment()
@@ -630,7 +630,7 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 		tx1 := wallet.CreateBasicOutputsEquallyFromInput("tx1", 1, "Genesis:0")
 		tx2 := wallet.CreateBasicOutputsEquallyFromInput("tx2", 1, "Genesis:0")
 
-		wallet.SetDefaultNode(node2)
+		wallet.SetDefaultClient(node2.Client)
 		ts.SetCurrentSlot(1)
 		ts.IssueBasicBlockWithOptions("block1.1", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssueBasicBlockWithOptions("block1.2", wallet, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
@@ -678,7 +678,7 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{5}, 1, "4.0", ts.Nodes("node1"), false, false)
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("5.0"), true, ts.Nodes()...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("5.0"), true, ts.ClientsForNodes()...)
 	}
 
 	partitions := map[string][]*mock.Node{
@@ -743,7 +743,7 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 		)
 
 		// Exchange each-other blocks, ignoring invalidity
-		wallet.SetDefaultNode(node1)
+		wallet.SetDefaultClient(node1.Client)
 		ts.IssueExistingBlock("n2-pending-genesis", wallet)
 		ts.IssueExistingBlock("n2-pending-commit1", wallet)
 
@@ -861,11 +861,11 @@ func Test_BlockWithInvalidTransactionGetsBooked(t *testing.T) {
 			nftBuilder.ImmutableIssuer(&iotago.Ed25519Address{})
 		},
 	)
-	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
+	block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1))
 
-	vblock1 := ts.IssueValidationBlockWithHeaderOptions("vblock1", ts.DefaultWallet().Node, mock.WithWeakParents(block1.ID()), mock.WithStrongParents(ts.Block("Genesis").ID()))
-	vblock2 := ts.IssueValidationBlockWithHeaderOptions("vblock2", ts.DefaultWallet().Node, mock.WithStrongParents(vblock1.ID()))
-	vblock3 := ts.IssueValidationBlockWithHeaderOptions("vblock3", ts.DefaultWallet().Node, mock.WithStrongParents(vblock2.ID()))
+	vblock1 := lo.PanicOnErr(ts.IssueValidationBlockWithHeaderOptions("vblock1", node1, mock.WithWeakParents(block1.ID()), mock.WithStrongParents(ts.Block("Genesis").ID())))
+	vblock2 := lo.PanicOnErr(ts.IssueValidationBlockWithHeaderOptions("vblock2", node1, mock.WithStrongParents(vblock1.ID())))
+	vblock3 := lo.PanicOnErr(ts.IssueValidationBlockWithHeaderOptions("vblock3", node1, mock.WithStrongParents(vblock2.ID())))
 
 	ts.AssertBlocksInCacheAccepted(ts.Blocks("block1"), true, ts.Nodes()...)
 	ts.AssertBlocksInCacheConfirmed(ts.Blocks("block1"), true, ts.Nodes()...)

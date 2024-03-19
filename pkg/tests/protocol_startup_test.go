@@ -59,11 +59,11 @@ func Test_BookInCommittedSlot(t *testing.T) {
 	ts.Wait()
 
 	expectedCommittee := []iotago.AccountID{
-		nodeA.Validator.AccountID,
+		nodeA.Validator.AccountData.ID,
 	}
 
 	expectedOnlineCommittee := []account.SeatIndex{
-		lo.Return1(lo.Return1(nodeA.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountID)),
+		lo.Return1(lo.Return1(nodeA.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountData.ID)),
 	}
 
 	// Verify that nodes have the expected states.
@@ -88,7 +88,7 @@ func Test_BookInCommittedSlot(t *testing.T) {
 	{
 		ts.IssueBlocksAtEpoch("", 0, 4, "Genesis", ts.Nodes(), true, true)
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefixes("1", "2", "3", "4", "5", "6", "7"), true, ts.Nodes()...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefixes("1", "2", "3", "4", "5", "6", "7"), true, ts.ClientsForNodes()...)
 
 		ts.AssertBlocksInCachePreAccepted(ts.BlocksWithPrefixes("7.3"), true, ts.Nodes()...)
 
@@ -120,9 +120,9 @@ func Test_BookInCommittedSlot(t *testing.T) {
 		}
 		ts.SetCurrentSlot(5)
 		commitment := lo.PanicOnErr(nodeA.Protocol.Engines.Main.Get().Storage.Commitments().Load(3)).Commitment()
-		ts.IssueValidationBlockWithHeaderOptions("5*", ts.Node("nodeA"), mock.WithSlotCommitment(commitment), mock.WithStrongParents(ts.BlockIDsWithPrefix("4.3-")...))
+		ts.IssueValidationBlockWithHeaderOptions("5*", nodeA, mock.WithSlotCommitment(commitment), mock.WithStrongParents(ts.BlockIDsWithPrefix("4.3-")...))
 
-		ts.AssertBlocksExist(ts.Blocks("5*"), false, ts.Nodes("nodeA")...)
+		ts.AssertBlocksExist(ts.Blocks("5*"), false, ts.ClientsForNodes(nodeA)...)
 	}
 }
 
@@ -174,13 +174,13 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	ts.Wait()
 
 	expectedCommittee := []iotago.AccountID{
-		nodeA.Validator.AccountID,
-		nodeB.Validator.AccountID,
+		nodeA.Validator.AccountData.ID,
+		nodeB.Validator.AccountData.ID,
 	}
 
 	expectedOnlineCommittee := []account.SeatIndex{
-		lo.Return1(lo.Return1(nodeA.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountID)),
-		lo.Return1(lo.Return1(nodeA.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeB.Validator.AccountID)),
+		lo.Return1(lo.Return1(nodeA.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountData.ID)),
+		lo.Return1(lo.Return1(nodeA.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeB.Validator.AccountData.ID)),
 	}
 
 	// Verify that nodes have the expected states.
@@ -205,7 +205,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	{
 		ts.IssueBlocksAtEpoch("", 0, 4, "Genesis", ts.Nodes(), true, false)
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefixes("1", "2", "3", "4", "5", "6", "7"), true, ts.Nodes()...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefixes("1", "2", "3", "4", "5", "6", "7"), true, ts.ClientsForNodes()...)
 
 		ts.AssertBlocksInCachePreAccepted(ts.BlocksWithPrefixes("7.3"), false, ts.Nodes()...)
 		ts.AssertBlocksInCachePreConfirmed(ts.BlocksWithPrefixes("7.3"), false, ts.Nodes()...)
@@ -251,7 +251,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	{
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{8, 9, 11, 12, 13}, 6, "7.3", ts.Nodes(), true, false)
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefixes("8", "9", "11", "12", "13"), true, ts.Nodes()...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefixes("8", "9", "11", "12", "13"), true, ts.ClientsForNodes()...)
 
 		ts.AssertBlocksInCachePreAccepted(ts.BlocksWithPrefixes("13.5"), false, ts.Nodes()...)
 		ts.AssertBlocksInCachePreConfirmed(ts.BlocksWithPrefixes("13.5"), false, ts.Nodes()...)

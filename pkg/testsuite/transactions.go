@@ -40,7 +40,7 @@ func (t *TestSuite) AssertTransaction(transaction *iotago.Transaction, node *moc
 
 		// TODO: fix this in another PR
 		//if !assert.Equal(t.fakeTesting, transaction.Outputs, typedTransaction.Outputs) {
-		api := t.DefaultWallet().Node.Protocol.APIForSlot(transactionID.Slot())
+		api := t.DefaultWallet().Client.APIForSlot(transactionID.Slot())
 		expected, _ := api.Encode(transaction.Outputs)
 		actual, _ := api.Encode(typedTransaction.Outputs)
 		if !assert.ElementsMatch(t.fakeTesting, expected, actual) {

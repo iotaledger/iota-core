@@ -13,6 +13,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/nodeclient"
@@ -51,7 +52,7 @@ func (e *EventAPIDockerTestFramework) ConnectEventAPIClient(ctx context.Context)
 }
 
 // SubmitDataBlockStream submits a stream of data blocks to the network for the given duration.
-func (e *EventAPIDockerTestFramework) SubmitDataBlockStream(account *AccountData, duration time.Duration) {
+func (e *EventAPIDockerTestFramework) SubmitDataBlockStream(account *mock.AccountData, duration time.Duration) {
 	timer := time.NewTimer(duration)
 	defer timer.Stop()
 

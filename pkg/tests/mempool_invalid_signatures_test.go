@@ -3,6 +3,9 @@ package tests
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -42,7 +45,8 @@ func Test_MempoolInvalidSignatures(t *testing.T) {
 	}
 
 	// Issue the invalid attachment of the transaction.
-	ts.IssueBasicBlockWithOptions("block1", wallet, invalidTX)
+	err := lo.Return2(ts.IssueBasicBlockWithOptions("block1", wallet, invalidTX))
+	require.NoError(t, err)
 
 	// Ensure that the attachment is seen as pending (tx) and failed (signed tx).
 	ts.AssertTransactionsExist([]*iotago.Transaction{invalidTX.Transaction}, true, ts.Nodes()...)
@@ -51,8 +55,11 @@ func Test_MempoolInvalidSignatures(t *testing.T) {
 	ts.AssertTransactionFailure(invalidTX.MustID(), iotago.ErrDirectUnlockableAddressUnlockInvalid, ts.Nodes()...)
 
 	// Issue the valid attachment and another invalid attachment on top.
-	block2 := ts.IssueBasicBlockWithOptions("block2", wallet, validTX)
-	block3 := ts.IssueBasicBlockWithOptions("block3", wallet, invalidTX, mock.WithStrongParents(block2.ID()))
+	block2, err := ts.IssueBasicBlockWithOptions("block2", wallet, validTX)
+	require.NoError(t, err)
+
+	block3, err := ts.IssueBasicBlockWithOptions("block3", wallet, invalidTX, mock.WithStrongParents(block2.ID()))
+	require.NoError(t, err)
 
 	// Accept block2 and block3.
 	ts.IssueBlocksAtSlots("accept-block3", []iotago.SlotIndex{block3.ID().Slot()}, 2, "block3", ts.Nodes(), false, true)

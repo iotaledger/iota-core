@@ -23,6 +23,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/requesthandler"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/wallet"
 )
@@ -46,13 +47,22 @@ type InvalidSignedTransactionEvent struct {
 	Error    error
 }
 
+// Nodes is a helper function that creates a slice of nodes.
+func Nodes(nodes ...*Node) []*Node {
+	return nodes
+}
+
 type Node struct {
 	Testing *testing.T
 	logger  log.Logger
 
-	Name       string
-	Validator  *BlockIssuer
-	KeyManager *wallet.KeyManager
+	Name string
+
+	Client         *TestSuiteClient
+	isValidator    bool
+	Validator      *BlockIssuer
+	KeyManager     *wallet.KeyManager
+	RequestHandler *requesthandler.RequestHandler
 
 	ctx       context.Context
 	ctxCancel context.CancelFunc
@@ -77,7 +87,7 @@ type Node struct {
 	invalidTransactionEvents map[iotago.SignedTransactionID]InvalidSignedTransactionEvent
 }
 
-func NewNode(t *testing.T, parentLogger log.Logger, net *Network, partition string, name string, validator bool) *Node {
+func NewNode(t *testing.T, parentLogger log.Logger, net *Network, partition string, name string, isValidator bool) *Node {
 	keyManager := lo.PanicOnErr(wallet.NewKeyManagerFromRandom(wallet.DefaultIOTAPath))
 	priv, pub := keyManager.KeyPair()
 
@@ -87,11 +97,11 @@ func NewNode(t *testing.T, parentLogger log.Logger, net *Network, partition stri
 	peerID := lo.PanicOnErr(peer.IDFromPrivateKey(lo.PanicOnErr(p2pcrypto.UnmarshalEd25519PrivateKey(priv))))
 	RegisterIDAlias(peerID, name)
 
-	var validationBlockIssuer *BlockIssuer
-	if validator {
-		validationBlockIssuer = NewBlockIssuer(t, name, keyManager, accountID, validator)
+	var validator *BlockIssuer
+	if isValidator {
+		validator = NewBlockIssuer(t, name, keyManager, nil, 0, accountID, isValidator)
 	} else {
-		validationBlockIssuer = nil
+		validator = nil
 	}
 
 	return &Node{
@@ -100,8 +110,9 @@ func NewNode(t *testing.T, parentLogger log.Logger, net *Network, partition stri
 
 		Name: name,
 
-		Validator:  validationBlockIssuer,
-		KeyManager: keyManager,
+		isValidator: isValidator,
+		Validator:   validator,
+		KeyManager:  keyManager,
 
 		PeerID: peerID,
 
@@ -129,7 +140,15 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 		n.Endpoint,
 		opts...,
 	)
+	n.RequestHandler = requesthandler.New(n.Protocol)
 
+	_, pub := n.KeyManager.KeyPair()
+	accountID := iotago.AccountID(blake2b.Sum256(pub))
+
+	n.Client = NewTestSuiteClient(n)
+	if n.isValidator {
+		n.Validator = NewBlockIssuer(n.Testing, n.Name, n.KeyManager, n.Client, 0, accountID, n.isValidator)
+	}
 	n.hookEvents()
 	n.hookEngineEvents(failOnBlockFiltered)
 
@@ -336,7 +355,7 @@ func (n *Node) MainEngineSwitchedCount() int {
 	return int(n.mainEngineSwitchedCount.Load())
 }
 
-func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...options.Option[ValidationBlockParams]) *blocks.Block {
+func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...options.Option[ValidationBlockParams]) (*blocks.Block, error) {
 	if n.Validator == nil {
 		panic("node is not a validator")
 	}

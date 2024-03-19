@@ -26,7 +26,25 @@ func (r *RequestHandler) BlockIDFromTransactionID(transactionID iotago.Transacti
 	return spent.BlockID(), nil
 }
 
-func (r *RequestHandler) TransactionMetadataByID(txID iotago.TransactionID) (*api.TransactionMetadataResponse, error) {
+func (r *RequestHandler) BlockFromTransactionID(transactionID iotago.TransactionID) (*iotago.Block, error) {
+	blockID, err := r.BlockIDFromTransactionID(transactionID)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.BlockFromBlockID(blockID)
+}
+
+func (r *RequestHandler) BlockMetadataFromTransactionID(txID iotago.TransactionID) (*api.BlockMetadataResponse, error) {
+	blockID, err := r.BlockIDFromTransactionID(txID)
+	if err != nil {
+		return nil, ierrors.WithMessagef(echo.ErrNotFound, "failed to get block ID from transaction ID: %v", err)
+	}
+
+	return r.BlockMetadataFromBlockID(blockID)
+}
+
+func (r *RequestHandler) TransactionMetadataFromTransactionID(txID iotago.TransactionID) (*api.TransactionMetadataResponse, error) {
 	txMetadata, err := r.protocol.Engines.Main.Get().TxRetainer.TransactionMetadata(txID)
 	if err != nil {
 		if ierrors.Is(err, txretainer.ErrEntryNotFound) {

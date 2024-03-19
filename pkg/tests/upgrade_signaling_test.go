@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
-	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -133,11 +132,11 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	hash2 := iotago.Identifier{2}
 
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:                                    ts.Node("nodeA").Validator.AccountID,
+		ID:                                    ts.Node("nodeA").Validator.AccountData.ID,
 		Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits / 2, UpdateSlot: 0},
 		ExpirySlot:                            iotago.MaxSlotIndex,
-		OutputID:                              ts.AccountOutput("Genesis:1").OutputID(),
-		BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeA").Validator.PublicKey))),
+		OutputID:                              ts.AccountOutput("Genesis:1").ID,
+		BlockIssuerKeys:                       ts.Node("nodeA").Validator.BlockIssuerKeys(),
 		ValidatorStake:                        mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()),
 		DelegationStake:                       0,
 		FixedCost:                             0,
@@ -146,11 +145,11 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	}, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:                                    wallet.BlockIssuer.AccountID,
+		ID:                                    wallet.BlockIssuer.AccountData.ID,
 		Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits / 2, UpdateSlot: 0},
 		ExpirySlot:                            iotago.MaxSlotIndex,
-		OutputID:                              ts.AccountOutput("Genesis:5").OutputID(),
-		BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(ed25519.PublicKey(wallet.BlockIssuer.PublicKey))),
+		OutputID:                              ts.AccountOutput("Genesis:5").ID,
+		BlockIssuerKeys:                       wallet.BlockIssuer.BlockIssuerKeys(),
 		ValidatorStake:                        0,
 		DelegationStake:                       0,
 		FixedCost:                             0,
@@ -167,11 +166,11 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 	// check account data before all nodes set the current version
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:                                    ts.Node("nodeA").Validator.AccountID,
+		ID:                                    ts.Node("nodeA").Validator.AccountData.ID,
 		Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits / 2, UpdateSlot: 0},
 		ExpirySlot:                            iotago.MaxSlotIndex,
-		OutputID:                              ts.AccountOutput("Genesis:1").OutputID(),
-		BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeA").Validator.PublicKey))),
+		OutputID:                              ts.AccountOutput("Genesis:1").ID,
+		BlockIssuerKeys:                       ts.Node("nodeA").Validator.BlockIssuerKeys(),
 		ValidatorStake:                        mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()),
 		DelegationStake:                       0,
 		FixedCost:                             0,
@@ -180,11 +179,11 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	}, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:                                    ts.Node("nodeD").Validator.AccountID,
+		ID:                                    ts.Node("nodeD").Validator.AccountData.ID,
 		Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits / 2, UpdateSlot: 0},
 		ExpirySlot:                            iotago.MaxSlotIndex,
-		OutputID:                              ts.AccountOutput("Genesis:4").OutputID(),
-		BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeD").Validator.PublicKey))),
+		OutputID:                              ts.AccountOutput("Genesis:4").ID,
+		BlockIssuerKeys:                       ts.Node("nodeD").Validator.BlockIssuerKeys(),
 		ValidatorStake:                        mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()),
 		DelegationStake:                       0,
 		FixedCost:                             0,
@@ -201,11 +200,11 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	ts.IssueBlocksAtEpoch("", 1, 4, "7.3", ts.Nodes(), true, false)
 
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:                                    ts.Node("nodeA").Validator.AccountID,
+		ID:                                    ts.Node("nodeA").Validator.AccountData.ID,
 		Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits / 2, UpdateSlot: 0},
 		ExpirySlot:                            iotago.MaxSlotIndex,
-		OutputID:                              ts.AccountOutput("Genesis:1").OutputID(),
-		BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeA").Validator.PublicKey))),
+		OutputID:                              ts.AccountOutput("Genesis:1").ID,
+		BlockIssuerKeys:                       ts.Node("nodeA").Validator.BlockIssuerKeys(),
 		ValidatorStake:                        mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()),
 		DelegationStake:                       0,
 		FixedCost:                             0,
@@ -214,10 +213,10 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	}, ts.Nodes()...)
 
 	// check that rollback is correct
-	pastAccounts, err := ts.Node("nodeA").Protocol.Engines.Main.Get().Ledger.PastAccounts(iotago.AccountIDs{ts.Node("nodeA").Validator.AccountID}, 7)
+	pastAccounts, err := ts.Node("nodeA").Protocol.Engines.Main.Get().Ledger.PastAccounts(iotago.AccountIDs{ts.Node("nodeA").Validator.AccountData.ID}, 7)
 	require.NoError(t, err)
-	require.Contains(t, pastAccounts, ts.Node("nodeA").Validator.AccountID)
-	require.Equal(t, model.VersionAndHash{Version: 4, Hash: hash2}, pastAccounts[ts.Node("nodeA").Validator.AccountID].LatestSupportedProtocolVersionAndHash)
+	require.Contains(t, pastAccounts, ts.Node("nodeA").Validator.AccountData.ID)
+	require.Equal(t, model.VersionAndHash{Version: 4, Hash: hash2}, pastAccounts[ts.Node("nodeA").Validator.AccountData.ID].LatestSupportedProtocolVersionAndHash)
 
 	ts.IssueBlocksAtEpoch("", 2, 4, "15.3", ts.Nodes(), true, false)
 	ts.IssueBlocksAtEpoch("", 3, 4, "23.3", ts.Nodes(), true, false)
@@ -366,11 +365,11 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 		// check account data at the end of the test
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:                                    ts.Node("nodeA").Validator.AccountID,
+			ID:                                    ts.Node("nodeA").Validator.AccountData.ID,
 			Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits / 2, UpdateSlot: 0},
 			ExpirySlot:                            iotago.MaxSlotIndex,
-			OutputID:                              ts.AccountOutput("Genesis:1").OutputID(),
-			BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeA").Validator.PublicKey))),
+			OutputID:                              ts.AccountOutput("Genesis:1").ID,
+			BlockIssuerKeys:                       ts.Node("nodeA").Validator.BlockIssuerKeys(),
 			ValidatorStake:                        mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()),
 			DelegationStake:                       0,
 			FixedCost:                             0,
@@ -379,11 +378,11 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		}, ts.Nodes()...)
 
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:                                    ts.Node("nodeD").Validator.AccountID,
+			ID:                                    ts.Node("nodeD").Validator.AccountData.ID,
 			Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits / 2, UpdateSlot: 0},
 			ExpirySlot:                            iotago.MaxSlotIndex,
-			OutputID:                              ts.AccountOutput("Genesis:4").OutputID(),
-			BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeD").Validator.PublicKey))),
+			OutputID:                              ts.AccountOutput("Genesis:4").ID,
+			BlockIssuerKeys:                       ts.Node("nodeD").Validator.BlockIssuerKeys(),
 			ValidatorStake:                        mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()),
 			DelegationStake:                       0,
 			FixedCost:                             0,

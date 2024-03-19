@@ -66,13 +66,13 @@ func TestProtocol_Eviction(t *testing.T) {
 				sybilprotectionv1.NewProvider(
 					sybilprotectionv1.WithSeatManagerProvider(module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
 						poa := mock2.NewManualPOAProvider()(e).(*mock2.ManualPOA)
-						poa.AddAccount(node.Validator.AccountID, node.Name)
+						poa.AddAccount(node.Validator.AccountData.ID, node.Name)
 
 						onlineValidators := ds.NewSet[string]()
 
 						e.ConstructedEvent().OnTrigger(func() {
 							e.Events.BlockDAG.BlockAppended.Hook(func(block *blocks.Block) {
-								if block.ModelBlock().ProtocolBlock().Header.IssuerID == node.Validator.AccountID && onlineValidators.Add(node.Name) {
+								if block.ModelBlock().ProtocolBlock().Header.IssuerID == node.Validator.AccountData.ID && onlineValidators.Add(node.Name) {
 									e.LogError("node online", "name", node.Name)
 									poa.SetOnline(onlineValidators.ToSlice()...)
 								}
@@ -119,7 +119,7 @@ func TestProtocol_Eviction(t *testing.T) {
 			testsuite.WithMainChainID(genesisCommitment.MustID()),
 			testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment}),
 
-			testsuite.WithSybilProtectionCommittee(0, []iotago.AccountID{node.Validator.AccountID}),
+			testsuite.WithSybilProtectionCommittee(0, []iotago.AccountID{node.Validator.AccountData.ID}),
 			testsuite.WithEvictedSlot(0),
 			testsuite.WithActiveRootBlocks(ts.Blocks("Genesis")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis")),
@@ -153,7 +153,7 @@ func TestProtocol_Eviction(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(lastCommittedSlot),
 			testsuite.WithEqualStoredCommitmentAtIndex(lastCommittedSlot),
 			testsuite.WithLatestCommitmentCumulativeWeight(cumulativeAttestations),
-			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(lastCommittedSlot), []iotago.AccountID{node.Validator.AccountID}),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(lastCommittedSlot), []iotago.AccountID{node.Validator.AccountData.ID}),
 			testsuite.WithEvictedSlot(lastCommittedSlot),
 		)
 
