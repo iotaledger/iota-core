@@ -497,7 +497,8 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 				committmentID := tpkg.RandCommitmentID()
 				resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesByID(context.Background(), committmentID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				// commitmentID is valid, but the UTXO changes does not exist in the storage
+				require.True(t, isStatusCode(err, http.StatusInternalServerError))
 				require.Nil(t, resp)
 			},
 		},
@@ -508,7 +509,8 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 
 				resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesFullByID(context.Background(), committmentID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				// commitmentID is valid, but the UTXO changes does not exist in the storage
+				require.True(t, isStatusCode(err, http.StatusInternalServerError))
 				require.Nil(t, resp)
 			},
 		},
