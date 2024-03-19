@@ -23,7 +23,7 @@ func (r *RequestHandler) GetCommitmentBySlot(slot iotago.SlotIndex) (*model.Comm
 	commitment, err := r.protocol.Engines.Main.Get().Storage.Commitments().Load(slot)
 	if err != nil {
 		if ierrors.Is(err, permanent.ErrCommitmentBeforeGenesis) {
-			return nil, ierrors.WithMessagef(httpserver.ErrInvalidParameter, "commitment slot (%d) is before the genesis slot", slot)
+			return nil, ierrors.Chain(httpserver.ErrInvalidParameter, err)
 		}
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
 			return nil, ierrors.WithMessagef(echo.ErrNotFound, "commitment not found, slot: %d", slot)
@@ -49,7 +49,7 @@ func (r *RequestHandler) GetCommitmentByID(commitmentID iotago.CommitmentID) (*m
 	commitment, err := r.protocol.Engines.Main.Get().Storage.Commitments().Load(commitmentID.Slot())
 	if err != nil {
 		if ierrors.Is(err, permanent.ErrCommitmentBeforeGenesis) {
-			return nil, ierrors.WithMessagef(httpserver.ErrInvalidParameter, "commitment ID (%s) is before the genesis slot", commitmentID)
+			return nil, ierrors.Chain(httpserver.ErrInvalidParameter, err)
 		}
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
 			return nil, ierrors.WithMessagef(echo.ErrNotFound, "commitment not found, commitmentID: %s, slot: %d", commitmentID, commitmentID.Slot())
