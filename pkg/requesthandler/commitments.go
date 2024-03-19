@@ -4,7 +4,10 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota.go/v4/api"
 
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -19,6 +22,13 @@ func (r *RequestHandler) GetCommitmentBySlot(slot iotago.SlotIndex) (*model.Comm
 
 	commitment, err := r.protocol.Engines.Main.Get().Storage.Commitments().Load(slot)
 	if err != nil {
+		if ierrors.Is(err, permanent.ErrCommitmentBeforeGenesis) {
+			return nil, ierrors.WithMessagef(httpserver.ErrInvalidParameter, "commitment slot (%d) is before the genesis slot", slot)
+		}
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+			return nil, ierrors.WithMessagef(echo.ErrNotFound, "commitment not found, slot: %d", slot)
+		}
+
 		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to load commitment, slot: %d, error: %w", slot, err)
 	}
 
@@ -38,7 +48,14 @@ func (r *RequestHandler) GetCommitmentByID(commitmentID iotago.CommitmentID) (*m
 
 	commitment, err := r.protocol.Engines.Main.Get().Storage.Commitments().Load(commitmentID.Slot())
 	if err != nil {
-		return nil, ierrors.WithMessagef(echo.ErrNotFound, "failed to load commitment, commitmentID: %s, slot: %d, error: %w", commitmentID, commitmentID.Slot(), err)
+		if ierrors.Is(err, permanent.ErrCommitmentBeforeGenesis) {
+			return nil, ierrors.WithMessagef(httpserver.ErrInvalidParameter, "commitment ID (%s) is before the genesis slot", commitmentID)
+		}
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+			return nil, ierrors.WithMessagef(echo.ErrNotFound, "commitment not found, commitmentID: %s, slot: %d", commitmentID, commitmentID.Slot())
+		}
+
+		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to load commitment, commitmentID: %s, slot: %d, error: %w", commitmentID, commitmentID.Slot(), err)
 	}
 
 	if commitment.ID() != commitmentID {
