@@ -43,6 +43,9 @@ type SyncManager struct {
 	isSynced     bool
 	isSyncedLock syncutils.RWMutex
 
+	isFinalizationDelayed     bool
+	isFinalizationDelayedLock syncutils.RWMutex
+
 	isBootstrapped     bool
 	isBootstrappedLock syncutils.RWMutex
 
@@ -111,6 +114,11 @@ func New(subModule module.Module, e *engine.Engine, latestCommitment *model.Comm
 		lastConfirmedBlockSlot: latestCommitment.Slot(),
 		latestCommitment:       latestCommitment,
 		latestFinalizedSlot:    finalizedSlot,
+		lastPrunedEpoch:        0,
+		hasPruned:              false,
+		isSynced:               false,
+		isFinalizationDelayed:  true,
+		isBootstrapped:         false,
 
 		optsBootstrappedThreshold: 10 * time.Second,
 	}, opts, func(s *SyncManager) {
@@ -126,26 +134,18 @@ func New(subModule module.Module, e *engine.Engine, latestCommitment *model.Comm
 }
 
 func (s *SyncManager) SyncStatus() *syncmanager.SyncStatus {
-	s.lastAcceptedBlockSlotLock.RLock()
-	s.lastConfirmedBlockSlotLock.RLock()
-	s.latestCommitmentLock.RLock()
-	s.latestFinalizedSlotLock.RLock()
-	s.lastPrunedEpochLock.RLock()
-	defer s.lastAcceptedBlockSlotLock.RUnlock()
-	defer s.lastConfirmedBlockSlotLock.RUnlock()
-	defer s.latestCommitmentLock.RUnlock()
-	defer s.latestFinalizedSlotLock.RUnlock()
-	defer s.lastPrunedEpochLock.RUnlock()
+	lastPrunedEpoch, hasPruned := s.LastPrunedEpoch()
 
 	return &syncmanager.SyncStatus{
-		NodeSynced:             s.IsNodeSynced(),
 		NodeBootstrapped:       s.IsBootstrapped(),
-		LastAcceptedBlockSlot:  s.lastAcceptedBlockSlot,
-		LastConfirmedBlockSlot: s.lastConfirmedBlockSlot,
-		LatestCommitment:       s.latestCommitment,
-		LatestFinalizedSlot:    s.latestFinalizedSlot,
-		LastPrunedEpoch:        s.lastPrunedEpoch,
-		HasPruned:              s.hasPruned,
+		NodeSynced:             s.IsNodeSynced(),
+		FinalizationDelayed:    s.IsFinalizationDelayed(),
+		LastAcceptedBlockSlot:  s.LastAcceptedBlockSlot(),
+		LastConfirmedBlockSlot: s.LastConfirmedBlockSlot(),
+		LatestCommitment:       s.LatestCommitment(),
+		LatestFinalizedSlot:    s.LatestFinalizedSlot(),
+		LastPrunedEpoch:        lastPrunedEpoch,
+		HasPruned:              hasPruned,
 	}
 }
 
@@ -155,16 +155,19 @@ func (s *SyncManager) Reset() {
 	s.lastConfirmedBlockSlotLock.Lock()
 	s.latestCommitmentLock.RLock()
 	s.isSyncedLock.Lock()
+	s.isFinalizationDelayedLock.Lock()
 	defer s.lastAcceptedBlockSlotLock.Unlock()
 	defer s.lastConfirmedBlockSlotLock.Unlock()
 	defer s.latestCommitmentLock.RUnlock()
 	defer s.isSyncedLock.Unlock()
+	defer s.isFinalizationDelayedLock.Unlock()
 
 	s.lastAcceptedBlockSlot = s.latestCommitment.Slot()
 	s.lastConfirmedBlockSlot = s.latestCommitment.Slot()
 	// Mark the synced flag as false,
 	// because we clear the latest accepted blocks and return the whole state to the last committed slot.
 	s.isSynced = false
+	s.isFinalizationDelayed = true
 }
 
 func (s *SyncManager) updateLastAcceptedBlock(id iotago.BlockID) (changed bool) {
@@ -193,12 +196,16 @@ func (s *SyncManager) updateLastConfirmedBlock(id iotago.BlockID) (changed bool)
 
 func (s *SyncManager) updateLatestCommitment(commitment *model.Commitment) (changed bool) {
 	s.latestCommitmentLock.Lock()
-	defer s.latestCommitmentLock.Unlock()
 
 	if s.latestCommitment != commitment {
 		s.latestCommitment = commitment
+		s.latestCommitmentLock.Unlock()
+
+		s.setIsFinalizationDelayed(s.LatestFinalizedSlot(), commitment.Slot())
+
 		return true
 	}
+	s.latestCommitmentLock.Unlock()
 
 	return false
 }
@@ -224,24 +231,28 @@ func (s *SyncManager) updateSyncStatus() (changed bool) {
 	return false
 }
 
-func (s *SyncManager) updateFinalizedSlot(index iotago.SlotIndex) (changed bool) {
+func (s *SyncManager) updateFinalizedSlot(slot iotago.SlotIndex) (changed bool) {
 	s.latestFinalizedSlotLock.Lock()
-	defer s.latestFinalizedSlotLock.Unlock()
 
-	if s.latestFinalizedSlot != index {
-		s.latestFinalizedSlot = index
+	if s.latestFinalizedSlot != slot {
+		s.latestFinalizedSlot = slot
+		s.latestFinalizedSlotLock.Unlock()
+
+		s.setIsFinalizationDelayed(slot, s.LatestCommitment().Slot())
+
 		return true
 	}
+	s.latestFinalizedSlotLock.Unlock()
 
 	return false
 }
 
-func (s *SyncManager) updatePrunedEpoch(index iotago.EpochIndex, hasPruned bool) (changed bool) {
+func (s *SyncManager) updatePrunedEpoch(epoch iotago.EpochIndex, hasPruned bool) (changed bool) {
 	s.lastPrunedEpochLock.Lock()
 	defer s.lastPrunedEpochLock.Unlock()
 
-	if s.lastPrunedEpoch != index {
-		s.lastPrunedEpoch = index
+	if s.lastPrunedEpoch != epoch {
+		s.lastPrunedEpoch = epoch
 		s.hasPruned = hasPruned
 
 		return true
@@ -262,6 +273,25 @@ func (s *SyncManager) IsNodeSynced() bool {
 	defer s.isSyncedLock.RUnlock()
 
 	return s.isSynced
+}
+
+func (s *SyncManager) setIsFinalizationDelayed(latestFinalizedSlot iotago.SlotIndex, latestCommitmentSlot iotago.SlotIndex) {
+	s.isFinalizationDelayedLock.Lock()
+	defer s.isFinalizationDelayedLock.Unlock()
+
+	if latestCommitmentSlot < latestFinalizedSlot {
+		// This should never happen, but if it does, we don't want to panic.
+		return
+	}
+
+	s.isFinalizationDelayed = latestCommitmentSlot-latestFinalizedSlot > s.engine.CommittedAPI().ProtocolParameters().MaxCommittableAge()
+}
+
+func (s *SyncManager) IsFinalizationDelayed() bool {
+	s.isFinalizationDelayedLock.RLock()
+	defer s.isFinalizationDelayedLock.RUnlock()
+
+	return s.isFinalizationDelayed
 }
 
 func (s *SyncManager) LastAcceptedBlockSlot() iotago.SlotIndex {
