@@ -134,18 +134,37 @@ func New(subModule module.Module, e *engine.Engine, latestCommitment *model.Comm
 }
 
 func (s *SyncManager) SyncStatus() *syncmanager.SyncStatus {
-	lastPrunedEpoch, hasPruned := s.LastPrunedEpoch()
+	// get all the locks so we have an atomic view of the state
+	s.isBootstrappedLock.RLock()
+	s.isSyncedLock.RLock()
+	s.isFinalizationDelayedLock.RLock()
+	s.lastAcceptedBlockSlotLock.RLock()
+	s.lastConfirmedBlockSlotLock.RLock()
+	s.latestCommitmentLock.RLock()
+	s.latestFinalizedSlotLock.RLock()
+	s.lastPrunedEpochLock.RLock()
+
+	defer func() {
+		s.isBootstrappedLock.RUnlock()
+		s.isSyncedLock.RUnlock()
+		s.isFinalizationDelayedLock.RUnlock()
+		s.lastAcceptedBlockSlotLock.RUnlock()
+		s.lastConfirmedBlockSlotLock.RUnlock()
+		s.latestCommitmentLock.RUnlock()
+		s.latestFinalizedSlotLock.RUnlock()
+		s.lastPrunedEpochLock.RUnlock()
+	}()
 
 	return &syncmanager.SyncStatus{
-		NodeBootstrapped:       s.IsBootstrapped(),
-		NodeSynced:             s.IsNodeSynced(),
-		FinalizationDelayed:    s.IsFinalizationDelayed(),
-		LastAcceptedBlockSlot:  s.LastAcceptedBlockSlot(),
-		LastConfirmedBlockSlot: s.LastConfirmedBlockSlot(),
-		LatestCommitment:       s.LatestCommitment(),
-		LatestFinalizedSlot:    s.LatestFinalizedSlot(),
-		LastPrunedEpoch:        lastPrunedEpoch,
-		HasPruned:              hasPruned,
+		NodeBootstrapped:       s.isBootstrapped,
+		NodeSynced:             s.isSynced,
+		FinalizationDelayed:    s.isFinalizationDelayed,
+		LastAcceptedBlockSlot:  s.lastAcceptedBlockSlot,
+		LastConfirmedBlockSlot: s.lastConfirmedBlockSlot,
+		LatestCommitment:       s.latestCommitment,
+		LatestFinalizedSlot:    s.latestFinalizedSlot,
+		LastPrunedEpoch:        s.lastPrunedEpoch,
+		HasPruned:              s.hasPruned,
 	}
 }
 
