@@ -214,7 +214,6 @@ func NewProvider(opts ...options.Option[TransactionRetainer]) module.Provider[*e
 
 			// this event is fired when an attachment of a transaction is detected
 			e.Ledger.MemPool().OnSignedTransactionAttached(func(signedTransactionMetadata mempool.SignedTransactionMetadata) {
-
 				// attachment with invalid signature detected
 				signedTransactionMetadata.OnSignaturesInvalid(func(err error) {
 					transactionMetadata := signedTransactionMetadata.TransactionMetadata()

@@ -423,8 +423,7 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*model.Ac
 		oldPubKeysSet := accountData.BlockIssuerKeys
 		newPubKeysSet := iotago.NewBlockIssuerKeys()
 		for _, blockIssuerKey := range createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys {
-			k := blockIssuerKey
-			newPubKeysSet.Add(k)
+			newPubKeysSet.Add(blockIssuerKey)
 		}
 
 		// Add public keys that are not in the old set

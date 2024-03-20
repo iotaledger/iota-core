@@ -41,7 +41,6 @@ func (c *Cache) Reset() {
 }
 
 func (c *Cache) GetOrCreateRegisteredValidators(apiForEpoch iotago.API, key []byte, defaultValueFunc func() ([]*api.ValidatorResponse, error)) ([]*api.ValidatorResponse, error) {
-
 	registeredValidatorsBytes := c.Get(key)
 	if registeredValidatorsBytes == nil {
 		// get the ordered registered validators list from engine.

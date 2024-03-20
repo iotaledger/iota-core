@@ -218,7 +218,7 @@ func getFeatures[T iotago.Feature](opts *Options) iotago.Features[T] {
 
 	if opts.BlockIssuerKeys > 0 {
 		blockIssuerKeys := make([]iotago.BlockIssuerKey, 0, opts.BlockIssuerKeys)
-		for i := 0; i < opts.BlockIssuerKeys; i++ {
+		for range opts.BlockIssuerKeys {
 			blockIssuerKeys = append(blockIssuerKeys, &iotago.Ed25519PublicKeyHashBlockIssuerKey{})
 		}
 

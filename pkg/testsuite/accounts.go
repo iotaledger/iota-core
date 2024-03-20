@@ -103,7 +103,6 @@ func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes .
 func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.SlotIndex, accountDiff *model.AccountDiff, destroyed bool, nodes ...*mock.Node) {
 	for _, node := range nodes {
 		t.Eventually(func() error {
-
 			accountsDiffStorage, err := node.Protocol.Engines.Main.Get().Storage.AccountDiffs(index)
 			if err != nil {
 				return ierrors.Wrapf(err, "AssertAccountDiff: %s: failed to load accounts diff for slot %d", node.Name, index)

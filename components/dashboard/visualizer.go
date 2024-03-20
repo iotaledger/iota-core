@@ -1,3 +1,4 @@
+//nolint:tagliatelle // we won't change the dashboard now
 package dashboard
 
 import (
@@ -60,6 +61,7 @@ func sendVertex(blk *blocks.Block, confirmed bool) {
 					return txMetadata.IsAccepted()
 				}
 			}
+
 			return false
 		}(),
 	}}, true)
@@ -82,7 +84,6 @@ func sendTipInfo(block *blocks.Block, isTip bool) {
 
 func runVisualizer(component *app.Component) {
 	if err := component.Daemon().BackgroundWorker("Dashboard[Visualizer]", func(ctx context.Context) {
-
 		unhook := lo.Batch(
 			deps.Protocol.Events.Engine.Booker.TransactionAccepted.Hook(func(transactionMetadata mempool.TransactionMetadata) {
 				attachmentID := transactionMetadata.EarliestIncludedAttachment()

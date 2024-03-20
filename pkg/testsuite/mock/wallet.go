@@ -85,6 +85,8 @@ type Wallet struct {
 }
 
 func NewWallet(t *testing.T, name string, client Client, keyManager ...*wallet.KeyManager) *Wallet {
+	t.Helper()
+
 	var km *wallet.KeyManager
 	if len(keyManager) == 0 {
 		km = lo.PanicOnErr(wallet.NewKeyManagerFromRandom(wallet.DefaultIOTAPath))

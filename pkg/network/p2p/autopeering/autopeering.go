@@ -195,7 +195,7 @@ func randomSubset[T any](slice []T, n int) []T {
 
 	subset := make([]T, n)
 	indices := rand.Perm(len(slice)) // Get a slice of random unique indices
-	for i := 0; i < n; i++ {
+	for i := range n {
 		subset[i] = slice[indices[i]]
 	}
 

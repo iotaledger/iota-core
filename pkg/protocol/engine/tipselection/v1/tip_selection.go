@@ -165,11 +165,14 @@ func (t *TipSelection) Reset() {
 
 // classifyTip determines the initial tip pool of the given tip.
 func (t *TipSelection) classifyTip(tipMetadata tipmanager.TipMetadata) {
-	if t.isValidStrongTip(tipMetadata.Block()) {
+	switch {
+	case t.isValidStrongTip(tipMetadata.Block()):
 		tipMetadata.TipPool().Set(tipmanager.StrongTipPool)
-	} else if t.isValidWeakTip(tipMetadata.Block()) {
+
+	case t.isValidWeakTip(tipMetadata.Block()):
 		tipMetadata.TipPool().Set(tipmanager.WeakTipPool)
-	} else {
+
+	default:
 		tipMetadata.TipPool().Set(tipmanager.DroppedTipPool)
 	}
 

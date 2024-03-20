@@ -88,6 +88,8 @@ type Node struct {
 }
 
 func NewNode(t *testing.T, parentLogger log.Logger, net *Network, partition string, name string, isValidator bool) *Node {
+	t.Helper()
+
 	keyManager := lo.PanicOnErr(wallet.NewKeyManagerFromRandom(wallet.DefaultIOTAPath))
 	priv, pub := keyManager.KeyPair()
 
@@ -132,7 +134,6 @@ func (n *Node) IsValidator() bool {
 	return n.Validator != nil
 }
 
-//nolint:revive
 func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[protocol.Protocol]) {
 	n.Protocol = protocol.New(
 		n.logger,

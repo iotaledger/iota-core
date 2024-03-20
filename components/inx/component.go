@@ -43,6 +43,7 @@ type dependencies struct {
 }
 
 func provide(c *dig.Container) error {
+	//nolint:gocritic // easier to read which type is returned
 	if err := c.Provide(func() *Server {
 		return newServer()
 	}); err != nil {

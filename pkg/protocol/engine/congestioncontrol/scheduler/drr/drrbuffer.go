@@ -267,7 +267,6 @@ func (b *BufferQueue) PopFront() *blocks.Block {
 	block := q.PopFront()
 	if block == nil {
 		return nil
-
 	}
 
 	b.size.Dec()

@@ -10,7 +10,6 @@ import (
 )
 
 func apiMiddleware() echo.MiddlewareFunc {
-
 	publicRoutesRegEx, err := restapi.CompileRoutesAsRegexes(ParamsRestAPI.PublicRoutes)
 	if err != nil {
 		Component.LogFatal(err.Error())
@@ -71,7 +70,6 @@ func apiMiddleware() echo.MiddlewareFunc {
 	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-
 		// Skip routes matching the publicRoutes
 		publicSkipper := func(c echo.Context) bool {
 			return matchPublic(c)
@@ -80,7 +78,6 @@ func apiMiddleware() echo.MiddlewareFunc {
 		jwtMiddlewareHandler := jwtAuth.Middleware(publicSkipper, jwtAllow)(next)
 
 		return func(c echo.Context) error {
-
 			// Check if the route should be exposed (public or protected)
 			if matchExposed(c) {
 				// Apply JWT middleware

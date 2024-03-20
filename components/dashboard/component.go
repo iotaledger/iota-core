@@ -28,7 +28,7 @@ func init() {
 		Params:    params,
 		Configure: configure,
 		Run:       run,
-		IsEnabled: func(c *dig.Container) bool {
+		IsEnabled: func(*dig.Container) bool {
 			return ParamsDashboard.Enabled
 		},
 	}
@@ -117,11 +117,12 @@ func configureServer() {
 	server.Use(middleware.Recover())
 
 	if ParamsDashboard.BasicAuth.Enabled {
-		server.Use(middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
+		server.Use(middleware.BasicAuth(func(username, password string, _ echo.Context) (bool, error) {
 			if username == ParamsDashboard.BasicAuth.Username &&
 				password == ParamsDashboard.BasicAuth.Password {
 				return true, nil
 			}
+
 			return false, nil
 		}))
 	}
@@ -170,17 +171,17 @@ func currentNodeStatus() *nodestatus {
 }
 
 func neighborMetrics() []neighbormetric {
-	var stats []neighbormetric
 	if deps.NetworkManager == nil {
-		return stats
+		return []neighbormetric{}
 	}
 
 	// gossip plugin might be disabled
 	neighbors := deps.NetworkManager.AllNeighbors()
 	if neighbors == nil {
-		return stats
+		return []neighbormetric{}
 	}
 
+	stats := make([]neighbormetric, 0, len(neighbors))
 	for _, neighbor := range neighbors {
 		stats = append(stats, neighbormetric{
 			ID:             neighbor.Peer().ID.String(),
@@ -189,5 +190,6 @@ func neighborMetrics() []neighbormetric {
 			PacketsWritten: neighbor.PacketsWritten(),
 		})
 	}
+
 	return stats
 }

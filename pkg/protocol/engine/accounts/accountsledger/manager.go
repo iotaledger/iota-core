@@ -197,7 +197,6 @@ func (m *Manager) Account(accountID iotago.AccountID, targetSlot iotago.SlotInde
 	defer m.mutex.RUnlock()
 
 	return m.account(accountID, targetSlot)
-
 }
 
 func (m *Manager) account(accountID iotago.AccountID, targetSlot iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error) {

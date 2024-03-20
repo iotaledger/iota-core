@@ -381,11 +381,9 @@ func (m *MemPool[VoteRank]) storeTransaction(signedTransaction mempool.SignedTra
 }
 
 func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
-	for i, inputReference := range transaction.inputReferences {
-		stateReference, index := inputReference, i
-
-		request, created := m.cachedStateRequests.GetOrCreate(stateReference.ReferencedStateID(), func() *promise.Promise[*StateMetadata] {
-			return m.requestState(stateReference, true)
+	for index, inputReference := range transaction.inputReferences {
+		request, created := m.cachedStateRequests.GetOrCreate(inputReference.ReferencedStateID(), func() *promise.Promise[*StateMetadata] {
+			return m.requestState(inputReference, true)
 		})
 
 		request.OnSuccess(func(inputState *StateMetadata) {

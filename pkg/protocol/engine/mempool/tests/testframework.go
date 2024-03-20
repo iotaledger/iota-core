@@ -9,7 +9,6 @@ import (
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/debug"
-	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	ledgertests "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
@@ -31,12 +30,13 @@ type TestFramework struct {
 	ledgerState *ledgertests.MockStateResolver
 	workers     *workerpool.Group
 
-	test  *testing.T
-	mutex syncutils.RWMutex
+	test *testing.T
 }
 
-func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedRank], spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, vote.MockedRank], ledgerState *ledgertests.MockStateResolver, workers *workerpool.Group) *TestFramework {
-	t := &TestFramework{
+func NewTestFramework(t *testing.T, instance mempool.MemPool[vote.MockedRank], spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, vote.MockedRank], ledgerState *ledgertests.MockStateResolver, workers *workerpool.Group) *TestFramework {
+	t.Helper()
+
+	tf := &TestFramework{
 		Instance:                 instance,
 		SpendDAG:                 spendDAG,
 		referencesByAlias:        make(map[string]mempool.StateReference),
@@ -47,12 +47,12 @@ func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedRank]
 
 		ledgerState: ledgerState,
 		workers:     workers,
-		test:        test,
+		test:        t,
 	}
 
-	t.setupHookedEvents()
+	tf.setupHookedEvents()
 
-	return t
+	return tf
 }
 
 func (t *TestFramework) InjectState(alias string, state mempool.State) {
@@ -94,7 +94,7 @@ func (t *TestFramework) CreateTransaction(alias string, referencedStates []strin
 	transactionID.RegisterAlias(alias)
 
 	// register the aliases for the generated output IDs
-	for i := uint16(0); i < transaction.outputCount; i++ {
+	for i := range transaction.outputCount {
 		t.referencesByAlias[alias+":"+strconv.Itoa(int(i))] = mempool.UTXOInputStateRefFromInput(&iotago.UTXOInput{
 			TransactionID:          transactionID,
 			TransactionOutputIndex: i,
@@ -154,7 +154,7 @@ func (t *TestFramework) CommitSlot(slot iotago.SlotIndex) {
 		return true
 	})
 
-	stateDiff.DestroyedStates().ForEach(func(stateID mempool.StateID, metadata mempool.StateMetadata) bool {
+	stateDiff.DestroyedStates().ForEach(func(stateID mempool.StateID, _ mempool.StateMetadata) bool {
 		t.ledgerState.DestroyOutputState(stateID)
 
 		return true

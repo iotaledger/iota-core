@@ -85,13 +85,15 @@ type TestSuite struct {
 	currentSlot iotago.SlotIndex
 }
 
-func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestSuite {
+func NewTestSuite(t *testing.T, opts ...options.Option[TestSuite]) *TestSuite {
+	t.Helper()
+
 	return options.Apply(&TestSuite{
-		Testing:                             testingT,
+		Testing:                             t,
 		fakeTesting:                         &testing.T{},
 		genesisKeyManager:                   lo.PanicOnErr(wallet.NewKeyManagerFromRandom(wallet.DefaultIOTAPath)),
 		network:                             mock.NewNetwork(),
-		Directory:                           utils.NewDirectory(testingT.TempDir()),
+		Directory:                           utils.NewDirectory(t.TempDir()),
 		nodes:                               orderedmap.New[string, *mock.Node](),
 		wallets:                             orderedmap.New[string, *mock.Wallet](),
 		blocks:                              shrinkingmap.New[string, *blocks.Block](),
@@ -100,30 +102,30 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		optsWaitFor: durationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
 		optsTick:    durationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
 		optsLogger:  loggerFromEnvOrDefault("CI_UNIT_TESTS_NO_LOG", "CI_UNIT_TESTS_LOG_LEVEL"),
-	}, opts, func(t *TestSuite) {
+	}, opts, func(ts *TestSuite) {
 		// fmt.Println("Setup TestSuite -", testingT.Name(), " @ ", time.Now())
 
-		t.ProtocolParameterOptions = append(t.ProtocolParameterOptions, iotago.WithNetworkOptions(testingT.Name(), iotago.PrefixTestnet))
-		t.API = iotago.V3API(iotago.NewV3SnapshotProtocolParameters(t.ProtocolParameterOptions...))
+		ts.ProtocolParameterOptions = append(ts.ProtocolParameterOptions, iotago.WithNetworkOptions(t.Name(), iotago.PrefixTestnet))
+		ts.API = iotago.V3API(iotago.NewV3SnapshotProtocolParameters(ts.ProtocolParameterOptions...))
 
-		genesisBlock := blocks.NewRootBlock(t.API.ProtocolParameters().GenesisBlockID(), iotago.NewEmptyCommitment(t.API).MustID(), time.Unix(t.API.ProtocolParameters().GenesisUnixTimestamp(), 0))
-		t.RegisterBlock("Genesis", genesisBlock)
+		genesisBlock := blocks.NewRootBlock(ts.API.ProtocolParameters().GenesisBlockID(), iotago.NewEmptyCommitment(ts.API).MustID(), time.Unix(ts.API.ProtocolParameters().GenesisUnixTimestamp(), 0))
+		ts.RegisterBlock("Genesis", genesisBlock)
 
-		t.commitmentCheck = true
+		ts.commitmentCheck = true
 
-		t.snapshotPath = t.Directory.Path("genesis_snapshot.bin")
+		ts.snapshotPath = ts.Directory.Path("genesis_snapshot.bin")
 		defaultSnapshotOptions := []options.Option[snapshotcreator.Options]{
 			snapshotcreator.WithDatabaseVersion(protocol.DatabaseVersion),
-			snapshotcreator.WithFilePath(t.snapshotPath),
-			snapshotcreator.WithProtocolParameters(t.API.ProtocolParameters()),
+			snapshotcreator.WithFilePath(ts.snapshotPath),
+			snapshotcreator.WithProtocolParameters(ts.API.ProtocolParameters()),
 			snapshotcreator.WithRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
-				t.API.ProtocolParameters().GenesisBlockID(): iotago.NewEmptyCommitment(t.API).MustID(),
+				ts.API.ProtocolParameters().GenesisBlockID(): iotago.NewEmptyCommitment(ts.API).MustID(),
 			}),
 		}
-		t.optsSnapshotOptions = append(defaultSnapshotOptions, t.optsSnapshotOptions...)
+		ts.optsSnapshotOptions = append(defaultSnapshotOptions, ts.optsSnapshotOptions...)
 
 		// The first valid slot is always +1 of the genesis slot.
-		t.currentSlot = t.API.TimeProvider().GenesisSlot() + 1
+		ts.currentSlot = ts.API.TimeProvider().GenesisSlot() + 1
 	})
 }
 
