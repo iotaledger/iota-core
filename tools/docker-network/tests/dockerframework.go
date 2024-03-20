@@ -206,6 +206,7 @@ func (d *DockerTestFramework) waitForNodesAndGetClients() error {
 		d.nodes[node.Name] = node
 		d.clients[node.Name] = client
 	}
+	d.wallet.Client = d.clients["V1"]
 
 	return nil
 }
