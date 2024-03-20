@@ -28,7 +28,7 @@ func (t *TestSuite) AssertTransaction(transaction *iotago.Transaction, node *moc
 			return ierrors.Errorf("AssertTransaction: %s: expected ID %s, got %s", node.Name, transactionID, loadedTransactionMetadata.ID())
 		}
 
-		// nolint: forcetypeassert // we are in a test and want to assert it anyway
+		//nolint:forcetypeassert // we are in a test and want to assert it anyway
 		if !assert.Equal(t.fakeTesting, transaction.TransactionEssence, loadedTransactionMetadata.Transaction().(*iotago.Transaction).TransactionEssence) {
 			return ierrors.Errorf("AssertTransaction: %s: expected TransactionEssence %v, got %v", node.Name, transaction.TransactionEssence, loadedTransactionMetadata.Transaction().(*iotago.Transaction).TransactionEssence)
 		}
