@@ -179,7 +179,7 @@ func (c *Chain) CumulativeVerifiedWeightAt(slot iotago.SlotIndex) uint64 {
 func (c *Chain) LatestEngine() *engine.Engine {
 	currentChain, currentEngine := c, c.Engine.Get()
 	for ; currentEngine == nil; currentEngine = currentChain.Engine.Get() {
-		if currentChain = c.ParentChain.Get(); currentChain == nil {
+		if currentChain = currentChain.ParentChain.Get(); currentChain == nil {
 			return nil
 		}
 	}
