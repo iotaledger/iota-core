@@ -178,10 +178,16 @@ func (c *Chain) CumulativeVerifiedWeightAt(slot iotago.SlotIndex) uint64 {
 // LatestEngine returns the latest engine instance that was spawned by the chain itself or one of its ancestors.
 func (c *Chain) LatestEngine() *engine.Engine {
 	currentChain, currentEngine := c, c.Engine.Get()
-	for ; currentEngine == nil; currentEngine = currentChain.Engine.Get() {
-		if currentChain = currentChain.ParentChain.Get(); currentChain == nil {
+
+	for currentEngine == nil {
+		// traverse the chain upwards until we find an engine
+		currentChain = currentChain.ParentChain.Get()
+		if currentChain == nil {
+			// no parent chain and therefore no engine found
 			return nil
 		}
+
+		currentEngine = currentChain.Engine.Get()
 	}
 
 	return currentEngine
