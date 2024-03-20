@@ -12,7 +12,8 @@ import (
 )
 
 type StateMetadata struct {
-	state mempool.State
+	state  mempool.State
+	source *TransactionMetadata
 
 	// lifecycle
 	spenderCount       uint64
@@ -30,7 +31,8 @@ type StateMetadata struct {
 
 func NewStateMetadata(state mempool.State, optSource ...*TransactionMetadata) *StateMetadata {
 	return (&StateMetadata{
-		state: state,
+		state:  state,
+		source: lo.First(optSource),
 
 		spent:              promise.NewEvent(),
 		doubleSpent:        promise.NewEvent(),
@@ -70,6 +72,14 @@ func (s *StateMetadata) setup(optSource ...*TransactionMetadata) *StateMetadata 
 	source.OnOrphanedSlotUpdated(lo.Void(s.orphanedSlot.Set))
 
 	return s
+}
+
+func (s *StateMetadata) CreatingTransaction() mempool.TransactionMetadata {
+	if s.source == nil {
+		return nil
+	}
+
+	return s.source
 }
 
 func (s *StateMetadata) State() mempool.State {

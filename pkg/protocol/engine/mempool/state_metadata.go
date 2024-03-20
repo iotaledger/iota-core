@@ -6,6 +6,8 @@ import (
 )
 
 type StateMetadata interface {
+	CreatingTransaction() TransactionMetadata
+
 	State() State
 
 	SpenderIDs() reactive.Set[iotago.TransactionID]
