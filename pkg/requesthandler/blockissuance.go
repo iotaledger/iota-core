@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -36,15 +37,33 @@ func (r *RequestHandler) submitBlockAndAwaitEvent(ctx context.Context, block *mo
 	defer processingCtxCancel()
 	// Calculate the blockID so that we don't capture the block pointer in the event handlers.
 	blockID := block.ID()
-	evtUnhook := evt.Hook(func(eventBlock *blocks.Block) {
-		if blockID != eventBlock.ID() {
-			return
-		}
-		select {
-		case filtered <- nil:
-		case <-exit:
-		}
-	}, event.WithWorkerPool(r.workerPool)).Unhook
+
+	var successUnhook func()
+	// Hook to TransactionAttached event if the block contains a transaction.
+	signedTx, isTx := block.SignedTransaction()
+	if isTx {
+		txID := signedTx.Transaction.MustID()
+		successUnhook = r.protocol.Engines.Main.Get().Ledger.MemPool().OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {
+			if transactionMetadata.ID() != txID {
+				return
+			}
+			select {
+			case filtered <- nil:
+			case <-exit:
+			}
+		}, event.WithWorkerPool(r.workerPool)).Unhook
+	} else {
+		successUnhook = evt.Hook(func(eventBlock *blocks.Block) {
+			if blockID != eventBlock.ID() {
+				return
+			}
+			select {
+			case filtered <- nil:
+			case <-exit:
+			}
+		}, event.WithWorkerPool(r.workerPool)).Unhook
+	}
+
 	prefilteredUnhook := r.protocol.Events.Engine.PreSolidFilter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
 		if blockID != event.Block.ID() {
 			return
@@ -65,7 +84,7 @@ func (r *RequestHandler) submitBlockAndAwaitEvent(ctx context.Context, block *mo
 		}
 	}, event.WithWorkerPool(r.workerPool)).Unhook
 
-	defer lo.BatchReverse(evtUnhook, prefilteredUnhook, postfilteredUnhook)()
+	defer lo.BatchReverse(successUnhook, prefilteredUnhook, postfilteredUnhook)()
 
 	if err := r.submitBlock(block); err != nil {
 		return ierrors.Wrapf(err, "failed to issue block %s", blockID)
