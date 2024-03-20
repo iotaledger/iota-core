@@ -76,8 +76,7 @@ type Wallet struct {
 
 	keyManager *wallet.KeyManager
 
-	BlockIssuer   *BlockIssuer
-	IssuerAccount *AccountData
+	BlockIssuer *BlockIssuer
 
 	outputs      map[string]*OutputData
 	transactions map[string]*iotago.Transaction
@@ -91,21 +90,18 @@ func NewWallet(t *testing.T, name string, client Client, keyManager ...*wallet.K
 	} else {
 		km = keyManager[0]
 	}
-	issuerAccountData := &AccountData{
-		ID:           iotago.EmptyAccountID,
-		AddressIndex: 0,
-	}
+	blockIssuerAddressIndex := uint32(0)
+	blockIssuerID := iotago.EmptyAccountID
 
 	return &Wallet{
-		Testing:       t,
-		Name:          name,
-		Client:        client,
-		outputs:       make(map[string]*OutputData),
-		transactions:  make(map[string]*iotago.Transaction),
-		keyManager:    km,
-		IssuerAccount: issuerAccountData,
-		BlockIssuer:   NewBlockIssuer(t, name, km, client, issuerAccountData.AddressIndex, issuerAccountData.ID, false),
-		clock:         &TestSuiteWalletClock{},
+		Testing:      t,
+		Name:         name,
+		Client:       client,
+		outputs:      make(map[string]*OutputData),
+		transactions: make(map[string]*iotago.Transaction),
+		keyManager:   km,
+		BlockIssuer:  NewBlockIssuer(t, name, km, client, blockIssuerAddressIndex, blockIssuerID, false),
+		clock:        &TestSuiteWalletClock{},
 	}
 }
 

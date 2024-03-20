@@ -39,7 +39,6 @@ type Client interface {
 	Info(ctx context.Context) (*api.InfoResponse, error)
 	LatestAPI() iotago.API
 	Management(ctx context.Context) (nodeclient.ManagementClient, error)
-	Name() string
 	NetworkMetrics(ctx context.Context) (*api.NetworkMetricsResponse, error)
 	NodeSupportsRoute(ctx context.Context, route string) (bool, error)
 	OutputByID(ctx context.Context, outputID iotago.OutputID) (iotago.Output, error)

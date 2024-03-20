@@ -70,6 +70,7 @@ type DockerTestFramework struct {
 	Testing *testing.T
 
 	nodes     map[string]*Node
+	clients   map[string]mock.Client
 	nodesLock syncutils.RWMutex
 
 	snapshotPath     string
@@ -89,6 +90,7 @@ func NewDockerTestFramework(t *testing.T, opts ...options.Option[DockerTestFrame
 	return options.Apply(&DockerTestFramework{
 		Testing:         t,
 		nodes:           make(map[string]*Node),
+		clients:         make(map[string]mock.Client),
 		wallet:          NewDockerWallet(t),
 		optsWaitForSync: 5 * time.Minute,
 		optsWaitFor:     2 * time.Minute,
@@ -201,8 +203,8 @@ func (d *DockerTestFramework) waitForNodesAndGetClients() error {
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to create node client for node %s", node.Name)
 		}
-		d.wallet.Clients[node.Name] = client
 		d.nodes[node.Name] = node
+		d.clients[node.Name] = client
 	}
 
 	return nil
@@ -242,7 +244,7 @@ func (d *DockerTestFramework) WaitUntilSync() {
 	d.Eventually(func() error {
 		for _, node := range d.Nodes() {
 			for {
-				synced, err := d.wallet.Clients[node.Name].Health(context.TODO())
+				synced, err := d.Client(node.Name).Health(context.TODO())
 				if err != nil {
 					return err
 				}
@@ -318,10 +320,39 @@ func (d *DockerTestFramework) Node(name string) *Node {
 	return node
 }
 
+func (d *DockerTestFramework) Clients(names ...string) map[string]mock.Client {
+	d.nodesLock.RLock()
+	defer d.nodesLock.RUnlock()
+
+	if len(names) == 0 {
+		return d.clients
+	}
+
+	clients := make(map[string]mock.Client, len(names))
+	for _, name := range names {
+		client, exist := d.clients[name]
+		require.True(d.Testing, exist)
+
+		clients[name] = client
+	}
+
+	return clients
+}
+
+func (d *DockerTestFramework) Client(name string) mock.Client {
+	d.nodesLock.RLock()
+	defer d.nodesLock.RUnlock()
+
+	client, exist := d.clients[name]
+	require.True(d.Testing, exist)
+
+	return client
+}
+
 func (d *DockerTestFramework) NodeStatus(name string) *api.InfoResNodeStatus {
 	node := d.Node(name)
 
-	info, err := d.wallet.Clients[node.Name].Info(context.TODO())
+	info, err := d.Client(node.Name).Info(context.TODO())
 	require.NoError(d.Testing, err)
 
 	return info.Status
@@ -367,7 +398,7 @@ func (d *DockerTestFramework) StopIssueCandidacyPayload(nodes ...*Node) {
 func (d *DockerTestFramework) IssueCandidacyPayloadFromAccount(issuerId iotago.AccountID) iotago.BlockID {
 	issuer := d.wallet.Account(issuerId)
 	ctx := context.TODO()
-	clt := d.wallet.DefaultClient()
+	clt := d.wallet.Client
 
 	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, issuer.Address)
 
@@ -378,7 +409,7 @@ func (d *DockerTestFramework) IssueCandidacyPayloadFromAccount(issuerId iotago.A
 func (d *DockerTestFramework) CreateTaggedDataBlock(issuerID iotago.AccountID, tag []byte) *iotago.Block {
 	issuer := d.wallet.Account(issuerID)
 	ctx := context.TODO()
-	clt := d.wallet.DefaultClient()
+	clt := d.wallet.Client
 
 	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, issuer.Address)
 
@@ -388,7 +419,7 @@ func (d *DockerTestFramework) CreateTaggedDataBlock(issuerID iotago.AccountID, t
 }
 
 func (d *DockerTestFramework) CreateBasicOutputBlock(issuerAccountID iotago.AccountID) (*iotago.Block, *iotago.SignedTransaction, *mock.OutputData) {
-	clt := d.wallet.DefaultClient()
+	clt := d.wallet.Client
 	ctx := context.Background()
 
 	fundsOutputID := d.RequestFaucetFunds(ctx, iotago.AddressEd25519)
@@ -406,7 +437,7 @@ func (d *DockerTestFramework) CreateBasicOutputBlock(issuerAccountID iotago.Acco
 func (d *DockerTestFramework) CreateDelegationBlockFromInput(issuerID iotago.AccountID, accountAdddress *iotago.AccountAddress, inputID iotago.OutputID) (iotago.DelegationID, iotago.OutputID, *iotago.Block) {
 	issuer := d.wallet.Account(issuerID)
 	ctx := context.TODO()
-	clt := d.wallet.DefaultClient()
+	clt := d.wallet.Client
 
 	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, issuer.Address)
 
@@ -422,7 +453,7 @@ func (d *DockerTestFramework) CreateDelegationBlockFromInput(issuerID iotago.Acc
 func (d *DockerTestFramework) CreateFoundryBlockFromInput(issuerID iotago.AccountID, inputID iotago.OutputID, mintedAmount iotago.BaseToken, maxSupply iotago.BaseToken) (iotago.FoundryID, iotago.OutputID, *iotago.Block) {
 	issuer := d.wallet.Account(issuerID)
 	ctx := context.TODO()
-	clt := d.wallet.DefaultClient()
+	clt := d.wallet.Client
 
 	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, issuer.Address)
 	signedTx := d.wallet.CreateFoundryAndNativeTokensFromInput(issuerID, inputID, mintedAmount, maxSupply, issuerResp)
@@ -439,7 +470,7 @@ func (d *DockerTestFramework) CreateFoundryBlockFromInput(issuerID iotago.Accoun
 func (d *DockerTestFramework) CreateNFTBlockFromInput(issuerID iotago.AccountID, inputID iotago.OutputID, opts ...options.Option[builder.NFTOutputBuilder]) (iotago.NFTID, iotago.OutputID, *iotago.Block) {
 	issuer := d.wallet.Account(issuerID)
 	ctx := context.TODO()
-	clt := d.wallet.DefaultClient()
+	clt := d.wallet.Client
 
 	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, issuer.Address)
 	signedTx := d.wallet.CreateNFTFromInput(issuerID, inputID, issuerResp, opts...)
@@ -453,7 +484,7 @@ func (d *DockerTestFramework) CreateNFTBlockFromInput(issuerID iotago.AccountID,
 // CreateFoundryTransitionBlockFromInput consumes the given foundry output, then build block by increasing the minted amount by 1.
 func (d *DockerTestFramework) CreateFoundryTransitionBlockFromInput(issuerID iotago.AccountID, inputID iotago.OutputID) (iotago.FoundryID, iotago.OutputID, *iotago.Block) {
 	ctx := context.TODO()
-	clt := d.wallet.DefaultClient()
+	clt := d.wallet.Client
 	issuer := d.wallet.Account(issuerID)
 
 	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, issuer.Address)
@@ -470,7 +501,7 @@ func (d *DockerTestFramework) CreateFoundryTransitionBlockFromInput(issuerID iot
 // CreateAccountBlockFromInput consumes the given output, which should be either an basic output with implicit address, then build block with the given account output options. Note that after the returned transaction is issued, remember to update the account information in the wallet with AddAccount().
 func (d *DockerTestFramework) CreateAccountBlockFromInput(inputID iotago.OutputID) (*mock.AccountData, iotago.OutputID, *iotago.Block) {
 	ctx := context.TODO()
-	clt := d.wallet.DefaultClient()
+	clt := d.wallet.Client
 	input := d.wallet.Output(inputID)
 
 	// check if the given input is an BasicOutput with implicit address
@@ -517,7 +548,7 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 	// create an implicit account by requesting faucet funds
 	ctx := context.TODO()
 	implicitAccount := d.CreateImplicitAccount(ctx)
-	clt := d.wallet.DefaultClient()
+	clt := d.wallet.Client
 
 	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, implicitAccount.Address)
 	fullAccount, signedTx := d.wallet.TransitionImplicitAccountToAccountOutput(implicitAccount.OutputID, issuerResp, opts...)
@@ -540,7 +571,7 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 // DelegateToValidator requests faucet funds and delegate the UTXO output to the validator.
 func (d *DockerTestFramework) DelegateToValidator(fromID iotago.AccountID, accountAddress *iotago.AccountAddress) (iotago.OutputID, *iotago.DelegationOutput) {
 	from := d.wallet.Account(fromID)
-	clt := d.wallet.DefaultClient()
+	clt := d.wallet.Client
 
 	// requesting faucet funds as delegation input
 	ctx := context.TODO()
@@ -561,7 +592,7 @@ func (d *DockerTestFramework) DelegateToValidator(fromID iotago.AccountID, accou
 }
 
 // PrepareBlockIssuance prepares the BlockIssuance and Congestion response, and increase BIC of the issuer if necessary.
-func (d *DockerTestFramework) PrepareBlockIssuance(ctx context.Context, clt *nodeclient.Client, issuerAddress *iotago.AccountAddress) (*api.IssuanceBlockHeaderResponse, *api.CongestionResponse) {
+func (d *DockerTestFramework) PrepareBlockIssuance(ctx context.Context, clt mock.Client, issuerAddress *iotago.AccountAddress) (*api.IssuanceBlockHeaderResponse, *api.CongestionResponse) {
 	issuerResp, err := clt.BlockIssuance(ctx)
 	require.NoError(d.Testing, err)
 
@@ -578,7 +609,7 @@ func (d *DockerTestFramework) AllotManaTo(fromID iotago.AccountID, toID iotago.A
 	// requesting faucet funds for allotment
 	ctx := context.TODO()
 	fundsOutputID := d.RequestFaucetFunds(ctx, iotago.AddressEd25519)
-	clt := d.wallet.DefaultClient()
+	clt := d.wallet.Client
 
 	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, from.Address)
 	signedTx := d.wallet.AllotManaFromAccount(fromID, toID, manaToAllot, fundsOutputID)
@@ -607,7 +638,7 @@ func (d *DockerTestFramework) CreateNativeToken(fromID iotago.AccountID, mintedA
 	require.GreaterOrEqual(d.Testing, maxSupply, mintedAmount)
 
 	ctx := context.TODO()
-	clt := d.wallet.DefaultClient()
+	clt := d.wallet.Client
 	from := d.wallet.Account(fromID)
 
 	// requesting faucet funds for native token creation
@@ -740,7 +771,7 @@ func (d *DockerTestFramework) GetContainersConfigs() {
 }
 
 func (d *DockerTestFramework) CreateBlock(payload iotago.Payload, issuerID iotago.AccountID, congestionResp *api.CongestionResponse, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.Block {
-	clt := d.wallet.DefaultClient()
+	clt := d.wallet.Client
 	issuingTime := time.Now()
 	apiForSlot := clt.APIForSlot(clt.LatestAPI().TimeProvider().SlotFromTime(issuingTime))
 	blockBuilder := builder.NewBasicBlockBuilder(apiForSlot)
@@ -767,14 +798,14 @@ func (d *DockerTestFramework) CreateBlock(payload iotago.Payload, issuerID iotag
 }
 
 func (d *DockerTestFramework) SubmitBlock(ctx context.Context, blk *iotago.Block) {
-	clt := d.wallet.DefaultClient()
+	clt := d.wallet.Client
 
 	_, err := clt.SubmitBlock(ctx, blk)
 	require.NoError(d.Testing, err)
 }
 
 func (d *DockerTestFramework) SubmitPayload(ctx context.Context, payload iotago.Payload, issuerID iotago.AccountID, congestionResp *api.CongestionResponse, issuerResp *api.IssuanceBlockHeaderResponse) iotago.BlockID {
-	clt := d.wallet.DefaultClient()
+	clt := d.wallet.Client
 
 	blk := d.CreateBlock(payload, issuerID, congestionResp, issuerResp)
 

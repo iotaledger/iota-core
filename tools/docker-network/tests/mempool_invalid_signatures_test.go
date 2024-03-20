@@ -51,18 +51,18 @@ func Test_MempoolInvalidSignatures(t *testing.T) {
 	}
 
 	fmt.Println("Submitting block with invalid TX")
-	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, d.wallet.DefaultClient(), account.ID.ToAddress().(*iotago.AccountAddress))
+	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, d.wallet.Client, account.ID.ToAddress().(*iotago.AccountAddress))
 	d.SubmitPayload(context.Background(), invalidTX, account.ID, congestionResp, issuerResp)
 
 	d.AwaitTransactionState(ctx, invalidTX.Transaction.MustID(), api.TransactionStateFailed)
 	d.AwaitTransactionFailure(ctx, invalidTX.Transaction.MustID(), api.TxFailureUnlockSignatureInvalid)
 
 	fmt.Println("Submitting block with valid TX")
-	issuerResp, congestionResp = d.PrepareBlockIssuance(ctx, d.wallet.DefaultClient(), account.ID.ToAddress().(*iotago.AccountAddress))
+	issuerResp, congestionResp = d.PrepareBlockIssuance(ctx, d.wallet.Client, account.ID.ToAddress().(*iotago.AccountAddress))
 	d.SubmitPayload(context.Background(), validTX, account.ID, congestionResp, issuerResp)
 
 	fmt.Println("Submitting block with invalid TX (again)")
-	issuerResp, congestionResp = d.PrepareBlockIssuance(ctx, d.wallet.DefaultClient(), account.ID.ToAddress().(*iotago.AccountAddress))
+	issuerResp, congestionResp = d.PrepareBlockIssuance(ctx, d.wallet.Client, account.ID.ToAddress().(*iotago.AccountAddress))
 	d.SubmitPayload(context.Background(), invalidTX, account.ID, congestionResp, issuerResp)
 
 	d.AwaitTransactionPayloadAccepted(ctx, validTX.Transaction.MustID())

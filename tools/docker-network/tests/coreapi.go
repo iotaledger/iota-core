@@ -226,7 +226,7 @@ func (d *DockerTestFramework) prepareAssets(totalAssetsNum int) (coreAPIAssets, 
 		d.AwaitTransactionPayloadAccepted(ctx, signedTx.Transaction.MustID())
 
 		// issue reattachment after the fisrt one is already included
-		issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, d.wallet.DefaultClient(), account.Address)
+		issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, d.wallet.Client, account.Address)
 		secondAttachment := d.SubmitPayload(ctx, signedTx, account.Address.AccountID(), congestionResp, issuerResp)
 		assets[valueBlockSlot].reattachments = append(assets[valueBlockSlot].reattachments, secondAttachment)
 

@@ -23,7 +23,7 @@ type EventAPIDockerTestFramework struct {
 	Testing *testing.T
 
 	dockerFramework *DockerTestFramework
-	DefaultClient   *nodeclient.Client
+	DefaultClient   mock.Client
 
 	finishChan chan struct{}
 
@@ -35,7 +35,7 @@ func NewEventAPIDockerTestFramework(t *testing.T, dockerFramework *DockerTestFra
 	return &EventAPIDockerTestFramework{
 		Testing:         t,
 		dockerFramework: dockerFramework,
-		DefaultClient:   dockerFramework.wallet.DefaultClient(),
+		DefaultClient:   dockerFramework.wallet.Client,
 		finishChan:      make(chan struct{}),
 		optsWaitFor:     3 * time.Minute,
 		optsTick:        5 * time.Second,

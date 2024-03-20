@@ -58,16 +58,16 @@ func (t *TestSuite) AssertCommitmentSlotIndexExists(slot iotago.SlotIndex, clien
 			latestCommitment, err := client.CommitmentByID(context.Background(), iotago.EmptyCommitmentID)
 			require.NoError(t.Testing, err)
 			if latestCommitment.Slot < slot {
-				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: commitment with at least %v not found in settings.LatestCommitment()", client.Name(), slot)
+				return ierrors.Errorf("AssertCommitmentSlotIndexExists: commitment with at least %v not found in settings.LatestCommitment()", slot)
 			}
 
 			cm, err := client.CommitmentBySlot(context.Background(), slot)
 			if err != nil {
-				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: expected %v, got error %v", client.Name(), slot, err)
+				return ierrors.Errorf("AssertCommitmentSlotIndexExists: expected %v, got error %v", slot, err)
 			}
 
 			if cm == nil {
-				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: commitment at index %v not found", client.Name(), slot)
+				return ierrors.Errorf("AssertCommitmentSlotIndexExists: commitment at index %v not found", slot)
 			}
 
 			return nil
