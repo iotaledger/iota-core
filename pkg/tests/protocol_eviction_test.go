@@ -93,7 +93,7 @@ func TestProtocol_Eviction(t *testing.T) {
 
 			protocol.WithSyncManagerProvider(
 				trivialsyncmanager.NewProvider(
-					trivialsyncmanager.WithBootstrappedFunc(func(e *engine.Engine) bool {
+					trivialsyncmanager.WithIsBootstrappedFunc(func(e *engine.Engine) bool {
 						return e.Notarization.IsBootstrapped()
 					}),
 				),
