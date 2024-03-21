@@ -315,7 +315,8 @@ func (c *Commitment) deriveChain(parent *Commitment) func() {
 		// We will spawn a new one if we ever change back to not being the main child.
 		// Here we basically move commitments to the parent chain.
 		if currentChain != nil && currentChain != parentChain {
-			currentChain.IsEvicted.Trigger()
+			// TODO: refactor it to use a dedicated WorkerPool
+			go currentChain.IsEvicted.Trigger()
 		}
 
 		return parentChain
