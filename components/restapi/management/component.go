@@ -46,7 +46,7 @@ func configure() error {
 			return err
 		}
 
-		return httpserver.JSONResponse(c, http.StatusOK, resp)
+		return responseByHeader(c, resp, http.StatusOK)
 	})
 
 	routeGroup.DELETE(api.EndpointWithEchoParameters(api.ManagementEndpointPeer), func(c echo.Context) error {
@@ -58,7 +58,7 @@ func configure() error {
 	})
 
 	routeGroup.GET(api.ManagementEndpointPeers, func(c echo.Context) error {
-		return httpserver.JSONResponse(c, http.StatusOK, listPeers())
+		return responseByHeader(c, listPeers(), http.StatusOK)
 	})
 
 	routeGroup.POST(api.ManagementEndpointPeers, func(c echo.Context) error {
@@ -67,7 +67,7 @@ func configure() error {
 			return err
 		}
 
-		return httpserver.JSONResponse(c, http.StatusOK, resp)
+		return responseByHeader(c, resp, http.StatusOK)
 	})
 
 	routeGroup.POST(api.ManagementEndpointDatabasePrune, func(c echo.Context) error {
@@ -76,7 +76,7 @@ func configure() error {
 			return err
 		}
 
-		return httpserver.JSONResponse(c, http.StatusOK, resp)
+		return responseByHeader(c, resp, http.StatusOK)
 	})
 
 	// routeGroup.POST(api.ManagementEndpointSnapshotsCreate, func(c echo.Context) error {
@@ -85,8 +85,12 @@ func configure() error {
 	//		return err
 	//	}
 	//
-	//	return httpserver.JSONResponse(c, http.StatusOK, resp)
+	//	return responseByHeader(c, resp, http.StatusOK)
 	// })
 
 	return nil
+}
+
+func responseByHeader(c echo.Context, obj any, httpStatusCode ...int) error {
+	return httpserver.SendResponseByHeader(c, deps.Protocol.CommittedAPI(), obj, httpStatusCode...)
 }
