@@ -11,7 +11,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/retainer/txretainer"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -48,9 +47,8 @@ func (r *RequestHandler) submitBlockAndAwaitRetainer(ctx context.Context, block 
 		// If the transaction is already retained, we hook to the BlockRetained event.
 		_, err := r.protocol.Engines.Main.Get().TxRetainer.TransactionMetadata(txID)
 		if ierrors.Is(err, txretainer.ErrEntryNotFound) {
-			// SignedTransactionAttached is triggered for new transactions and for reattachment.
-			successUnhook = r.protocol.Engines.Main.Get().Ledger.MemPool().OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {
-				if transactionMetadata.ID() != txID {
+			successUnhook = r.protocol.Events.Engine.TransactionRetainer.TransactionRetained.Hook(func(transactionID iotago.TransactionID) {
+				if transactionID != txID {
 					return
 				}
 				select {
@@ -63,7 +61,7 @@ func (r *RequestHandler) submitBlockAndAwaitRetainer(ctx context.Context, block 
 
 	// if no hook was set, hook to the block retained event.
 	if successUnhook == nil {
-		successUnhook = r.protocol.Events.Engine.Retainer.BlockRetained.Hook(func(eventBlock *blocks.Block) {
+		successUnhook = r.protocol.Events.Engine.BlockRetainer.BlockRetained.Hook(func(eventBlock *blocks.Block) {
 			if blockID != eventBlock.ID() {
 				return
 			}

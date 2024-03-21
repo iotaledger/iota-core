@@ -86,7 +86,7 @@ func configure() error {
 
 	debugAPIWorkerPool := workerpool.NewGroup("DebugAPI").CreatePool("DebugAPI", workerpool.WithWorkerCount(1))
 
-	deps.Protocol.Events.Engine.Retainer.BlockRetained.Hook(func(block *blocks.Block) {
+	deps.Protocol.Events.Engine.BlockRetainer.BlockRetained.Hook(func(block *blocks.Block) {
 		blocksPerSlot.Set(block.ID().Slot(), append(lo.Return1(blocksPerSlot.GetOrCreate(block.ID().Slot(), func() []*blocks.Block {
 			return make([]*blocks.Block, 0)
 		})), block))
