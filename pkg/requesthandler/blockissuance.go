@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
+	"github.com/iotaledger/iota-core/pkg/retainer/txretainer"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -33,7 +34,7 @@ func (r *RequestHandler) submitBlockAndAwaitRetainer(ctx context.Context, block 
 
 	// Make sure we don't wait forever here. If the block is not dispatched to the main engine,
 	// it will never trigger one of the below events.
-	processingCtx, processingCtxCancel := context.WithTimeout(ctx, 5*time.Second)
+	processingCtx, processingCtxCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer processingCtxCancel()
 	// Calculate the blockID so that we don't capture the block pointer in the event handlers.
 	blockID := block.ID()
@@ -43,16 +44,25 @@ func (r *RequestHandler) submitBlockAndAwaitRetainer(ctx context.Context, block 
 	signedTx, isTx := block.SignedTransaction()
 	if isTx {
 		txID := signedTx.Transaction.MustID()
-		successUnhook = r.protocol.Engines.Main.Get().Ledger.MemPool().OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {
-			if transactionMetadata.ID() != txID {
-				return
-			}
-			select {
-			case filtered <- nil:
-			case <-exit:
-			}
-		}, event.WithWorkerPool(r.workerPool)).Unhook
-	} else {
+		// Check if the transaction is already retained. The onTransactionAttached event is only triggered if it's a new transaction.
+		// If the transaction is already retained, we hook to the BlockRetained event.
+		_, err := r.protocol.Engines.Main.Get().TxRetainer.TransactionMetadata(txID)
+		if ierrors.Is(err, txretainer.ErrEntryNotFound) {
+			// SignedTransactionAttached is triggered for new transactions and for reattachment.
+			successUnhook = r.protocol.Engines.Main.Get().Ledger.MemPool().OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {
+				if transactionMetadata.ID() != txID {
+					return
+				}
+				select {
+				case filtered <- nil:
+				case <-exit:
+				}
+			}, event.WithWorkerPool(r.workerPool)).Unhook
+		}
+	}
+
+	// if no hook was set, hook to the block retained event.
+	if successUnhook == nil {
 		successUnhook = r.protocol.Events.Engine.Retainer.BlockRetained.Hook(func(eventBlock *blocks.Block) {
 			if blockID != eventBlock.ID() {
 				return
