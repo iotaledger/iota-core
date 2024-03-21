@@ -363,7 +363,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			),
 			protocol.WithSyncManagerProvider(
 				trivialsyncmanager.NewProvider(
-					trivialsyncmanager.WithBootstrappedFunc(func(e *engine.Engine) bool {
+					trivialsyncmanager.WithIsBootstrappedFunc(func(e *engine.Engine) bool {
 						return e.SyncManager.LatestCommitment().Slot() >= expectedCommittedSlotAfterPartitionMerge && e.Notarization.IsBootstrapped()
 					}),
 				),
@@ -723,7 +723,7 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 		),
 		protocol.WithSyncManagerProvider(
 			trivialsyncmanager.NewProvider(
-				trivialsyncmanager.WithBootstrappedFunc(func(e *engine.Engine) bool {
+				trivialsyncmanager.WithIsBootstrappedFunc(func(e *engine.Engine) bool {
 					return e.SyncManager.LatestCommitment().Slot() >= expectedCommittedSlotAfterPartitionMerge && e.Notarization.IsBootstrapped()
 				}),
 			),
@@ -1058,7 +1058,7 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 
 		protocol.WithSyncManagerProvider(
 			trivialsyncmanager.NewProvider(
-				trivialsyncmanager.WithBootstrappedFunc(func(e *engine.Engine) bool {
+				trivialsyncmanager.WithIsBootstrappedFunc(func(e *engine.Engine) bool {
 					return e.Storage.Settings().LatestCommitment().Slot() >= expectedCommittedSlotAfterPartitionMerge && e.Notarization.IsBootstrapped()
 				}),
 			),

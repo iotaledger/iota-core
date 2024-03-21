@@ -5289,7 +5289,7 @@
               "step": 240
             }
           ],
-          "title": "Memory Commited",
+          "title": "Memory Committed",
           "type": "timeseries"
         },
         {
@@ -10381,7 +10381,7 @@
               "expr": "node_memory_NFS_Unstable_bytes{instance=\"$node\",job=\"$job\"}",
               "format": "time_series",
               "intervalFactor": 1,
-              "legendFormat": "NFS Unstable - Memory in NFS pages sent to the server, but not yet commited to the storage",
+              "legendFormat": "NFS Unstable - Memory in NFS pages sent to the server, but not yet committed to the storage",
               "refId": "A",
               "step": 240
             }
