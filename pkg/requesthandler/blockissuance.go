@@ -25,8 +25,8 @@ func (r *RequestHandler) SubmitBlockWithoutAwaitingBooking(block *model.Block) e
 	return r.submitBlock(block)
 }
 
-// submitBlockAndAwaitEvent submits a block to be processed and waits for the event to be triggered.
-func (r *RequestHandler) submitBlockAndAwaitEvent(ctx context.Context, block *model.Block, evt *event.Event1[*blocks.Block]) error {
+// submitBlockAndAwaitRetainer submits a block to be processed and waits for the block gets retained.
+func (r *RequestHandler) submitBlockAndAwaitRetainer(ctx context.Context, block *model.Block) error {
 	filtered := make(chan error, 1)
 	exit := make(chan struct{})
 	defer close(exit)
@@ -53,7 +53,7 @@ func (r *RequestHandler) submitBlockAndAwaitEvent(ctx context.Context, block *mo
 			}
 		}, event.WithWorkerPool(r.workerPool)).Unhook
 	} else {
-		successUnhook = evt.Hook(func(eventBlock *blocks.Block) {
+		successUnhook = r.protocol.Events.Engine.Retainer.BlockRetained.Hook(func(eventBlock *blocks.Block) {
 			if blockID != eventBlock.ID() {
 				return
 			}
@@ -101,13 +101,13 @@ func (r *RequestHandler) submitBlockAndAwaitEvent(ctx context.Context, block *mo
 	}
 }
 
-func (r *RequestHandler) SubmitBlockAndAwaitBooking(ctx context.Context, iotaBlock *iotago.Block) (iotago.BlockID, error) {
+func (r *RequestHandler) SubmitBlockAndAwaitRetainer(ctx context.Context, iotaBlock *iotago.Block) (iotago.BlockID, error) {
 	modelBlock, err := model.BlockFromBlock(iotaBlock)
 	if err != nil {
 		return iotago.EmptyBlockID, ierrors.Wrap(err, "error serializing block to model block")
 	}
 
-	if err = r.submitBlockAndAwaitEvent(ctx, modelBlock, r.protocol.Events.Engine.Retainer.BlockRetained); err != nil {
+	if err = r.submitBlockAndAwaitRetainer(ctx, modelBlock); err != nil {
 		return iotago.EmptyBlockID, ierrors.Wrap(err, "error issuing model block")
 	}
 
