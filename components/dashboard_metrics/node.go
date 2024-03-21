@@ -25,12 +25,12 @@ func nodeInfoExtended() *NodeInfoExtended {
 	return status
 }
 
-func databaseSizesMetrics() (*DatabaseSizesMetric, error) {
+func databaseSizesMetrics() *DatabaseSizesMetric {
 	return &DatabaseSizesMetric{
 		Permanent:  deps.Protocol.Engines.Main.Get().Storage.PermanentDatabaseSize(),
 		Prunable:   deps.Protocol.Engines.Main.Get().Storage.PrunableDatabaseSize(),
 		TxRetainer: deps.Protocol.Engines.Main.Get().Storage.TransactionRetainerDatabaseSize(),
 		Total:      deps.Protocol.Engines.Main.Get().Storage.Size(),
 		Time:       time.Now().Unix(),
-	}, nil
+	}
 }

@@ -131,7 +131,6 @@ func (o *SybilProtection) TrackBlock(block *blocks.Block) {
 	// then don't consider it because the validator can't be part of the committee in the next epoch
 	if accountData.StakeEndEpoch == blockEpoch ||
 		block.ID().Slot()+o.apiProvider.APIForSlot(block.ID().Slot()).ProtocolParameters().EpochNearingThreshold() > o.apiProvider.APIForSlot(block.ID().Slot()).TimeProvider().EpochEnd(blockEpoch) {
-
 		return
 	}
 

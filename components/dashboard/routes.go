@@ -21,7 +21,6 @@ const (
 var ErrInvalidParameter = echo.NewHTTPError(http.StatusBadRequest, "invalid parameter")
 
 func indexRoute(e echo.Context) error {
-
 	index, err := staticFS.Open(build + "/index.html")
 	if err != nil {
 		return err

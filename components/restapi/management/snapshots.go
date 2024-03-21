@@ -32,6 +32,6 @@ func createSnapshots(_ echo.Context) (*api.CreateSnapshotResponse, error) {
 		}, nil
 	*/
 
-	//nolint:revive,nilnil
+	//nolint:nilnil
 	return nil, nil
 }

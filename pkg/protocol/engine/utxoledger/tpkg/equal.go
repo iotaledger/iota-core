@@ -1,4 +1,3 @@
-//nolint:forcetypeassert,varnamelen,revive,exhaustruct // we don't care about these linters in test cases
 package tpkg
 
 import (
@@ -13,6 +12,8 @@ import (
 )
 
 func EqualOutput(t *testing.T, expected *utxoledger.Output, actual *utxoledger.Output) {
+	t.Helper()
+
 	require.Equal(t, expected.OutputID(), actual.OutputID())
 	require.Equal(t, expected.BlockID(), actual.BlockID())
 	require.Equal(t, expected.SlotBooked(), actual.SlotBooked())
@@ -47,6 +48,8 @@ func EqualOutput(t *testing.T, expected *utxoledger.Output, actual *utxoledger.O
 }
 
 func EqualSpent(t *testing.T, expected *utxoledger.Spent, actual *utxoledger.Spent) {
+	t.Helper()
+
 	require.Equal(t, expected.OutputID(), actual.OutputID())
 	require.Equal(t, expected.TransactionIDSpent(), actual.TransactionIDSpent())
 	require.Equal(t, expected.SlotSpent(), actual.SlotSpent())
@@ -54,6 +57,8 @@ func EqualSpent(t *testing.T, expected *utxoledger.Spent, actual *utxoledger.Spe
 }
 
 func EqualOutputs(t *testing.T, expected utxoledger.Outputs, actual utxoledger.Outputs) {
+	t.Helper()
+
 	require.Equal(t, len(expected), len(actual))
 
 	// Sort Outputs by output ID.
@@ -70,12 +75,14 @@ func EqualOutputs(t *testing.T, expected utxoledger.Outputs, actual utxoledger.O
 		return bytes.Compare(iOutputID[:], jOutputID[:]) == -1
 	})
 
-	for i := 0; i < len(expected); i++ {
+	for i := range expected {
 		EqualOutput(t, expected[i], actual[i])
 	}
 }
 
 func EqualSpents(t *testing.T, expected utxoledger.Spents, actual utxoledger.Spents) {
+	t.Helper()
+
 	require.Equal(t, len(expected), len(actual))
 
 	// Sort Spents by output ID.
@@ -92,7 +99,7 @@ func EqualSpents(t *testing.T, expected utxoledger.Spents, actual utxoledger.Spe
 		return bytes.Compare(iOutputID[:], jOutputID[:]) == -1
 	})
 
-	for i := 0; i < len(expected); i++ {
+	for i := range len(expected) {
 		EqualSpent(t, expected[i], actual[i])
 	}
 }

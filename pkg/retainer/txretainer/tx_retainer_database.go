@@ -58,11 +58,11 @@ func (r *transactionRetainerDatabase) InsertTxMetadata(newTxMeta *TransactionMet
 	return nil
 }
 
-// ApplyTxMetadataChanges applies the given uncommitedTxMetadataChanges to the database in a single atomic transaction.
-func (r *transactionRetainerDatabase) ApplyTxMetadataChanges(uncommitedTxMetadataChanges map[iotago.TransactionID]*TransactionMetadata) error {
+// ApplyTxMetadataChanges applies the given uncommittedTxMetadataChanges to the database in a single atomic transaction.
+func (r *transactionRetainerDatabase) ApplyTxMetadataChanges(uncommittedTxMetadataChanges map[iotago.TransactionID]*TransactionMetadata) error {
 	if err := r.dbExecFunc(func(db *gorm.DB) error {
 		return db.Transaction(func(tx *gorm.DB) error {
-			for _, newTxMeta := range uncommitedTxMetadataChanges {
+			for _, newTxMeta := range uncommittedTxMetadataChanges {
 				if err := r.insertTransactionMetadata(tx, newTxMeta); err != nil {
 					return err
 				}

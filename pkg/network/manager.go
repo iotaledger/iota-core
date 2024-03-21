@@ -13,21 +13,21 @@ import (
 type Manager interface {
 	Endpoint
 
-	DialPeer(context.Context, *Peer) error
+	DialPeer(ctx context.Context, peer *Peer) error
 
-	OnNeighborAdded(func(Neighbor)) *event.Hook[func(Neighbor)]
-	OnNeighborRemoved(func(Neighbor)) *event.Hook[func(Neighbor)]
+	OnNeighborAdded(handler func(Neighbor)) *event.Hook[func(Neighbor)]
+	OnNeighborRemoved(handler func(Neighbor)) *event.Hook[func(Neighbor)]
 
 	AllNeighbors() []Neighbor
 	AutopeeringNeighbors() []Neighbor
 
-	DropNeighbor(peer.ID) error
-	NeighborExists(peer.ID) bool
+	DropNeighbor(peerID peer.ID) error
+	NeighborExists(peerID peer.ID) bool
 
 	P2PHost() host.Host
 
 	Start(ctx context.Context, networkID string) error
 	Shutdown()
 
-	AddManualPeers(...multiaddr.Multiaddr) error
+	AddManualPeers(multiAddresses ...multiaddr.Multiaddr) error
 }

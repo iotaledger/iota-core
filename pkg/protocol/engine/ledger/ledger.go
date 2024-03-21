@@ -27,7 +27,7 @@ type Ledger interface {
 
 	Output(id iotago.OutputID) (*utxoledger.Output, error)
 	OutputOrSpent(id iotago.OutputID) (output *utxoledger.Output, spent *utxoledger.Spent, err error)
-	ForEachUnspentOutput(func(output *utxoledger.Output) bool) error
+	ForEachUnspentOutput(consumer func(output *utxoledger.Output) bool) error
 	AddGenesisUnspentOutput(unspentOutput *utxoledger.Output) error
 
 	SpendDAG() spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, BlockVoteRank]

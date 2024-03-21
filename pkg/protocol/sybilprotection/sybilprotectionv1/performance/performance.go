@@ -146,7 +146,6 @@ func (t *Tracker) TrackCandidateBlock(block *blocks.Block) {
 	if rollback {
 		t.nextEpochCommitteeCandidates.Delete(block.ProtocolBlock().Header.IssuerID)
 	}
-
 }
 
 // EligibleValidatorCandidates returns the eligible validator candidates registered in the given epoch for the next epoch.
@@ -360,7 +359,7 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 	}
 
 	// Set a bit at subslotIndex to 1 to indicate activity in that subslot.
-	validatorPerformance.SlotActivityVector = validatorPerformance.SlotActivityVector | (1 << t.subslotIndex(block.ID().Slot(), block.ProtocolBlock().Header.IssuingTime))
+	validatorPerformance.SlotActivityVector |= (1 << t.subslotIndex(block.ID().Slot(), block.ProtocolBlock().Header.IssuingTime))
 
 	apiForSlot := t.apiProvider.APIForSlot(block.ID().Slot())
 

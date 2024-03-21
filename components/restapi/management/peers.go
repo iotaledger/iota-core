@@ -54,7 +54,7 @@ func getPeer(_ echo.Context) (*api.PeerInfo, error) {
 		return WrapInfoSnapshot(info), nil
 	*/
 
-	//nolint:revive,nilnil
+	//nolint:nilnil
 	return nil, nil
 }
 
@@ -73,7 +73,6 @@ func removePeer(_ echo.Context) error {
 	return nil
 }
 
-//nolint:unparam // even if the error is never used, the structure of all routes should be the same
 func listPeers(_ echo.Context) (*api.PeersResponse, error) {
 	/*
 		peerInfos := deps.PeeringManager.PeerInfoSnapshots()
@@ -85,7 +84,7 @@ func listPeers(_ echo.Context) (*api.PeersResponse, error) {
 		return results, nil
 	*/
 
-	//nolint:revive,nilnil
+	//nolint:nilnil
 	return nil, nil
 }
 
@@ -129,6 +128,6 @@ func addPeer(_ echo.Context, _ log.Logger) (*api.PeerInfo, error) {
 		return WrapInfoSnapshot(info), nil
 	*/
 
-	//nolint:revive,nilnil
+	//nolint:nilnil
 	return nil, nil
 }

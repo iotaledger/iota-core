@@ -1,3 +1,4 @@
+//nolint:tagliatelle // we won't change the dashboard now
 package dashboard
 
 import (
@@ -211,8 +212,10 @@ func NewUnlockBlock(unlockBlock iotago.Unlock) *UnlockBlock {
 		Type: unlockBlock.Type().String(),
 	}
 
+	//nolint:gocritic
 	switch unlock := unlockBlock.(type) {
 	case *iotago.SignatureUnlock:
+		//nolint:gocritic
 		switch signature := unlock.Signature.(type) {
 		case *iotago.Ed25519Signature:
 			sigJSON, err := deps.Protocol.CommittedAPI().JSONEncode(signature)
@@ -244,11 +247,15 @@ type TransactionMetadata struct {
 // NewTransactionMetadata returns the TransactionMetadata from the given mempool.TransactionMetadata.
 func NewTransactionMetadata(transactionMetadata mempool.TransactionMetadata, conflicts ds.Set[iotago.TransactionID]) *TransactionMetadata {
 	var confirmationState string
-	if transactionMetadata.IsAccepted() {
+
+	switch {
+	case transactionMetadata.IsAccepted():
 		confirmationState = "accepted"
-	} else if transactionMetadata.IsPending() {
+
+	case transactionMetadata.IsPending():
 		confirmationState = "pending"
-	} else if transactionMetadata.IsRejected() {
+
+	case transactionMetadata.IsRejected():
 		confirmationState = "rejected"
 	}
 
@@ -259,6 +266,7 @@ func NewTransactionMetadata(transactionMetadata mempool.TransactionMetadata, con
 			for _, txID := range conflicts.ToSlice() {
 				strIDs = append(strIDs, txID.ToHex())
 			}
+
 			return strIDs
 		}(),
 		Booked:            transactionMetadata.IsBooked(),

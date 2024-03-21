@@ -118,7 +118,7 @@ func (t *TestSuite) AssertLatestFinalizedSlot(slot iotago.SlotIndex, nodes ...*m
 			}
 
 			if slot != node.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot() {
-				return ierrors.Errorf("AssertLatestFinalizedSlot: %s: expected %d, got %d from from SyncManager", node.Name, slot, node.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot())
+				return ierrors.Errorf("AssertLatestFinalizedSlot: %s: expected %d, got %d from SyncManager", node.Name, slot, node.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot())
 			}
 
 			return nil

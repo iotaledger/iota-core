@@ -42,7 +42,7 @@ type Manager struct {
 	acceptedTimeFunc func() time.Time
 	apiProvider      iotago.APIProvider
 
-	commitmentMutex syncutils.RWMutex
+	commitmentMutex syncutils.Mutex
 
 	module.Module
 }
@@ -170,9 +170,6 @@ func (m *Manager) IsBootstrapped() bool {
 }
 
 func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
-	m.commitmentMutex.RLock()
-	defer m.commitmentMutex.RUnlock()
-
 	if err = m.slotMutations.AddAcceptedBlock(block); err != nil {
 		return ierrors.Wrap(err, "failed to add accepted block to slot mutations")
 	}

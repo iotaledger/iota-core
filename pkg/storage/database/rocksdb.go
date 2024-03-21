@@ -8,7 +8,6 @@ import (
 
 // NewRocksDB creates a new RocksDB instance.
 func NewRocksDB(path string) (*rocksdb.RocksDB, error) {
-
 	opts := []rocksdb.Option{
 		rocksdb.IncreaseParallelism(runtime.NumCPU() - 1),
 		rocksdb.Custom([]string{

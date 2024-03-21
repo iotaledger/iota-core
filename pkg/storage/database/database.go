@@ -133,7 +133,6 @@ func (db *Database) Size() (int64, error) {
 
 // CheckEngine is a wrapper around hivedb.CheckEngine to throw a custom error message in case of engine mismatch.
 func CheckEngine(dbPath string, createDatabaseIfNotExists bool, dbEngine hivedb.Engine, allowedEngines ...hivedb.Engine) (hivedb.Engine, error) {
-
 	tmpAllowedEngines := AllowedEnginesDefault
 	if len(allowedEngines) > 0 {
 		tmpAllowedEngines = allowedEngines
@@ -142,7 +141,6 @@ func CheckEngine(dbPath string, createDatabaseIfNotExists bool, dbEngine hivedb.
 	targetEngine, err := hivedb.CheckEngine(dbPath, createDatabaseIfNotExists, dbEngine, tmpAllowedEngines)
 	if err != nil {
 		if ierrors.Is(err, hivedb.ErrEngineMismatch) {
-			//nolint:stylecheck,revive // this error message is shown to the user
 			return hivedb.EngineUnknown, ierrors.Errorf(`database (%s) engine does not match the configuration: '%v' != '%v'
 
 			If you want to use another database engine, you can use the tool './iota-core tool db-migration' to convert the current database.`, dbPath, targetEngine, dbEngine)
@@ -157,7 +155,6 @@ func CheckEngine(dbPath string, createDatabaseIfNotExists bool, dbEngine hivedb.
 // StoreWithDefaultSettings returns a kvstore with default settings.
 // It also checks if the database engine is correct.
 func StoreWithDefaultSettings(path string, createDatabaseIfNotExists bool, dbEngine hivedb.Engine, allowedEngines ...hivedb.Engine) (kvstore.KVStore, error) {
-
 	tmpAllowedEngines := AllowedEnginesDefault
 	if len(allowedEngines) > 0 {
 		tmpAllowedEngines = allowedEngines

@@ -103,7 +103,7 @@ func newCommitment(commitments *Commitments, model *model.Commitment) *Commitmen
 		WarpSyncBlocks:                  reactive.NewVariable[bool](),
 		BlocksToWarpSync:                reactive.NewVariable[ds.Set[iotago.BlockID]](),
 		Weight:                          reactive.NewVariable[uint64](),
-		AttestedWeight:                  reactive.NewVariable[uint64](func(currentValue uint64, newValue uint64) uint64 { return max(currentValue, newValue) }),
+		AttestedWeight:                  reactive.NewVariable[uint64](func(currentValue uint64, newValue uint64) uint64 { return max(currentValue, newValue) }), //nolint:gocritic // easier to read
 		CumulativeWeight:                reactive.NewVariable[uint64](),
 		CumulativeAttestedWeight:        reactive.NewVariable[uint64](),
 		CumulativeVerifiedWeight:        reactive.NewVariable[uint64](),
@@ -141,11 +141,12 @@ func (c *Commitment) TargetEngine() *engine.Engine {
 // the ID of their divergence points (the first commitment that is different between their chains).
 func (c *Commitment) Less(other *Commitment) bool {
 	// trivial case where both commitments are the same or one of them is nil
-	if c == other {
+	switch {
+	case c == other:
 		return false
-	} else if c == nil {
+	case c == nil:
 		return true
-	} else if other == nil {
+	case other == nil:
 		return false
 	}
 
@@ -315,7 +316,8 @@ func (c *Commitment) deriveChain(parent *Commitment) func() {
 		// We will spawn a new one if we ever change back to not being the main child.
 		// Here we basically move commitments to the parent chain.
 		if currentChain != nil && currentChain != parentChain {
-			currentChain.IsEvicted.Trigger()
+			// TODO: refactor it to use a dedicated WorkerPool
+			go currentChain.IsEvicted.Trigger()
 		}
 
 		return parentChain

@@ -145,7 +145,6 @@ func NewOutput(apiProvider iotago.APIProvider,
 	outputProof *iotago.OutputIDProof,
 	outputProofBytes []byte,
 ) *Output {
-
 	o := &Output{
 		apiProvider:   apiProvider,
 		outputID:      outputID,
@@ -173,7 +172,6 @@ func CreateOutput(apiProvider iotago.APIProvider,
 	output iotago.Output,
 	outputProof *iotago.OutputIDProof,
 ) *Output {
-
 	encodedOutput, err := apiProvider.APIForSlot(blockID.Slot()).Encode(output)
 	if err != nil {
 		panic(err)

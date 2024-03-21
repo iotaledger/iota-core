@@ -218,7 +218,6 @@ func NewProvider(opts ...options.Option[TransactionRetainer]) module.Provider[*e
 
 			// this event is fired when an attachment of a transaction is detected
 			e.Ledger.MemPool().OnSignedTransactionAttached(func(signedTransactionMetadata mempool.SignedTransactionMetadata) {
-
 				// attachment with invalid signature detected
 				signedTransactionMetadata.OnSignaturesInvalid(func(err error) {
 					transactionMetadata := signedTransactionMetadata.TransactionMetadata()
@@ -287,12 +286,12 @@ func (r *TransactionRetainer) Prune(targetSlot iotago.SlotIndex) error {
 
 // CommitSlot applies all uncommitted changes of a slot from the cache to the database and deletes them from the cache.
 func (r *TransactionRetainer) CommitSlot(slot iotago.SlotIndex) error {
-	uncommitedChanges := r.txRetainerCache.DeleteAndReturnTxMetadataChangesBySlot(slot)
-	if len(uncommitedChanges) == 0 {
+	uncommittedChanges := r.txRetainerCache.DeleteAndReturnTxMetadataChangesBySlot(slot)
+	if len(uncommittedChanges) == 0 {
 		return nil
 	}
 
-	if err := r.txRetainerDatabase.ApplyTxMetadataChanges(uncommitedChanges); err != nil {
+	if err := r.txRetainerDatabase.ApplyTxMetadataChanges(uncommittedChanges); err != nil {
 		return ierrors.Wrapf(err, "failed to commit slot: %d", slot)
 	}
 

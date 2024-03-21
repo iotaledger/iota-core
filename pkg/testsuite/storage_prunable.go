@@ -21,7 +21,6 @@ func (t *TestSuite) AssertPrunedUntil(expectedStorage *types.Tuple[int, bool],
 	expectedPoolStats *types.Tuple[int, bool],
 	expectedCommittee *types.Tuple[int, bool],
 	expectedRewards *types.Tuple[int, bool], nodes ...*mock.Node) {
-
 	mustNodes(nodes)
 
 	for _, node := range nodes {
@@ -41,7 +40,6 @@ func (t *TestSuite) assertPrunedUntil(storageInstance *storage.Storage,
 	expectedPoolStats *types.Tuple[int, bool],
 	expectedCommittee *types.Tuple[int, bool],
 	expectedRewards *types.Tuple[int, bool]) error {
-
 	if err := t.assertPrunedState(expectedStorage, storageInstance.LastPrunedEpoch, "prunable"); err != nil {
 		return err
 	}

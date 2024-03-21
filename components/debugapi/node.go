@@ -7,7 +7,6 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-//nolint:unparam // we have no error case right now
 func validatorsSummary() (*ValidatorsSummaryResponse, error) {
 	seatManager := deps.Protocol.Engines.Main.Get().SybilProtection.SeatManager()
 	latestSlotIndex := deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot()
