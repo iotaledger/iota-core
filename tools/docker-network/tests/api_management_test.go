@@ -63,18 +63,18 @@ func Test_PeerManagementAPI(t *testing.T) {
 				peersResponse, err := managementClient.Peers(getContextWithTimeout(5 * time.Second))
 				require.NoError(t, err)
 				require.NotNil(t, peersResponse)
-				require.Equal(t, 4, len(peersResponse.Peers))
+				require.Equal(t, 5, len(peersResponse.Peers))
 			},
 		},
 		{
 			name: "Delete a peer from node 1",
 			testFunc: func(t *testing.T) {
 				peersResponse, err := managementClient.Peers(getContextWithTimeout(5 * time.Second))
-				require.NoError(t, err)
 				require.NotNil(t, peersResponse)
-				require.Equal(t, 4, len(peersResponse.Peers))
-
 				removedPeerInfo = peersResponse.Peers[0]
+				require.NoError(t, err)
+				require.Equal(t, 5, len(peersResponse.Peers))
+
 				err = managementClient.RemovePeerByID(getContextWithTimeout(5*time.Second), removedPeerInfo.ID)
 				require.NoError(t, err)
 			},
@@ -85,7 +85,7 @@ func Test_PeerManagementAPI(t *testing.T) {
 				peersResponse, err := managementClient.Peers(getContextWithTimeout(5 * time.Second))
 				require.NoError(t, err)
 				require.NotNil(t, peersResponse)
-				require.Equal(t, 3, len(peersResponse.Peers))
+				require.Equal(t, 4, len(peersResponse.Peers))
 			},
 		},
 		{
@@ -103,7 +103,7 @@ func Test_PeerManagementAPI(t *testing.T) {
 				peersResponse, err := managementClient.Peers(getContextWithTimeout(5 * time.Second))
 				require.NoError(t, err)
 				require.NotNil(t, peersResponse)
-				require.Equal(t, 4, len(peersResponse.Peers))
+				require.Equal(t, 5, len(peersResponse.Peers))
 			},
 		},
 	}
