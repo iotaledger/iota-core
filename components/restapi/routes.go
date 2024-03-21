@@ -16,10 +16,14 @@ type RoutesResponse struct {
 func setupRoutes() {
 	deps.Echo.GET(api.RouteHealth, func(c echo.Context) error {
 		if deps.Protocol.Engines.Main.Get().SyncManager.IsNodeSynced() {
-			return c.NoContent(http.StatusOK)
+			return httpserver.JSONResponse(c, http.StatusOK, &api.HealthResponse{
+				IsHealthy: true,
+			})
 		}
 
-		return c.NoContent(http.StatusServiceUnavailable)
+		return httpserver.JSONResponse(c, http.StatusServiceUnavailable, &api.HealthResponse{
+			IsHealthy: false,
+		})
 	})
 
 	deps.Echo.GET(api.RouteRoutes, func(c echo.Context) error {

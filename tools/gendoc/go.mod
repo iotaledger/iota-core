@@ -59,23 +59,23 @@ require (
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
 	github.com/iotaledger/hive.go/ads v0.0.0-20240315104458-b689cbcfddbd // indirect
-	github.com/iotaledger/hive.go/constraints v0.0.0-20240315104458-b689cbcfddbd // indirect
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20240315104458-b689cbcfddbd // indirect
-	github.com/iotaledger/hive.go/crypto v0.0.0-20240315104458-b689cbcfddbd // indirect
+	github.com/iotaledger/hive.go/constraints v0.0.0-20240320122938-13a946cf3c7a // indirect
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20240320122938-13a946cf3c7a // indirect
+	github.com/iotaledger/hive.go/crypto v0.0.0-20240320122938-13a946cf3c7a // indirect
 	github.com/iotaledger/hive.go/db v0.0.0-20240315104458-b689cbcfddbd // indirect
-	github.com/iotaledger/hive.go/ds v0.0.0-20240315104458-b689cbcfddbd // indirect
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20240315104458-b689cbcfddbd // indirect
+	github.com/iotaledger/hive.go/ds v0.0.0-20240320122938-13a946cf3c7a // indirect
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20240320122938-13a946cf3c7a // indirect
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20240315104458-b689cbcfddbd // indirect
-	github.com/iotaledger/hive.go/lo v0.0.0-20240315104458-b689cbcfddbd // indirect
+	github.com/iotaledger/hive.go/lo v0.0.0-20240320122938-13a946cf3c7a // indirect
 	github.com/iotaledger/hive.go/log v0.0.0-20240315104458-b689cbcfddbd // indirect
-	github.com/iotaledger/hive.go/runtime v0.0.0-20240315104458-b689cbcfddbd // indirect
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20240315104458-b689cbcfddbd // indirect
+	github.com/iotaledger/hive.go/runtime v0.0.0-20240320122938-13a946cf3c7a // indirect
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20240320122938-13a946cf3c7a // indirect
 	github.com/iotaledger/hive.go/sql v0.0.0-20240315104458-b689cbcfddbd // indirect
-	github.com/iotaledger/hive.go/stringify v0.0.0-20240315104458-b689cbcfddbd // indirect
+	github.com/iotaledger/hive.go/stringify v0.0.0-20240320122938-13a946cf3c7a // indirect
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20240307101848-db58eb9353ec // indirect
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20240307100839-48553e1d2022 // indirect
-	github.com/iotaledger/iota-crypto-demo v0.0.0-20240216103559-27ca8dffd1e7 // indirect
-	github.com/iotaledger/iota.go/v4 v4.0.0-20240319114032-b6fcc3585c99 // indirect
+	github.com/iotaledger/iota-crypto-demo v0.0.0-20240320124000-d02f37a4fdff // indirect
+	github.com/iotaledger/iota.go/v4 v4.0.0-20240321164059-d61818989ece // indirect
 	github.com/ipfs/boxo v0.18.0 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-datastore v0.6.0 // indirect
@@ -101,7 +101,7 @@ require (
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
 	github.com/libp2p/go-cidranger v1.1.0 // indirect
 	github.com/libp2p/go-flow-metrics v0.1.0 // indirect
-	github.com/libp2p/go-libp2p v0.33.0 // indirect
+	github.com/libp2p/go-libp2p v0.33.1 // indirect
 	github.com/libp2p/go-libp2p-asn-util v0.4.1 // indirect
 	github.com/libp2p/go-libp2p-kad-dht v0.25.2 // indirect
 	github.com/libp2p/go-libp2p-kbucket v0.6.3 // indirect
@@ -140,7 +140,7 @@ require (
 	github.com/otiai10/copy v1.14.0 // indirect
 	github.com/pasztorpisti/qs v0.0.0-20171216220353-8d6c33ee906c // indirect
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
-	github.com/pelletier/go-toml/v2 v2.1.1 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.0 // indirect
 	github.com/petermattis/goid v0.0.0-20231207134359-e60b3f734c67 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pokt-network/smt v0.9.2 // indirect
@@ -150,7 +150,7 @@ require (
 	github.com/prometheus/common v0.50.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
-	github.com/quic-go/quic-go v0.41.0 // indirect
+	github.com/quic-go/quic-go v0.42.0 // indirect
 	github.com/quic-go/webtransport-go v0.6.0 // indirect
 	github.com/raulk/go-watchdog v1.3.0 // indirect
 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
