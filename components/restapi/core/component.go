@@ -50,10 +50,14 @@ func configure() error {
 
 	routeGroup.GET(api.CoreEndpointNetworkHealth, func(c echo.Context) error {
 		if deps.RequestHandler.IsNetworkHealthy() {
-			return c.NoContent(http.StatusOK)
+			return httpserver.JSONResponse(c, http.StatusOK, &api.NetworkHealthResponse{
+				IsNetworkHealthy: true,
+			})
 		}
 
-		return c.NoContent(http.StatusServiceUnavailable)
+		return httpserver.JSONResponse(c, http.StatusServiceUnavailable, &api.NetworkHealthResponse{
+			IsNetworkHealthy: false,
+		})
 	})
 
 	routeGroup.GET(api.CoreEndpointNetworkMetrics, func(c echo.Context) error {
