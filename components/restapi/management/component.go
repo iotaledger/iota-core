@@ -8,6 +8,8 @@ import (
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
+	"github.com/iotaledger/iota-core/pkg/network"
+	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	"github.com/iotaledger/iota.go/v4/api"
@@ -29,8 +31,10 @@ var (
 type dependencies struct {
 	dig.In
 
-	RestRouteManager *restapipkg.RestRouteManager
-	Protocol         *protocol.Protocol
+	RestRouteManager     *restapipkg.RestRouteManager
+	Protocol             *protocol.Protocol
+	PeeringConfigManager *p2p.ConfigManager
+	NetworkManager       network.Manager
 }
 
 func configure() error {
@@ -54,16 +58,11 @@ func configure() error {
 	})
 
 	routeGroup.GET(api.ManagementEndpointPeers, func(c echo.Context) error {
-		resp, err := listPeers(c)
-		if err != nil {
-			return err
-		}
-
-		return httpserver.JSONResponse(c, http.StatusOK, resp)
+		return httpserver.JSONResponse(c, http.StatusOK, listPeers())
 	})
 
 	routeGroup.POST(api.ManagementEndpointPeers, func(c echo.Context) error {
-		resp, err := addPeer(c, Component.Logger)
+		resp, err := addPeer(c)
 		if err != nil {
 			return err
 		}
@@ -80,14 +79,14 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	})
 
-	routeGroup.POST(api.ManagementEndpointSnapshotsCreate, func(c echo.Context) error {
-		resp, err := createSnapshots(c)
-		if err != nil {
-			return err
-		}
-
-		return httpserver.JSONResponse(c, http.StatusOK, resp)
-	})
+	// routeGroup.POST(api.ManagementEndpointSnapshotsCreate, func(c echo.Context) error {
+	//	resp, err := createSnapshots(c)
+	//	if err != nil {
+	//		return err
+	//	}
+	//
+	//	return httpserver.JSONResponse(c, http.StatusOK, resp)
+	// })
 
 	return nil
 }
