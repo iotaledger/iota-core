@@ -260,23 +260,16 @@ func (s *SyncManager) IsNodeSynced() bool {
 	return s.isSynced
 }
 
-func (s *SyncManager) updateIsFinalizationDelayed(latestFinalizedSlot iotago.SlotIndex, latestCommitmentSlot iotago.SlotIndex) (changed bool) {
+func (s *SyncManager) updateIsFinalizationDelayed(latestFinalizedSlot iotago.SlotIndex, latestCommitmentSlot iotago.SlotIndex) {
 	s.isFinalizationDelayedLock.Lock()
 	defer s.isFinalizationDelayedLock.Unlock()
 
 	if latestCommitmentSlot < latestFinalizedSlot {
 		// This should never happen, but if it does, we don't want to panic.
-		return false
+		return
 	}
 
-	isFinalizationDelayed := latestCommitmentSlot-latestFinalizedSlot > s.engine.CommittedAPI().ProtocolParameters().MaxCommittableAge()
-	if s.isFinalizationDelayed != isFinalizationDelayed {
-		s.isFinalizationDelayed = isFinalizationDelayed
-
-		return true
-	}
-
-	return false
+	s.isFinalizationDelayed = latestCommitmentSlot-latestFinalizedSlot > s.engine.CommittedAPI().ProtocolParameters().MaxCommittableAge()
 }
 
 func (s *SyncManager) IsFinalizationDelayed() bool {
