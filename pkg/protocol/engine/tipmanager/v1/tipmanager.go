@@ -111,7 +111,7 @@ func (t *TipManager) RemoveSeat(seat account.SeatIndex) {
 
 func (t *TipManager) ValidationTips(optAmount ...int) []tipmanager.TipMetadata {
 	a := t.selectTips(t.validationTipSet, optAmount...)
-	fmt.Println(">> selecting validation tips", lo.Map(a, tipmanager.TipMetadata.String))
+	fmt.Println(">> selecting validation tips", lo.Map(a, tipmanager.TipMetadata.ID))
 
 	return a
 }
