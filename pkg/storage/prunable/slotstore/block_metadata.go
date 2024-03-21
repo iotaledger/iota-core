@@ -59,43 +59,8 @@ func NewBlockMetadataStore(slot iotago.SlotIndex, store kvstore.KVStore) *BlockM
 	}
 }
 
-func (r *BlockMetadataStore) StoreBlockBooked(blockID iotago.BlockID) error {
-	return r.blockMetadataStore.Set(blockID, &BlockMetadata{
-		State: api.BlockStatePending,
-	})
-}
-
-func (r *BlockMetadataStore) StoreBlockAccepted(blockID iotago.BlockID) error {
-	blockMetadata, err := r.blockMetadataStore.Get(blockID)
-	if err != nil {
-		return err
-	}
-
-	blockMetadata.State = api.BlockStateAccepted
-
-	return r.blockMetadataStore.Set(blockID, blockMetadata)
-}
-
-func (r *BlockMetadataStore) StoreBlockConfirmed(blockID iotago.BlockID) error {
-	blockMetadata, err := r.blockMetadataStore.Get(blockID)
-	if err != nil {
-		return err
-	}
-
-	blockMetadata.State = api.BlockStateConfirmed
-
-	return r.blockMetadataStore.Set(blockID, blockMetadata)
-}
-
-func (r *BlockMetadataStore) StoreBlockDropped(blockID iotago.BlockID) error {
-	blockMetadata, err := r.blockMetadataStore.Get(blockID)
-	if err != nil {
-		return err
-	}
-
-	blockMetadata.State = api.BlockStateDropped
-
-	return r.blockMetadataStore.Set(blockID, blockMetadata)
+func (r *BlockMetadataStore) StoreBlockMetadata(blockID iotago.BlockID, state api.BlockState) error {
+	return r.blockMetadataStore.Set(blockID, &BlockMetadata{State: state})
 }
 
 func (r *BlockMetadataStore) BlockMetadata(blockID iotago.BlockID) (*BlockMetadata, error) {

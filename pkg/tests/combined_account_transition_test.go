@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
@@ -83,23 +84,23 @@ func createFullAccount(ts *testsuite.TestSuite) iotago.AccountID {
 		newUserWallet,
 		mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{newAccountBlockIssuerKey}, newAccountExpirySlot),
 		mock.WithAccountAmount(mock.MinIssuerAccountAmount(ts.API.ProtocolParameters())),
-		mock.WithAccountMana(mock.MaxBlockManaCost(ts.DefaultWallet().Node.Protocol.CommittedAPI().ProtocolParameters())),
+		mock.WithAccountMana(mock.MaxBlockManaCost(ts.DefaultWallet().Client.CommittedAPI().ProtocolParameters())),
 	)
 
-	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
+	block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1))
 	var block1Slot iotago.SlotIndex = block1.ID().Slot()
 
 	ts.CommitUntilSlot(block1Slot, block1.ID())
 
-	newAccount := newUserWallet.AccountOutput("TX2:0")
-	newAccountOutput := newAccount.Output().(*iotago.AccountOutput)
+	newAccount := newUserWallet.AccountOutputData("TX2:0")
+	newAccountOutput := newAccount.Output.(*iotago.AccountOutput)
 
 	ts.AssertAccountDiff(newAccountOutput.AccountID, block1Slot, &model.AccountDiff{
 		BICChange:              0,
 		PreviousUpdatedSlot:    0,
 		NewExpirySlot:          newAccountExpirySlot,
 		PreviousExpirySlot:     0,
-		NewOutputID:            newAccount.OutputID(),
+		NewOutputID:            newAccount.ID,
 		PreviousOutputID:       iotago.EmptyOutputID,
 		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
 		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(),
@@ -113,7 +114,7 @@ func createFullAccount(ts *testsuite.TestSuite) iotago.AccountID {
 		ID:              newAccountOutput.AccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(0, block1Slot),
 		ExpirySlot:      newAccountExpirySlot,
-		OutputID:        newAccount.OutputID(),
+		OutputID:        newAccount.ID,
 		BlockIssuerKeys: iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
 	}, ts.Nodes()...)
 
@@ -131,12 +132,12 @@ func createImplicitToFullAccount(ts *testsuite.TestSuite) iotago.AccountID {
 		"TX1:1",
 		newUserWallet,
 	)
-	block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx3)
+	block2 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx3))
 	block2Slot := block2.ID().Slot()
 	latestParents := ts.CommitUntilSlot(block2Slot, block2.ID())
 
-	implicitAccountOutput := newUserWallet.Output("TX3:0")
-	implicitAccountOutputID := implicitAccountOutput.OutputID()
+	implicitAccountOutput := newUserWallet.OutputData("TX3:0")
+	implicitAccountOutputID := implicitAccountOutput.ID
 	implicitAccountID := iotago.AccountIDFromOutputID(implicitAccountOutputID)
 	var implicitBlockIssuerKey iotago.BlockIssuerKey = iotago.Ed25519PublicKeyHashBlockIssuerKeyFromImplicitAccountCreationAddress(newUserWallet.ImplicitAccountCreationAddress())
 
@@ -160,10 +161,10 @@ func createImplicitToFullAccount(ts *testsuite.TestSuite) iotago.AccountID {
 		),
 	)
 	block2Commitment := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
-	block3 := ts.IssueBasicBlockWithOptions("block3", newUserWallet, tx4, mock.WithStrongParents(latestParents...))
+	block3 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block3", newUserWallet, tx4, mock.WithStrongParents(latestParents...)))
 	latestParents = ts.CommitUntilSlot(block3Slot, block3.ID())
 
-	fullAccountOutputID := newUserWallet.Output("TX4:0").OutputID()
+	fullAccountOutputID := newUserWallet.OutputData("TX4:0").ID
 	allotted := iotago.BlockIssuanceCredits(tx4.Transaction.Allotments.Get(implicitAccountID))
 	burned := iotago.BlockIssuanceCredits(block3.WorkScore()) * iotago.BlockIssuanceCredits(block2Commitment.ReferenceManaCost)
 	// the implicit account should now have been transitioned to a full account in the accounts ledger.

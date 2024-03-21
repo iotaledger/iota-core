@@ -1,6 +1,8 @@
 package testsuite
 
 import (
+	"context"
+
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
@@ -13,7 +15,7 @@ func (t *TestSuite) AssertRetainerBlocksState(expectedBlocks []*blocks.Block, ex
 	for _, node := range nodes {
 		for _, block := range expectedBlocks {
 			t.Eventually(func() error {
-				blockFromRetainer, err := node.Protocol.Engines.Main.Get().BlockRetainer.BlockMetadata(block.ID())
+				blockFromRetainer, err := node.Client.BlockMetadataByBlockID(context.Background(), block.ID())
 				if err != nil {
 					return ierrors.Errorf("AssertRetainerBlocksState: %s: block %s: error when loading %s", node.Name, block.ID(), err.Error())
 				}
@@ -25,7 +27,7 @@ func (t *TestSuite) AssertRetainerBlocksState(expectedBlocks []*blocks.Block, ex
 				return nil
 			})
 
-			t.AssertBlock(block, node)
+			t.AssertBlock(block, node.Client)
 		}
 	}
 }

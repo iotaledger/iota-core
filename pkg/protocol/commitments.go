@@ -214,14 +214,13 @@ func (c *Commitments) publishCommitment(commitment *model.Commitment) (published
 	}
 
 	// otherwise try to publish it and determine if we were the goroutine that published it
-	publishedCommitment = newCommitment(c, commitment)
-	cachedRequest.Resolve(publishedCommitment).OnSuccess(func(resolvedCommitment *Commitment) {
-		if published = resolvedCommitment == publishedCommitment; !published {
-			publishedCommitment = resolvedCommitment
-		}
+	cachedRequest.ResolveDynamically(func() *Commitment {
+		published = true
+
+		return newCommitment(c, commitment)
 	})
 
-	return publishedCommitment, published, nil
+	return cachedRequest.Result(), published, nil
 }
 
 // cachedRequest returns a singleton Promise for the given commitmentID. If the Promise does not exist yet, it will be

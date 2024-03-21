@@ -19,13 +19,13 @@ import (
 //  - if the engine name/chain is the same we can always issue a block.
 //  - if the engine name/chain is different we need to make sure to wait "slot ratification" slots.
 
-// SubmitBlock submits a block to be processed.
-func (r *RequestHandler) SubmitBlock(block *model.Block) error {
+// SubmitBlockWithoutAwaitingBooking submits a block to be processed.
+func (r *RequestHandler) SubmitBlockWithoutAwaitingBooking(block *model.Block) error {
 	return r.submitBlock(block)
 }
 
-// SubmitBlockAndAwaitEvent submits a block to be processed and waits for the event to be triggered.
-func (r *RequestHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *model.Block, evt *event.Event1[*blocks.Block]) error {
+// submitBlockAndAwaitEvent submits a block to be processed and waits for the event to be triggered.
+func (r *RequestHandler) submitBlockAndAwaitEvent(ctx context.Context, block *model.Block, evt *event.Event1[*blocks.Block]) error {
 	filtered := make(chan error, 1)
 	exit := make(chan struct{})
 	defer close(exit)
@@ -34,10 +34,8 @@ func (r *RequestHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *mo
 	// it will never trigger one of the below events.
 	processingCtx, processingCtxCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer processingCtxCancel()
-
 	// Calculate the blockID so that we don't capture the block pointer in the event handlers.
 	blockID := block.ID()
-
 	evtUnhook := evt.Hook(func(eventBlock *blocks.Block) {
 		if blockID != eventBlock.ID() {
 			return
@@ -47,7 +45,6 @@ func (r *RequestHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *mo
 		case <-exit:
 		}
 	}, event.WithWorkerPool(r.workerPool)).Unhook
-
 	prefilteredUnhook := r.protocol.Events.Engine.PreSolidFilter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
 		if blockID != event.Block.ID() {
 			return
@@ -73,7 +70,6 @@ func (r *RequestHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *mo
 	if err := r.submitBlock(block); err != nil {
 		return ierrors.Wrapf(err, "failed to issue block %s", blockID)
 	}
-
 	select {
 	case <-processingCtx.Done():
 		return ierrors.Errorf("context canceled whilst waiting for event on block %s", blockID)
@@ -86,13 +82,13 @@ func (r *RequestHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *mo
 	}
 }
 
-func (r *RequestHandler) AttachBlock(ctx context.Context, iotaBlock *iotago.Block) (iotago.BlockID, error) {
+func (r *RequestHandler) SubmitBlockAndAwaitBooking(ctx context.Context, iotaBlock *iotago.Block) (iotago.BlockID, error) {
 	modelBlock, err := model.BlockFromBlock(iotaBlock)
 	if err != nil {
 		return iotago.EmptyBlockID, ierrors.Wrap(err, "error serializing block to model block")
 	}
 
-	if err = r.SubmitBlockAndAwaitEvent(ctx, modelBlock, r.protocol.Events.Engine.Retainer.BlockRetained); err != nil {
+	if err = r.submitBlockAndAwaitEvent(ctx, modelBlock, r.protocol.Events.Engine.Retainer.BlockRetained); err != nil {
 		return iotago.EmptyBlockID, ierrors.Wrap(err, "error issuing model block")
 	}
 

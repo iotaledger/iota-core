@@ -19,6 +19,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
@@ -56,7 +57,7 @@ func (d *DockerTestFramework) CheckAccountStatus(ctx context.Context, blkID iota
 	require.NoError(d.Testing, err)
 }
 
-func (d *DockerTestFramework) AssertIndexerAccount(account *AccountData) {
+func (d *DockerTestFramework) AssertIndexerAccount(account *mock.AccountData) {
 	d.Eventually(func() error {
 		ctx := context.TODO()
 		indexerClt, err := d.wallet.DefaultClient().Indexer(ctx)
@@ -214,6 +215,40 @@ func (d *DockerTestFramework) AwaitTransactionPayloadAccepted(ctx context.Contex
 	})
 }
 
+func (d *DockerTestFramework) AwaitTransactionState(ctx context.Context, txID iotago.TransactionID, expectedState api.TransactionState) {
+	clt := d.wallet.DefaultClient()
+
+	d.Eventually(func() error {
+		resp, err := clt.TransactionMetadata(ctx, txID)
+		if err != nil {
+			return err
+		}
+
+		if expectedState == resp.TransactionState {
+			return nil
+		} else {
+			return ierrors.Errorf("expected transaction %s to have state %s, got %s instead", txID, expectedState, resp.TransactionState)
+		}
+	})
+}
+
+func (d *DockerTestFramework) AwaitTransactionFailure(ctx context.Context, txID iotago.TransactionID, expectedReason api.TransactionFailureReason) {
+	clt := d.wallet.DefaultClient()
+
+	d.Eventually(func() error {
+		resp, err := clt.TransactionMetadata(ctx, txID)
+		if err != nil {
+			return err
+		}
+
+		if expectedReason == resp.TransactionFailureReason {
+			return nil
+		} else {
+			return ierrors.Errorf("expected transaction %s to have failure reason %T, got %s instead, failure details: %s", txID, expectedReason, resp.TransactionState, resp.TransactionFailureDetails)
+		}
+	})
+}
+
 func (d *DockerTestFramework) AwaitCommitment(targetSlot iotago.SlotIndex) {
 	currentCommittedSlot := d.NodeStatus("V1").LatestCommitmentID.Slot()
 
@@ -315,26 +350,6 @@ func createLogDirectory(testName string) string {
 	}
 
 	return dir
-}
-
-func AwaitEventAPITopics(duration time.Duration, cancleFunc context.CancelFunc, receiveChan chan struct{}, numOfTopics int) error {
-	counter := 0
-	timer := time.NewTimer(duration)
-	defer timer.Stop()
-
-	for {
-		select {
-		case <-timer.C:
-			cancleFunc()
-			return ierrors.New("Timeout, did not receive signals from all  topics")
-		case <-receiveChan:
-			counter++
-			if counter == numOfTopics {
-				fmt.Println("Received all signals from topics")
-				return nil
-			}
-		}
-	}
 }
 
 func getDelegationStartEpoch(api iotago.API, commitmentSlot iotago.SlotIndex) iotago.EpochIndex {

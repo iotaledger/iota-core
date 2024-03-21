@@ -65,7 +65,6 @@ func (s *StateMetadata) setup(optSource ...*TransactionMetadata) *StateMetadata 
 		})
 	})
 
-	source.OnPending(func() { s.accepted.Set(false) })
 	source.OnAccepted(func() { s.accepted.Set(true) })
 	source.OnRejected(func() { s.rejected.Trigger() })
 	source.OnCommittedSlotUpdated(lo.Void(s.committedSlot.Set))
@@ -172,12 +171,6 @@ func (s *StateMetadata) setupSpender(spender *TransactionMetadata) {
 	spender.OnAccepted(func() {
 		if !s.state.IsReadOnly() {
 			s.spendAccepted.Set(spender)
-		}
-	})
-
-	spender.OnPending(func() {
-		if !s.state.IsReadOnly() {
-			s.spendAccepted.Set(nil)
 		}
 	})
 

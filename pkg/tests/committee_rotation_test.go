@@ -67,9 +67,9 @@ func Test_TopStakersRotation(t *testing.T) {
 	})
 
 	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
-		ts.Node("node1").Validator.AccountID,
-		ts.Node("node2").Validator.AccountID,
-		ts.Node("node3").Validator.AccountID,
+		ts.Node("node1").Validator.AccountData.ID,
+		ts.Node("node2").Validator.AccountData.ID,
+		ts.Node("node3").Validator.AccountData.ID,
 	}, ts.Nodes()...)
 
 	// Select committee for epoch 1 and test candidacy announcements at different times.
@@ -97,19 +97,19 @@ func Test_TopStakersRotation(t *testing.T) {
 
 		// Assert that only candidates that issued before slot 11 are considered.
 		ts.AssertSybilProtectionCandidates(0, []iotago.AccountID{
-			ts.Node("node1").Validator.AccountID,
-			ts.Node("node4").Validator.AccountID,
-			ts.Node("node5").Validator.AccountID,
-			ts.Node("node6").Validator.AccountID,
+			ts.Node("node1").Validator.AccountData.ID,
+			ts.Node("node4").Validator.AccountData.ID,
+			ts.Node("node5").Validator.AccountData.ID,
+			ts.Node("node6").Validator.AccountData.ID,
 		}, ts.Nodes()...)
 
 		ts.IssueBlocksAtSlots("wave-4:", []iotago.SlotIndex{11, 12, 13, 14, 15, 16, 17}, 4, "node5-candidacy:2", ts.Nodes(), true, false)
 
 		ts.AssertLatestFinalizedSlot(14, ts.Nodes()...)
 		ts.AssertSybilProtectionCommittee(1, []iotago.AccountID{
-			ts.Node("node1").Validator.AccountID,
-			ts.Node("node4").Validator.AccountID,
-			ts.Node("node5").Validator.AccountID,
+			ts.Node("node1").Validator.AccountData.ID,
+			ts.Node("node4").Validator.AccountData.ID,
+			ts.Node("node5").Validator.AccountData.ID,
 		}, ts.Nodes()...)
 
 		ts.AssertReelectedCommitteeSeatIndices(0, 1, ts.Nodes()...)
@@ -123,9 +123,9 @@ func Test_TopStakersRotation(t *testing.T) {
 		ts.AssertLatestCommitmentSlotIndex(28, ts.Nodes()...)
 		ts.AssertLatestFinalizedSlot(27, ts.Nodes()...)
 		ts.AssertSybilProtectionCommittee(2, []iotago.AccountID{
-			ts.Node("node1").Validator.AccountID,
-			ts.Node("node4").Validator.AccountID,
-			ts.Node("node5").Validator.AccountID,
+			ts.Node("node1").Validator.AccountData.ID,
+			ts.Node("node4").Validator.AccountData.ID,
+			ts.Node("node5").Validator.AccountData.ID,
 		}, ts.Nodes()...)
 
 		ts.AssertReelectedCommitteeSeatIndices(1, 2, ts.Nodes()...)
@@ -145,13 +145,13 @@ func Test_TopStakersRotation(t *testing.T) {
 		ts.AssertLatestCommitmentSlotIndex(43, ts.Nodes()...)
 		// Even though we have a candidate, the committee should be reused as we did not finalize at epochNearingThreshold before epoch end - maxCommittableAge was committed
 		ts.AssertSybilProtectionCandidates(2, []iotago.AccountID{
-			ts.Node("node6").Validator.AccountID,
+			ts.Node("node6").Validator.AccountData.ID,
 		}, ts.Nodes()...)
 		// Check that the committee is reused.
 		ts.AssertSybilProtectionCommittee(3, []iotago.AccountID{
-			ts.Node("node1").Validator.AccountID,
-			ts.Node("node4").Validator.AccountID,
-			ts.Node("node5").Validator.AccountID,
+			ts.Node("node1").Validator.AccountData.ID,
+			ts.Node("node4").Validator.AccountData.ID,
+			ts.Node("node5").Validator.AccountData.ID,
 		}, ts.Nodes()...)
 
 		ts.AssertReelectedCommitteeSeatIndices(2, 3, ts.Nodes()...)
@@ -170,10 +170,10 @@ func Test_TopStakersRotation(t *testing.T) {
 		ts.AssertLatestFinalizedSlot(58, ts.Nodes()...)
 		// We finalized at epochEnd-epochNearingThreshold, so the committee should be rotated even if there is just one candidate.
 		ts.AssertSybilProtectionCandidates(3, []iotago.AccountID{
-			ts.Node("node3").Validator.AccountID,
+			ts.Node("node3").Validator.AccountData.ID,
 		}, ts.Nodes()...)
 		ts.AssertSybilProtectionCommittee(4, []iotago.AccountID{
-			ts.Node("node3").Validator.AccountID,
+			ts.Node("node3").Validator.AccountData.ID,
 		}, ts.Nodes()...)
 		ts.AssertReelectedCommitteeSeatIndices(3, 4, ts.Nodes()...)
 	}
@@ -193,12 +193,12 @@ func Test_TopStakersRotation(t *testing.T) {
 		ts.AssertLatestFinalizedSlot(76, ts.Nodes()...)
 		// We finalized at epochEnd-epochNearingThreshold, so the committee should be rotated even if there is just one candidate.
 		ts.AssertSybilProtectionCandidates(4, []iotago.AccountID{
-			ts.Node("node3").Validator.AccountID,
-			ts.Node("node5").Validator.AccountID,
+			ts.Node("node3").Validator.AccountData.ID,
+			ts.Node("node5").Validator.AccountData.ID,
 		}, ts.Nodes()...)
 		ts.AssertSybilProtectionCommittee(5, []iotago.AccountID{
-			ts.Node("node3").Validator.AccountID,
-			ts.Node("node5").Validator.AccountID,
+			ts.Node("node3").Validator.AccountData.ID,
+			ts.Node("node5").Validator.AccountData.ID,
 		}, ts.Nodes()...)
 		ts.AssertReelectedCommitteeSeatIndices(4, 5, ts.Nodes()...)
 	}
@@ -215,10 +215,10 @@ func Test_TopStakersRotation(t *testing.T) {
 		ts.AssertLatestFinalizedSlot(91, ts.Nodes()...)
 		// We finalized at epochEnd-epochNearingThreshold, so the committee should be rotated even if there is just one candidate.
 		ts.AssertSybilProtectionCandidates(5, []iotago.AccountID{
-			ts.Node("node5").Validator.AccountID,
+			ts.Node("node5").Validator.AccountData.ID,
 		}, ts.Nodes()...)
 		ts.AssertSybilProtectionCommittee(6, []iotago.AccountID{
-			ts.Node("node5").Validator.AccountID,
+			ts.Node("node5").Validator.AccountData.ID,
 		}, ts.Nodes()...)
 		ts.AssertReelectedCommitteeSeatIndices(5, 6, ts.Nodes()...)
 	}

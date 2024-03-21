@@ -1,10 +1,14 @@
 package blockretainer
 
 import (
+	"sync"
+
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/retainer"
@@ -14,32 +18,33 @@ import (
 )
 
 type (
-	StoreFunc               func(iotago.SlotIndex) (*slotstore.BlockMetadataStore, error)
-	LatestCommittedSlotFunc func() iotago.SlotIndex
-	FinalizedSlotFunc       func() iotago.SlotIndex
+	StoreFunc         func(iotago.SlotIndex) (*slotstore.BlockMetadataStore, error)
+	FinalizedSlotFunc func() iotago.SlotIndex
 )
 
 type BlockRetainer struct {
 	events *retainer.Events
 	store  StoreFunc
+	cache  *cache
 
-	latestCommittedSlotFunc LatestCommittedSlotFunc
-	finalizedSlotFunc       FinalizedSlotFunc
-	errorHandler            func(error)
+	latestCommittedSlot iotago.SlotIndex
+	finalizedSlotFunc   FinalizedSlotFunc
+	errorHandler        func(error)
 
 	workerPool *workerpool.WorkerPool
+	sync.RWMutex
 	module.Module
 }
 
-func New(module module.Module, workersGroup *workerpool.Group, retainerStoreFunc StoreFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *BlockRetainer {
+func New(module module.Module, workersGroup *workerpool.Group, retainerStoreFunc StoreFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *BlockRetainer {
 	b := &BlockRetainer{
-		Module:                  module,
-		events:                  retainer.NewEvents(),
-		workerPool:              workersGroup.CreatePool("Retainer", workerpool.WithWorkerCount(1)),
-		store:                   retainerStoreFunc,
-		latestCommittedSlotFunc: latestCommittedSlotFunc,
-		finalizedSlotFunc:       finalizedSlotFunc,
-		errorHandler:            errorHandler,
+		Module:            module,
+		events:            retainer.NewEvents(),
+		workerPool:        workersGroup.CreatePool("Retainer", workerpool.WithWorkerCount(1)),
+		store:             retainerStoreFunc,
+		cache:             newCache(),
+		finalizedSlotFunc: finalizedSlotFunc,
+		errorHandler:      errorHandler,
 	}
 
 	b.ShutdownEvent().OnTrigger(func() {
@@ -56,9 +61,6 @@ func NewProvider() module.Provider[*engine.Engine, retainer.BlockRetainer] {
 	return module.Provide(func(e *engine.Engine) retainer.BlockRetainer {
 		r := New(e.NewSubModule("BlockRetainer"), e.Workers.CreateGroup("Retainer"),
 			e.Storage.BlockMetadata,
-			func() iotago.SlotIndex {
-				return e.SyncManager.LatestCommitment().Slot()
-			},
 			func() iotago.SlotIndex {
 				return e.SyncManager.LatestFinalizedSlot()
 			},
@@ -90,6 +92,13 @@ func NewProvider() module.Provider[*engine.Engine, retainer.BlockRetainer] {
 			}
 		})
 
+		// this event is fired when a new commitment is detected
+		e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
+			if err := r.CommitSlot(commitment.Slot()); err != nil {
+				panic(err)
+			}
+		}, asyncOpt)
+
 		e.Events.Retainer.BlockRetained.LinkTo(r.events.BlockRetained)
 
 		r.InitializedEvent().Trigger()
@@ -100,33 +109,23 @@ func NewProvider() module.Provider[*engine.Engine, retainer.BlockRetainer] {
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (r *BlockRetainer) Reset() {
-	// TODO: check if something needs to be cleaned here
-	// on chain switching reset everything up to the forking point
+	r.Lock()
+	defer r.Unlock()
+
+	r.cache.uncommittedBlockMetadata.Clear()
 }
 
-func (r *BlockRetainer) getBlockMetadata(blockID iotago.BlockID) (*slotstore.BlockMetadata, error) {
-	store, err := r.store(blockID.Slot())
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := store.BlockMetadata(blockID)
-	if err != nil {
-		return nil, ierrors.Wrapf(err, "block %s not found", blockID.String())
-	}
-
-	return data, nil
+func (r *BlockRetainer) Shutdown() {
+	r.workerPool.Shutdown()
 }
 
 func (r *BlockRetainer) BlockMetadata(blockID iotago.BlockID) (*api.BlockMetadataResponse, error) {
+	r.RLock()
+	defer r.RUnlock()
+
 	blockStatus, err := r.blockState(blockID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "block %s not found", blockID)
-	}
-
-	// we do not expose accepted flag
-	if blockStatus == api.BlockStateAccepted {
-		blockStatus = api.BlockStatePending
 	}
 
 	return &api.BlockMetadataResponse{
@@ -136,14 +135,24 @@ func (r *BlockRetainer) BlockMetadata(blockID iotago.BlockID) (*api.BlockMetadat
 }
 
 func (r *BlockRetainer) blockState(blockID iotago.BlockID) (api.BlockState, error) {
-	blockMetadata, err := r.getBlockMetadata(blockID)
-	if err != nil {
-		return api.BlockStateUnknown, err
+	state, found := r.cache.blockMetadataByID(blockID)
+	if !found {
+		// block is not committed yet, should be in cache
+		if blockID.Slot() > r.latestCommittedSlot {
+			return api.BlockStateUnknown, kvstore.ErrKeyNotFound
+		}
+
+		blockMetadata, err := r.getBlockMetadata(blockID)
+		if err != nil {
+			return api.BlockStateUnknown, err
+		}
+
+		state = blockMetadata.State
 	}
 
-	switch blockMetadata.State {
+	switch state {
 	case api.BlockStatePending, api.BlockStateDropped:
-		if blockID.Slot() <= r.latestCommittedSlotFunc() {
+		if blockID.Slot() <= r.latestCommittedSlot {
 			return api.BlockStateOrphaned, nil
 		}
 	case api.BlockStateAccepted, api.BlockStateConfirmed:
@@ -152,7 +161,21 @@ func (r *BlockRetainer) blockState(blockID iotago.BlockID) (api.BlockState, erro
 		}
 	}
 
-	return blockMetadata.State, nil
+	return state, nil
+}
+
+func (r *BlockRetainer) getBlockMetadata(blockID iotago.BlockID) (*slotstore.BlockMetadata, error) {
+	store, err := r.store(blockID.Slot())
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Slot())
+	}
+
+	data, err := store.BlockMetadata(blockID)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "block %s not found", blockID.String())
+	}
+
+	return data, nil
 }
 
 // OnBlockBooked triggers storing block in the retainer on block booked event.
@@ -167,37 +190,76 @@ func (r *BlockRetainer) OnBlockBooked(block *blocks.Block) error {
 }
 
 func (r *BlockRetainer) setBlockBooked(blockID iotago.BlockID) error {
-	store, err := r.store(blockID.Slot())
-	if err != nil {
-		return ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Slot())
-	}
-
-	return store.StoreBlockBooked(blockID)
+	return r.UpdateBlockMetadata(blockID, api.BlockStatePending)
 }
 
 func (r *BlockRetainer) OnBlockAccepted(blockID iotago.BlockID) error {
-	store, err := r.store(blockID.Slot())
-	if err != nil {
-		return ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Slot())
-	}
-
-	return store.StoreBlockAccepted(blockID)
+	return r.UpdateBlockMetadata(blockID, api.BlockStateAccepted)
 }
 
 func (r *BlockRetainer) OnBlockConfirmed(blockID iotago.BlockID) error {
-	store, err := r.store(blockID.Slot())
-	if err != nil {
-		return ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Slot())
-	}
-
-	return store.StoreBlockConfirmed(blockID)
+	return r.UpdateBlockMetadata(blockID, api.BlockStateConfirmed)
 }
 
 func (r *BlockRetainer) OnBlockDropped(blockID iotago.BlockID) error {
+	return r.UpdateBlockMetadata(blockID, api.BlockStateDropped)
+}
+
+func (r *BlockRetainer) UpdateBlockMetadata(blockID iotago.BlockID, state api.BlockState) error {
+	r.Lock()
+	defer r.Unlock()
+
+	// we can safely use this as a check where block is stored as r.latestCommittedSlot is updated on commitment
+	if blockID.Slot() > r.latestCommittedSlot {
+		r.cache.setBlockMetadata(blockID, state)
+
+		return nil
+	}
+
+	//  for blocks the state might still change after the commitment but only on confirmation
+	if state != api.BlockStateConfirmed {
+		return ierrors.Errorf("cannot update block metadata for block %s with state %s as block is already committed", blockID.String(), state)
+	}
+
+	// store in the database
 	store, err := r.store(blockID.Slot())
 	if err != nil {
 		return ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Slot())
 	}
 
-	return store.StoreBlockDropped(blockID)
+	return store.StoreBlockMetadata(blockID, state)
+}
+
+func (r *BlockRetainer) CommitSlot(committedSlot iotago.SlotIndex) error {
+	r.Lock()
+	defer r.Unlock()
+
+	var innerErr error
+	r.cache.uncommittedBlockMetadata.ForEach(func(cacheSlot iotago.SlotIndex, blocks map[iotago.BlockID]api.BlockState) bool {
+		if cacheSlot <= committedSlot {
+			store, err := r.store(cacheSlot)
+			if err != nil {
+				innerErr = ierrors.Wrapf(err, "could not get retainer store for slot %d", cacheSlot)
+				return false
+			}
+
+			for blockID, state := range blocks {
+				if err = store.StoreBlockMetadata(blockID, state); err != nil {
+					innerErr = ierrors.Wrapf(err, "could not store block metadata for block %s", blockID.String())
+					return false
+				}
+			}
+
+			r.cache.uncommittedBlockMetadata.Delete(cacheSlot)
+		}
+
+		return true
+	})
+	if innerErr != nil {
+		return innerErr
+	}
+
+	r.latestCommittedSlot = committedSlot
+
+	return nil
 }

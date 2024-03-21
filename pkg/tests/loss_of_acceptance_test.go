@@ -46,26 +46,26 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 
 	// Create snapshot to use later.
 	snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
-	require.NoError(t, ts.Node("node0").Protocol.Engines.Main.Get().WriteSnapshot(snapshotPath))
+	require.NoError(t, node0.Protocol.Engines.Main.Get().WriteSnapshot(snapshotPath))
 
 	// Revive chain on node0.
 	{
 		ts.SetCurrentSlot(50)
-		block0 := ts.IssueValidationBlockWithHeaderOptions("block0", node0)
+		block0 := lo.PanicOnErr(ts.IssueValidationBlockWithHeaderOptions("block0", node0))
 		require.EqualValues(t, 48, ts.Block("block0").SlotCommitmentID().Slot())
 		// Reviving the chain should select one parent from the last committed slot.
 		require.Len(t, block0.Parents(), 1)
 		require.Equal(t, block0.Parents()[0].Alias(), "Genesis")
-		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.Nodes("node0")...)
+		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.ClientsForNodes(node0)...)
 	}
 
 	// Need to issue to slot 52 so that all other nodes can warp sync up to slot 49 and then commit slot 50 themselves.
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{51, 52}, 2, "block0", ts.Nodes("node0"), true, false)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{51, 52}, 2, "block0", mock.Nodes(node0), true, false)
 
 		ts.AssertLatestCommitmentSlotIndex(50, ts.Nodes()...)
 		ts.AssertEqualStoredCommitmentAtIndex(50, ts.Nodes()...)
-		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.Nodes()...)
+		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.ClientsForNodes()...)
 	}
 
 	// Continue issuing on all nodes for a few slots.
@@ -145,11 +145,12 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 		require.NoError(t, ts.Node("node0").Protocol.Engines.Main.Get().WriteSnapshot(snapshotPath))
 
 		node0restarted = ts.AddNode("node0-restarted")
-		node0restarted.Validator = node0.Validator
 		node0restarted.Initialize(true,
 			protocol.WithSnapshotPath(snapshotPath),
 			protocol.WithBaseDirectory(ts.Directory.PathWithCreate(node0restarted.Name)),
 		)
+		node0restarted.Validator = node0.Validator
+		node0restarted.Validator.Client = node0restarted.Client
 		ts.Wait()
 	}
 
@@ -161,12 +162,12 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 	// Revive chain on node0-restarted.
 	{
 		ts.SetCurrentSlot(20)
-		block0 := ts.IssueValidationBlockWithHeaderOptions("block0", node0restarted)
+		block0 := lo.PanicOnErr(ts.IssueValidationBlockWithHeaderOptions("block0", node0restarted))
 		require.EqualValues(t, 18, block0.SlotCommitmentID().Slot())
 		// Reviving the chain should select one parent from the last committed slot.
 		require.Len(t, block0.Parents(), 1)
 		require.EqualValues(t, block0.Parents()[0].Slot(), 8)
-		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.Nodes("node0-restarted")...)
+		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.ClientsForNodes(node0restarted)...)
 	}
 
 	// Need to issue to slot 22 so that all other nodes can warp sync up to slot 19 and then commit slot 20 themselves.
@@ -241,27 +242,28 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 	var node0restarted *mock.Node
 	{
 		node0restarted = ts.AddNode("node0-restarted")
-		node0restarted.Validator = node0.Validator
 		node0restarted.Initialize(true,
 			protocol.WithBaseDirectory(ts.Directory.PathWithCreate(node0.Name)),
 		)
+		node0restarted.Validator = node0.Validator
+		node0restarted.Validator.Client = node0restarted.Client
 		ts.Wait()
 	}
 
 	// Revive chain on node0-restarted.
 	{
 		ts.SetCurrentSlot(20)
-		block0 := ts.IssueValidationBlockWithHeaderOptions("block0", node0restarted)
+		block0 := lo.PanicOnErr(ts.IssueValidationBlockWithHeaderOptions("block0", node0restarted))
 		require.EqualValues(t, 18, block0.SlotCommitmentID().Slot())
 		// Reviving the chain should select one parent from the last committed slot.
 		require.Len(t, block0.Parents(), 1)
 		require.EqualValues(t, block0.Parents()[0].Slot(), 8)
-		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.Nodes("node0-restarted")...)
+		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.ClientsForNodes(node0restarted)...)
 	}
 
 	// Need to issue to slot 22 so that all other nodes can warp sync up to slot 19 and then commit slot 20 themselves.
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{21, 22}, 2, "block0", ts.Nodes("node0-restarted"), true, false)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{21, 22}, 2, "block0", mock.Nodes(node0restarted), true, false)
 
 		ts.AssertEqualStoredCommitmentAtIndex(20, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(20, ts.Nodes()...)
@@ -328,17 +330,17 @@ func TestLossOfAcceptanceWithoutRestart(t *testing.T) {
 	// slot when force committing.
 	{
 		ts.SetCurrentSlot(20)
-		block0 := ts.IssueValidationBlockWithHeaderOptions("block0", node0)
+		block0 := lo.PanicOnErr(ts.IssueValidationBlockWithHeaderOptions("block0", node0))
 		require.EqualValues(t, 18, block0.SlotCommitmentID().Slot())
 		// Reviving the chain should select one parent from the last committed slot.
 		require.Len(t, block0.Parents(), 1)
 		require.EqualValues(t, 10, block0.Parents()[0].Slot())
-		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.Nodes("node0")...)
+		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.ClientsForNodes(node0)...)
 	}
 
 	// Need to issue to slot 22 so that all other nodes can warp sync up to slot 19 and then commit slot 20 themselves.
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{21, 22}, 2, "block0", ts.Nodes("node0"), true, false)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{21, 22}, 2, "block0", mock.Nodes(node0), true, false)
 
 		ts.AssertEqualStoredCommitmentAtIndex(20, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(20, ts.Nodes()...)

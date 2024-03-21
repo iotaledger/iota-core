@@ -49,14 +49,16 @@ func New[T any](optResolver ...func(p *Promise[T])) *Promise[T] {
 	return p
 }
 
-// Resolve resolves the promise with the given result.
-func (p *Promise[T]) Resolve(result T) *Promise[T] {
+// ResolveDynamically resolves the promise with the result of the given resolve function.
+func (p *Promise[T]) ResolveDynamically(resolve func() T) *Promise[T] {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
 	if p.complete {
 		return p
 	}
+
+	result := resolve()
 
 	//nolint:revive
 	p.successCallbacks.ForEach(func(key types.UniqueID, callback func(T)) bool {
@@ -77,6 +79,13 @@ func (p *Promise[T]) Resolve(result T) *Promise[T] {
 	p.complete = true
 
 	return p
+}
+
+// Resolve resolves the promise with the given result.
+func (p *Promise[T]) Resolve(result T) *Promise[T] {
+	return p.ResolveDynamically(func() T {
+		return result
+	})
 }
 
 // Reject rejects the promise with the given error.

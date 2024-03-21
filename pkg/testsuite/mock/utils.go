@@ -3,7 +3,6 @@ package mock
 import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/testsuite/depositcalculator"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
@@ -46,45 +45,45 @@ func MaxBlockManaCost(protocolParameters iotago.ProtocolParameters) iotago.Mana 
 
 // TransactionBuilder options
 
-func WithInputs(inputs ...*utxoledger.Output) options.Option[builder.TransactionBuilder] {
+func WithInputs(inputs ...*OutputData) options.Option[builder.TransactionBuilder] {
 	return func(txBuilder *builder.TransactionBuilder) {
 		for _, input := range inputs {
-			switch input.OutputType() {
+			switch input.Output.Type() {
 			case iotago.OutputFoundry:
 				// For foundries we need to unlock the account output
 				txBuilder.AddInput(&builder.TxInput{
-					UnlockTarget: input.Output().UnlockConditionSet().ImmutableAccount().Address,
-					InputID:      input.OutputID(),
-					Input:        input.Output(),
+					UnlockTarget: input.Output.UnlockConditionSet().ImmutableAccount().Address,
+					InputID:      input.ID,
+					Input:        input.Output,
 				})
 			case iotago.OutputAnchor:
 				// For anchor outputs we need to unlock the state controller
 				txBuilder.AddInput(&builder.TxInput{
-					UnlockTarget: input.Output().UnlockConditionSet().StateControllerAddress().Address,
-					InputID:      input.OutputID(),
-					Input:        input.Output(),
+					UnlockTarget: input.Output.UnlockConditionSet().StateControllerAddress().Address,
+					InputID:      input.ID,
+					Input:        input.Output,
 				})
 			default:
 				txBuilder.AddInput(&builder.TxInput{
-					UnlockTarget: input.Output().UnlockConditionSet().Address().Address,
-					InputID:      input.OutputID(),
-					Input:        input.Output(),
+					UnlockTarget: input.Output.UnlockConditionSet().Address().Address,
+					InputID:      input.ID,
+					Input:        input.Output,
 				})
 			}
 		}
 	}
 }
 
-func WithAccountInput(input *utxoledger.Output) options.Option[builder.TransactionBuilder] {
+func WithAccountInput(input *OutputData) options.Option[builder.TransactionBuilder] {
 	return func(txBuilder *builder.TransactionBuilder) {
-		switch input.OutputType() {
+		switch input.Output.Type() {
 		case iotago.OutputAccount:
-			address := input.Output().UnlockConditionSet().Address().Address
+			address := input.Output.UnlockConditionSet().Address().Address
 
 			txBuilder.AddInput(&builder.TxInput{
 				UnlockTarget: address,
-				InputID:      input.OutputID(),
-				Input:        input.Output(),
+				InputID:      input.ID,
+				Input:        input.Output,
 			})
 		default:
 			panic("only OutputAccount can be added as account input")

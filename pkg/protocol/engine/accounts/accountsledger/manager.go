@@ -268,12 +268,18 @@ func (m *Manager) PastAccounts(accountIDs iotago.AccountIDs, targetSlot iotago.S
 }
 
 func (m *Manager) Rollback(targetSlot iotago.SlotIndex) error {
+	processedAccounts := ds.NewSet[iotago.AccountID]()
 	for slot := m.latestCommittedSlot; slot > targetSlot; slot-- {
 		slotDiff := lo.PanicOnErr(m.slotDiff(slot))
 		var internalErr error
 
 		//nolint:revive
 		if err := slotDiff.Stream(func(accountID iotago.AccountID, accountDiff *model.AccountDiff, destroyed bool) bool {
+			// We rollback each account directly to targetSlot, therefore, we should rollback each account only once.
+			if processedAccounts.Has(accountID) {
+				return true
+			}
+
 			accountData, exists, err := m.accountsTree.Get(accountID)
 			if err != nil {
 				internalErr = ierrors.Wrapf(err, "unable to retrieve account %s to rollback in slot %d", accountID, slot)
@@ -296,6 +302,8 @@ func (m *Manager) Rollback(targetSlot iotago.SlotIndex) error {
 
 				return false
 			}
+
+			processedAccounts.Add(accountID)
 
 			return true
 		}); err != nil {

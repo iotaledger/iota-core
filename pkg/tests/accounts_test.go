@@ -1,10 +1,12 @@
 package tests
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
@@ -58,11 +60,11 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 	// check that the accounts added in the genesis snapshot were added to account manager correctly.
 	// genesis account.
 	genesisAccount := ts.AccountOutput("Genesis:1")
-	genesisAccountOutput := genesisAccount.Output().(*iotago.AccountOutput)
+	genesisAccountOutput := genesisAccount.Output.(*iotago.AccountOutput)
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              genesisAccountOutput.AccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(123), 0),
-		OutputID:        genesisAccount.OutputID(),
+		OutputID:        genesisAccount.ID,
 		ExpirySlot:      iotago.MaxSlotIndex,
 		BlockIssuerKeys: iotago.NewBlockIssuerKeys(oldGenesisOutputKey),
 	}, ts.Nodes()...)
@@ -70,9 +72,9 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 	// validator node account.
 	validatorAccountOutput := ts.AccountOutput("Genesis:2")
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              node1.Validator.AccountID,
+		ID:              node1.Validator.AccountData.ID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.MaxBlockIssuanceCredits/2, 0),
-		OutputID:        validatorAccountOutput.OutputID(),
+		OutputID:        validatorAccountOutput.ID,
 		ExpirySlot:      iotago.MaxSlotIndex,
 		BlockIssuerKeys: node1.Validator.BlockIssuerKeys(),
 		StakeEndEpoch:   iotago.MaxEpochIndex,
@@ -82,9 +84,9 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 	// default wallet block issuer account.
 	blockIssuerAccountOutput := ts.AccountOutput("Genesis:3")
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              wallet.BlockIssuer.AccountID,
+		ID:              wallet.BlockIssuer.AccountData.ID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.MaxBlockIssuanceCredits/2, 0),
-		OutputID:        blockIssuerAccountOutput.OutputID(),
+		OutputID:        blockIssuerAccountOutput.ID,
 		ExpirySlot:      iotago.MaxSlotIndex,
 		BlockIssuerKeys: wallet.BlockIssuer.BlockIssuerKeys(),
 	}, ts.Nodes()...)
@@ -106,7 +108,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 	genesisCommitment := iotago.NewEmptyCommitment(ts.API)
 	genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 	ts.SetCurrentSlot(block1Slot)
-	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(genesisCommitment))
+	block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(genesisCommitment)))
 	latestParents := ts.CommitUntilSlot(ts.BlockID("block1").Slot(), block1.ID())
 
 	// assert diff of the genesis account, it should have a new output ID, new expiry slot and a new block issuer key.
@@ -115,8 +117,8 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 		PreviousUpdatedSlot:    0,
 		PreviousExpirySlot:     iotago.MaxSlotIndex,
 		NewExpirySlot:          newExpirySlot,
-		NewOutputID:            ts.DefaultWallet().Output("TX1:0").OutputID(),
-		PreviousOutputID:       genesisAccount.OutputID(),
+		NewOutputID:            ts.DefaultWallet().OutputData("TX1:0").ID,
+		PreviousOutputID:       genesisAccount.ID,
 		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(),
 		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(newGenesisOutputKey),
 	}, false, ts.Nodes()...)
@@ -124,7 +126,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              genesisAccountOutput.AccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(123), 0),
-		OutputID:        ts.DefaultWallet().Output("TX1:0").OutputID(),
+		OutputID:        ts.DefaultWallet().OutputData("TX1:0").ID,
 		BlockIssuerKeys: iotago.NewBlockIssuerKeys(oldGenesisOutputKey, newGenesisOutputKey),
 		ExpirySlot:      newExpirySlot,
 	}, ts.Nodes()...)
@@ -137,7 +139,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 	block2Slot := ts.CurrentSlot()
 	// create a transaction which destroys the genesis account.
 	tx2 := ts.DefaultWallet().DestroyAccount("TX2", "TX1:0")
-	block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(latestParents...))
+	block2 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(latestParents...)))
 	latestParents = ts.CommitUntilSlot(block2Slot, block2.ID())
 
 	// assert diff of the destroyed account.
@@ -147,7 +149,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 		NewExpirySlot:          0,
 		PreviousExpirySlot:     newExpirySlot,
 		NewOutputID:            iotago.EmptyOutputID,
-		PreviousOutputID:       ts.DefaultWallet().Output("TX1:0").OutputID(),
+		PreviousOutputID:       ts.DefaultWallet().OutputData("TX1:0").ID,
 		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(),
 		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(oldGenesisOutputKey, newGenesisOutputKey),
 		ValidatorStakeChange:   0,
@@ -183,9 +185,9 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	// Validator node account.
 	validatorAccountOutput := ts.AccountOutput("Genesis:1")
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              node1.Validator.AccountID,
+		ID:              node1.Validator.AccountData.ID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.MaxBlockIssuanceCredits/2, 0),
-		OutputID:        validatorAccountOutput.OutputID(),
+		OutputID:        validatorAccountOutput.ID,
 		ExpirySlot:      iotago.MaxSlotIndex,
 		BlockIssuerKeys: node1.Validator.BlockIssuerKeys(),
 		StakeEndEpoch:   iotago.MaxEpochIndex,
@@ -195,9 +197,9 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	// Default wallet block issuer account.
 	blockIssuerAccountOutput := ts.AccountOutput("Genesis:2")
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              wallet.BlockIssuer.AccountID,
+		ID:              wallet.BlockIssuer.AccountData.ID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.MaxBlockIssuanceCredits/2, 0),
-		OutputID:        blockIssuerAccountOutput.OutputID(),
+		OutputID:        blockIssuerAccountOutput.ID,
 		ExpirySlot:      iotago.MaxSlotIndex,
 		BlockIssuerKeys: wallet.BlockIssuer.BlockIssuerKeys(),
 	}, ts.Nodes()...)
@@ -224,22 +226,22 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{newAccountBlockIssuerKey}, newAccountExpirySlot),
 		mock.WithStakingFeature(stakedAmount, 421, 0, 10),
 		mock.WithAccountAmount(validatorAccountAmount),
-		mock.WithAccountMana(mock.MaxBlockManaCost(ts.DefaultWallet().Node.Protocol.CommittedAPI().ProtocolParameters())),
+		mock.WithAccountMana(mock.MaxBlockManaCost(node1.Protocol.LatestAPI().ProtocolParameters())),
 	)
 
 	ts.SetCurrentSlot(block1Slot)
-	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
+	block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1))
 	latestParents := ts.CommitUntilSlot(block1Slot, block1.ID())
 
-	newAccount := ts.DefaultWallet().AccountOutput("TX1:0")
-	newAccountOutput := newAccount.Output().(*iotago.AccountOutput)
+	newAccount := ts.DefaultWallet().AccountOutputData("TX1:0")
+	newAccountOutput := newAccount.Output.(*iotago.AccountOutput)
 
 	ts.AssertAccountDiff(newAccountOutput.AccountID, block1Slot, &model.AccountDiff{
 		BICChange:              0,
 		PreviousUpdatedSlot:    0,
 		NewExpirySlot:          newAccountExpirySlot,
 		PreviousExpirySlot:     0,
-		NewOutputID:            newAccount.OutputID(),
+		NewOutputID:            newAccount.ID,
 		PreviousOutputID:       iotago.EmptyOutputID,
 		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
 		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(),
@@ -253,7 +255,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		ID:              newAccountOutput.AccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(0, block1Slot),
 		ExpirySlot:      newAccountExpirySlot,
-		OutputID:        newAccount.OutputID(),
+		OutputID:        newAccount.ID,
 		BlockIssuerKeys: iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
 		StakeEndEpoch:   10,
 		FixedCost:       421,
@@ -270,10 +272,10 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		mock.WithDelegatedValidatorAddress(&accountAddress),
 		mock.WithDelegationStartEpoch(1),
 	)
-	block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(latestParents...))
+	block2 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(latestParents...)))
 
 	latestParents = ts.CommitUntilSlot(block2Slot, block2.ID())
-	delegatedAmount := ts.DefaultWallet().Output("TX1:1").BaseTokenAmount()
+	delegatedAmount := ts.DefaultWallet().OutputData("TX1:1").Output.BaseTokenAmount()
 
 	ts.AssertAccountDiff(newAccountOutput.AccountID, block2Slot, &model.AccountDiff{
 		BICChange:              0,
@@ -292,7 +294,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		ID:              newAccountOutput.AccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(0, block1Slot),
 		ExpirySlot:      newAccountExpirySlot,
-		OutputID:        newAccount.OutputID(),
+		OutputID:        newAccount.ID,
 		BlockIssuerKeys: iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
 		StakeEndEpoch:   10,
 		FixedCost:       421,
@@ -303,7 +305,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	// transition a delegation output to a delayed claiming state
 	block3Slot := ts.CurrentSlot()
 	tx3 := ts.DefaultWallet().DelayedClaimingTransition("TX3", "TX2:0", 0)
-	block3 := ts.IssueBasicBlockWithOptions("block3", ts.DefaultWallet(), tx3, mock.WithStrongParents(latestParents...))
+	block3 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block3", ts.DefaultWallet(), tx3, mock.WithStrongParents(latestParents...)))
 
 	latestParents = ts.CommitUntilSlot(block3Slot, block3.ID())
 
@@ -325,7 +327,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		ID:              newAccountOutput.AccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(0, block1Slot),
 		ExpirySlot:      newAccountExpirySlot,
-		OutputID:        newAccount.OutputID(),
+		OutputID:        newAccount.ID,
 		BlockIssuerKeys: iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
 		StakeEndEpoch:   10,
 		FixedCost:       421,
@@ -360,9 +362,9 @@ func Test_ImplicitAccounts(t *testing.T) {
 	// validator node account.
 	validatorAccountOutput := ts.AccountOutput("Genesis:1")
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              node1.Validator.AccountID,
+		ID:              node1.Validator.AccountData.ID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.MaxBlockIssuanceCredits/2, 0),
-		OutputID:        validatorAccountOutput.OutputID(),
+		OutputID:        validatorAccountOutput.ID,
 		ExpirySlot:      iotago.MaxSlotIndex,
 		BlockIssuerKeys: node1.Validator.BlockIssuerKeys(),
 		StakeEndEpoch:   iotago.MaxEpochIndex,
@@ -372,9 +374,9 @@ func Test_ImplicitAccounts(t *testing.T) {
 	// default wallet block issuer account.
 	blockIssuerAccountOutput := ts.AccountOutput("Genesis:2")
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              wallet.BlockIssuer.AccountID,
+		ID:              wallet.BlockIssuer.AccountData.ID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.MaxBlockIssuanceCredits/2, 0),
-		OutputID:        blockIssuerAccountOutput.OutputID(),
+		OutputID:        blockIssuerAccountOutput.ID,
 		ExpirySlot:      iotago.MaxSlotIndex,
 		BlockIssuerKeys: wallet.BlockIssuer.BlockIssuerKeys(),
 	}, ts.Nodes()...)
@@ -390,11 +392,11 @@ func Test_ImplicitAccounts(t *testing.T) {
 	)
 	var block1Slot iotago.SlotIndex = 1
 	ts.SetCurrentSlot(block1Slot)
-	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
+	block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1))
 	latestParents := ts.CommitUntilSlot(block1Slot, block1.ID())
 
-	implicitAccountOutput := newUserWallet.Output("TX1:0")
-	implicitAccountOutputID := implicitAccountOutput.OutputID()
+	implicitAccountOutput := newUserWallet.OutputData("TX1:0")
+	implicitAccountOutputID := implicitAccountOutput.ID
 	implicitAccountID := iotago.AccountIDFromOutputID(implicitAccountOutputID)
 	var implicitBlockIssuerKey iotago.BlockIssuerKey = iotago.Ed25519PublicKeyHashBlockIssuerKeyFromImplicitAccountCreationAddress(newUserWallet.ImplicitAccountCreationAddress())
 
@@ -422,10 +424,10 @@ func Test_ImplicitAccounts(t *testing.T) {
 		mock.WithAccountAmount(mock.MinIssuerAccountAmount(ts.API.ProtocolParameters())),
 	)
 	block2Commitment := node1.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment()
-	block2 := ts.IssueBasicBlockWithOptions("block2", newUserWallet, tx2, mock.WithStrongParents(latestParents...))
+	block2 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block2", newUserWallet, tx2, mock.WithStrongParents(latestParents...)))
 	ts.CommitUntilSlot(block2Slot, block2.ID())
 
-	fullAccountOutputID := newUserWallet.Output("TX2:0").OutputID()
+	fullAccountOutputID := newUserWallet.OutputData("TX2:0").ID
 	allotted := iotago.BlockIssuanceCredits(tx2.Transaction.Allotments.Get(implicitAccountID))
 	burned := iotago.BlockIssuanceCredits(block2.WorkScore()) * iotago.BlockIssuanceCredits(block2Commitment.ReferenceManaCost)
 	// the implicit account should now have been transitioned to a full account in the accounts ledger.
@@ -489,9 +491,9 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 	// check that the accounts added in the genesis snapshot were added to the account manager correctly.
 
 	// wallet 1 block issuer account.
-	wallet1OutputID := ts.AccountOutput("Genesis:2").OutputID()
+	wallet1OutputID := ts.AccountOutput("Genesis:2").ID
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              wallet1.BlockIssuer.AccountID,
+		ID:              wallet1.BlockIssuer.AccountData.ID,
 		Credits:         accounts.NewBlockIssuanceCredits(wallet1BIC, 0),
 		OutputID:        wallet1OutputID,
 		ExpirySlot:      iotago.MaxSlotIndex,
@@ -499,9 +501,9 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 	}, ts.Nodes()...)
 
 	// wallet 2 block issuer account.
-	wallet2OutputID := ts.AccountOutput("Genesis:3").OutputID()
+	wallet2OutputID := ts.AccountOutput("Genesis:3").ID
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              wallet2.BlockIssuer.AccountID,
+		ID:              wallet2.BlockIssuer.AccountData.ID,
 		Credits:         accounts.NewBlockIssuanceCredits(wallet2BIC, 0),
 		OutputID:        wallet2OutputID,
 		ExpirySlot:      iotago.MaxSlotIndex,
@@ -516,8 +518,8 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 		block1Commitment := iotago.NewEmptyCommitment(ts.API)
 		block1Commitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 		ts.SetCurrentSlot(block1Slot)
-		block11 := ts.IssueBasicBlockWithOptions("block1.1", wallet1, testPayload, mock.WithSlotCommitment(block1Commitment))
-		block12 := ts.IssueBasicBlockWithOptions("block1.2", wallet2, testPayload, mock.WithStrongParents(block11.ID()), mock.WithSlotCommitment(block1Commitment))
+		block11 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1.1", wallet1, testPayload, mock.WithSlotCommitment(block1Commitment)))
+		block12 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1.2", wallet2, testPayload, mock.WithStrongParents(block11.ID()), mock.WithSlotCommitment(block1Commitment)))
 
 		// Commit BIC burns and check account states.
 		ts.CommitUntilSlot(ts.BlockID("block1.2").Slot(), block12.ID())
@@ -528,7 +530,7 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 		wallet2BIC -= burned
 
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet1.BlockIssuer.AccountID,
+			ID:              wallet1.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet1BIC, block1Slot),
 			OutputID:        wallet1OutputID,
 			ExpirySlot:      iotago.MaxSlotIndex,
@@ -536,7 +538,7 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 		}, ts.Nodes()...)
 
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet2.BlockIssuer.AccountID,
+			ID:              wallet2.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet2BIC, block1Slot),
 			ExpirySlot:      iotago.MaxSlotIndex,
 			OutputID:        wallet2OutputID,
@@ -551,11 +553,12 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 	{
 		block2Commitment := node1.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment()
 
-		block21 := ts.IssueBasicBlockWithOptions("block2.1", wallet1, testPayload, mock.WithSlotCommitment(block2Commitment))
+		block21 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block2.1", wallet1, testPayload, mock.WithSlotCommitment(block2Commitment)))
 
-		block22 := ts.IssueBasicBlockWithOptions("block2.2", wallet2, testPayload, mock.WithStrongParents(ts.BlockID("block2.1")), mock.WithSlotCommitment(block2Commitment))
-
-		ts.AssertBlockFiltered([]*blocks.Block{block22}, iotago.ErrAccountLocked, wallet2.Node)
+		_, err := ts.IssueBasicBlockWithOptions("block2.2", wallet2, testPayload, mock.WithStrongParents(ts.BlockID("block2.1")), mock.WithSlotCommitment(block2Commitment))
+		if !ierrors.Is(err, iotago.ErrAccountLocked) {
+			t.Fatalf("expected block2.2 to be rejected with ErrAccountLocked, but got: %v", err)
+		}
 
 		latestParents = ts.CommitUntilSlot(ts.BlockID("block2.1").Slot(), block21.ID())
 
@@ -564,7 +567,7 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 		wallet1BIC -= burned
 
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet1.BlockIssuer.AccountID,
+			ID:              wallet1.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet1BIC, block2Slot),
 			OutputID:        wallet1OutputID,
 			ExpirySlot:      iotago.MaxSlotIndex,
@@ -572,7 +575,7 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 		}, ts.Nodes()...)
 
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet2.BlockIssuer.AccountID,
+			ID:              wallet2.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet2BIC, block1Slot),
 			ExpirySlot:      iotago.MaxSlotIndex,
 			OutputID:        wallet2OutputID,
@@ -588,13 +591,13 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 		allottedBIC := testPayloadCost
 		tx1 := wallet2.AllotManaFromInputs("TX1",
 			iotago.Allotments{&iotago.Allotment{
-				AccountID: wallet2.BlockIssuer.AccountID,
+				AccountID: wallet2.BlockIssuer.AccountData.ID,
 				Mana:      iotago.Mana(allottedBIC),
 			}}, "Genesis:0")
 
 		block3Commitment := node1.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment()
 		// Wallet 1 whose account is not locked is issuing the block to unlock the account of wallet 2.
-		block31 := ts.IssueBasicBlockWithOptions("block3.1", wallet1, tx1, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block3Commitment))
+		block31 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block3.1", wallet1, tx1, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block3Commitment)))
 
 		latestParents = ts.CommitUntilSlot(ts.BlockID("block3.1").Slot(), block31.ID())
 
@@ -604,7 +607,7 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 		wallet2BIC += allottedBIC
 
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet1.BlockIssuer.AccountID,
+			ID:              wallet1.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet1BIC, block3Slot),
 			OutputID:        wallet1OutputID,
 			ExpirySlot:      iotago.MaxSlotIndex,
@@ -612,7 +615,7 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 		}, ts.Nodes()...)
 
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet2.BlockIssuer.AccountID,
+			ID:              wallet2.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet2BIC, block3Slot),
 			ExpirySlot:      iotago.MaxSlotIndex,
 			OutputID:        wallet2OutputID,
@@ -626,7 +629,7 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 	{
 		block4Commitment := node1.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment()
 
-		block4 := ts.IssueBasicBlockWithOptions("block4", wallet2, testPayload, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block4Commitment))
+		block4 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block4", wallet2, testPayload, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block4Commitment)))
 
 		ts.CommitUntilSlot(ts.BlockID("block4").Slot(), block4.ID())
 
@@ -635,7 +638,7 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 		wallet2BIC -= burned
 
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet1.BlockIssuer.AccountID,
+			ID:              wallet1.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet1BIC, block3Slot),
 			OutputID:        wallet1OutputID,
 			ExpirySlot:      iotago.MaxSlotIndex,
@@ -643,7 +646,7 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 		}, ts.Nodes()...)
 
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet2.BlockIssuer.AccountID,
+			ID:              wallet2.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet2BIC, block4Slot),
 			ExpirySlot:      iotago.MaxSlotIndex,
 			OutputID:        wallet2OutputID,
@@ -688,9 +691,9 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 	// validator node account.
 	validatorAccountOutput := ts.AccountOutput("Genesis:1")
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              node1.Validator.AccountID,
+		ID:              node1.Validator.AccountData.ID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.MaxBlockIssuanceCredits/2, 0),
-		OutputID:        validatorAccountOutput.OutputID(),
+		OutputID:        validatorAccountOutput.ID,
 		ExpirySlot:      iotago.MaxSlotIndex,
 		BlockIssuerKeys: node1.Validator.BlockIssuerKeys(),
 		StakeEndEpoch:   iotago.MaxEpochIndex,
@@ -700,18 +703,18 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 	// default wallet block issuer account.
 	wallet1AccountOutput := ts.AccountOutput("Genesis:2")
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              wallet1.BlockIssuer.AccountID,
+		ID:              wallet1.BlockIssuer.AccountData.ID,
 		Credits:         accounts.NewBlockIssuanceCredits(-1, 0),
-		OutputID:        wallet1AccountOutput.OutputID(),
+		OutputID:        wallet1AccountOutput.ID,
 		ExpirySlot:      iotago.MaxSlotIndex,
 		BlockIssuerKeys: wallet1.BlockIssuer.BlockIssuerKeys(),
 	}, ts.Nodes()...)
 
 	wallet2AccountOutput := ts.AccountOutput("Genesis:3")
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              wallet2.BlockIssuer.AccountID,
+		ID:              wallet2.BlockIssuer.AccountData.ID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.MaxBlockIssuanceCredits/2, 0),
-		OutputID:        wallet2AccountOutput.OutputID(),
+		OutputID:        wallet2AccountOutput.ID,
 		ExpirySlot:      iotago.MaxSlotIndex,
 		BlockIssuerKeys: wallet2.BlockIssuer.BlockIssuerKeys(),
 	}, ts.Nodes()...)
@@ -746,17 +749,17 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 
 		// The outputID of wallet1 and wallet2 account should remain the same as neither was successfully spent.
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet1.BlockIssuer.AccountID,
+			ID:              wallet1.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet1BIC, 0),
-			OutputID:        wallet1AccountOutput.OutputID(),
+			OutputID:        wallet1AccountOutput.ID,
 			ExpirySlot:      iotago.MaxSlotIndex,
 			BlockIssuerKeys: wallet1.BlockIssuer.BlockIssuerKeys(),
 		}, ts.Nodes()...)
 
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet2.BlockIssuer.AccountID,
+			ID:              wallet2.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet2BIC, 0),
-			OutputID:        wallet2AccountOutput.OutputID(),
+			OutputID:        wallet2AccountOutput.ID,
 			ExpirySlot:      iotago.MaxSlotIndex,
 			BlockIssuerKeys: wallet2.BlockIssuer.BlockIssuerKeys(),
 		}, ts.Nodes()...)
@@ -780,13 +783,13 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 		allottedBIC := dummyTxCost + 1
 		tx2 := wallet1.AllotManaFromInputs("TX2",
 			iotago.Allotments{&iotago.Allotment{
-				AccountID: wallet1.BlockIssuer.AccountID,
+				AccountID: wallet1.BlockIssuer.AccountData.ID,
 				Mana:      iotago.Mana(allottedBIC),
 			}}, "Genesis:0")
 
 		block2Commitment := node1.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment()
 		// Wallet 2 whose account is not locked is issuing the block to unlock the account of wallet 1.
-		block2 := ts.IssueBasicBlockWithOptions("block2", wallet2, tx2, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block2Commitment))
+		block2 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block2", wallet2, tx2, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block2Commitment)))
 
 		latestParents = ts.CommitUntilSlot(block2Slot, block2.ID())
 
@@ -794,18 +797,18 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 		wallet2BIC -= iotago.BlockIssuanceCredits(block2.WorkScore()) * iotago.BlockIssuanceCredits(ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost)
 
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet1.BlockIssuer.AccountID,
+			ID:              wallet1.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet1BIC, block2Slot),
-			OutputID:        wallet1AccountOutput.OutputID(),
+			OutputID:        wallet1AccountOutput.ID,
 			ExpirySlot:      iotago.MaxSlotIndex,
 			BlockIssuerKeys: wallet1.BlockIssuer.BlockIssuerKeys(),
 		}, ts.Nodes()...)
 
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet2.BlockIssuer.AccountID,
+			ID:              wallet2.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet2BIC, block2Slot),
 			ExpirySlot:      iotago.MaxSlotIndex,
-			OutputID:        wallet2AccountOutput.OutputID(),
+			OutputID:        wallet2AccountOutput.ID,
 			BlockIssuerKeys: wallet2.BlockIssuer.BlockIssuerKeys(),
 		}, ts.Nodes()...)
 	}
@@ -813,6 +816,7 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 	block3Slot := ts.CurrentSlot()
 	newExpirySlot = block3Slot + ts.API.ProtocolParameters().MaxCommittableAge()
 	{
+
 		// Prepare a transaction that will try to spend an AccountOutput of an already unlocked account.
 		tx3 := wallet1.TransitionAccount(
 			"TX3",
@@ -822,9 +826,10 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 		)
 
 		block3Commitment := node1.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment()
+		fmt.Printf("block3Commitment slot: %d\n", block3Commitment.Slot)
 
 		// Wallet 1, which already has non-negative BIC issues the block.
-		block3 := ts.IssueBasicBlockWithOptions("block3", wallet1, tx3, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block3Commitment))
+		block3 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block3", wallet1, tx3, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block3Commitment)))
 		latestParents = ts.CommitUntilSlot(block3Slot, block3.ID())
 
 		wallet1BIC -= iotago.BlockIssuanceCredits(block3.WorkScore()) * iotago.BlockIssuanceCredits(ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost)
@@ -833,17 +838,17 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 		// The mana on wallet2 account should be subtracted
 		// because it issued the block with a transaction that didn't mutate the ledger.
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet1.BlockIssuer.AccountID,
+			ID:              wallet1.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet1BIC, block3Slot),
-			OutputID:        wallet1.AccountOutput("TX3:0").OutputID(),
+			OutputID:        wallet1.AccountOutputData("TX3:0").ID,
 			ExpirySlot:      newExpirySlot,
 			BlockIssuerKeys: iotago.NewBlockIssuerKeys(wallet1.BlockIssuer.BlockIssuerKeys()[0], newWallet1IssuerKey),
 		}, ts.Nodes()...)
 
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet2.BlockIssuer.AccountID,
+			ID:              wallet2.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet2BIC, block2Slot),
-			OutputID:        wallet2AccountOutput.OutputID(),
+			OutputID:        wallet2AccountOutput.ID,
 			ExpirySlot:      iotago.MaxSlotIndex,
 			BlockIssuerKeys: wallet2.BlockIssuer.BlockIssuerKeys(),
 		}, ts.Nodes()...)
@@ -861,17 +866,17 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 		tx4 := wallet1.DestroyAccount("TX4", "TX3:0")
 		block4Commitment := node1.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment()
 
-		block4 := ts.IssueBasicBlockWithOptions("block4", wallet2, tx4, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block4Commitment))
+		block4 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block4", wallet2, tx4, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block4Commitment)))
 		latestParents = ts.CommitUntilSlot(block4Slot, block4.ID())
 
 		// assert diff of the destroyed account.
-		ts.AssertAccountDiff(wallet1.BlockIssuer.AccountID, block4Slot, &model.AccountDiff{
+		ts.AssertAccountDiff(wallet1.BlockIssuer.AccountData.ID, block4Slot, &model.AccountDiff{
 			BICChange:              -iotago.BlockIssuanceCredits(wallet1BIC),
 			PreviousUpdatedSlot:    block3Slot,
 			NewExpirySlot:          0,
 			PreviousExpirySlot:     newExpirySlot,
 			NewOutputID:            iotago.EmptyOutputID,
-			PreviousOutputID:       wallet1.Output("TX3:0").OutputID(),
+			PreviousOutputID:       wallet1.OutputData("TX3:0").ID,
 			BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(),
 			BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(wallet1.BlockIssuer.BlockIssuerKeys()[0], newWallet1IssuerKey),
 			ValidatorStakeChange:   0,
@@ -911,9 +916,9 @@ func Test_NegativeBIC_AccountOwnedBasicOutputLocked(t *testing.T) {
 	// validator node account.
 	validatorAccountOutput := ts.AccountOutput("Genesis:1")
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              node1.Validator.AccountID,
+		ID:              node1.Validator.AccountData.ID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.MaxBlockIssuanceCredits/2, 0),
-		OutputID:        validatorAccountOutput.OutputID(),
+		OutputID:        validatorAccountOutput.ID,
 		ExpirySlot:      iotago.MaxSlotIndex,
 		BlockIssuerKeys: node1.Validator.BlockIssuerKeys(),
 		StakeEndEpoch:   iotago.MaxEpochIndex,
@@ -923,18 +928,18 @@ func Test_NegativeBIC_AccountOwnedBasicOutputLocked(t *testing.T) {
 	// default wallet block issuer account.
 	wallet1AccountOutput := ts.AccountOutput("Genesis:2")
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              wallet1.BlockIssuer.AccountID,
+		ID:              wallet1.BlockIssuer.AccountData.ID,
 		Credits:         accounts.NewBlockIssuanceCredits(wallet1BIC, 0),
-		OutputID:        wallet1AccountOutput.OutputID(),
+		OutputID:        wallet1AccountOutput.ID,
 		ExpirySlot:      iotago.MaxSlotIndex,
 		BlockIssuerKeys: wallet1.BlockIssuer.BlockIssuerKeys(),
 	}, ts.Nodes()...)
 
 	wallet2AccountOutput := ts.AccountOutput("Genesis:3")
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              wallet2.BlockIssuer.AccountID,
+		ID:              wallet2.BlockIssuer.AccountData.ID,
 		Credits:         accounts.NewBlockIssuanceCredits(wallet2BIC, 0),
-		OutputID:        wallet2AccountOutput.OutputID(),
+		OutputID:        wallet2AccountOutput.ID,
 		ExpirySlot:      iotago.MaxSlotIndex,
 		BlockIssuerKeys: wallet2.BlockIssuer.BlockIssuerKeys(),
 	}, ts.Nodes()...)
@@ -951,21 +956,21 @@ func Test_NegativeBIC_AccountOwnedBasicOutputLocked(t *testing.T) {
 		2,
 		"Genesis:0",
 	)
-	block0 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx0, mock.WithSlotCommitment(genesisCommitment))
+	block0 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx0, mock.WithSlotCommitment(genesisCommitment)))
 
 	// SEND A TRANSACTION TO AN ACCOUNT ADDRESS
 	{
 		// Prepare a transaction that will try to spend an AccountOutput of a locked account.
 		tx1 := wallet1.SendFundsToAccount(
 			"TX1",
-			wallet1.BlockIssuer.AccountID,
+			wallet1.BlockIssuer.AccountData.ID,
 			"TX0:0",
 		)
 
 		// default block issuer issues a block containing the transaction in slot 1.
 
 		// Wallet 2, which has non-negative BIC issues the block.
-		block1 := ts.IssueBasicBlockWithOptions("block1", wallet2, tx1, mock.WithStrongParents(block0.ID()), mock.WithSlotCommitment(genesisCommitment))
+		block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", wallet2, tx1, mock.WithStrongParents(block0.ID()), mock.WithSlotCommitment(genesisCommitment)))
 
 		ts.AssertTransactionsInCacheBooked([]*iotago.Transaction{tx1.Transaction}, true, node1)
 
@@ -975,17 +980,17 @@ func Test_NegativeBIC_AccountOwnedBasicOutputLocked(t *testing.T) {
 
 		// The outputID of wallet1 and wallet2 account should remain the same as neither was successfully spent.
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet1.BlockIssuer.AccountID,
+			ID:              wallet1.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet1BIC, 0),
-			OutputID:        wallet1AccountOutput.OutputID(),
+			OutputID:        wallet1AccountOutput.ID,
 			ExpirySlot:      iotago.MaxSlotIndex,
 			BlockIssuerKeys: wallet1.BlockIssuer.BlockIssuerKeys(),
 		}, ts.Nodes()...)
 
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet2.BlockIssuer.AccountID,
+			ID:              wallet2.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet2BIC, block1Slot),
-			OutputID:        wallet2AccountOutput.OutputID(),
+			OutputID:        wallet2AccountOutput.ID,
 			ExpirySlot:      iotago.MaxSlotIndex,
 			BlockIssuerKeys: wallet2.BlockIssuer.BlockIssuerKeys(),
 		}, ts.Nodes()...)
@@ -1013,17 +1018,17 @@ func Test_NegativeBIC_AccountOwnedBasicOutputLocked(t *testing.T) {
 
 		// The outputID of wallet1 and wallet2 account should remain the same as neither was successfully spent.
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet1.BlockIssuer.AccountID,
+			ID:              wallet1.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet1BIC, 0),
-			OutputID:        wallet1AccountOutput.OutputID(),
+			OutputID:        wallet1AccountOutput.ID,
 			ExpirySlot:      iotago.MaxSlotIndex,
 			BlockIssuerKeys: wallet1.BlockIssuer.BlockIssuerKeys(),
 		}, ts.Nodes()...)
 
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet2.BlockIssuer.AccountID,
+			ID:              wallet2.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet2BIC, block1Slot),
-			OutputID:        wallet2AccountOutput.OutputID(),
+			OutputID:        wallet2AccountOutput.ID,
 			ExpirySlot:      iotago.MaxSlotIndex,
 			BlockIssuerKeys: wallet2.BlockIssuer.BlockIssuerKeys(),
 		}, ts.Nodes()...)
@@ -1038,14 +1043,14 @@ func Test_NegativeBIC_AccountOwnedBasicOutputLocked(t *testing.T) {
 		allottedBIC := iotago.BlockIssuanceCredits(10001)
 		tx3 := wallet1.AllotManaFromInputs("TX3",
 			iotago.Allotments{&iotago.Allotment{
-				AccountID: wallet1.BlockIssuer.AccountID,
+				AccountID: wallet1.BlockIssuer.AccountData.ID,
 				Mana:      iotago.Mana(allottedBIC),
 			}}, "TX0:1")
 
 		block3Commitment := node1.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment()
 
 		// Wallet 2 whose account is not locked is issuing the block to unlock the account of wallet 1.
-		block3 := ts.IssueBasicBlockWithOptions("block3", wallet2, tx3, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block3Commitment))
+		block3 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block3", wallet2, tx3, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block3Commitment)))
 
 		ts.AssertTransactionsInCacheBooked([]*iotago.Transaction{tx3.Transaction}, true, ts.Nodes()...)
 		ts.AssertBlocksInCacheBooked([]*blocks.Block{block3}, true, ts.Nodes()...)
@@ -1057,18 +1062,18 @@ func Test_NegativeBIC_AccountOwnedBasicOutputLocked(t *testing.T) {
 		require.GreaterOrEqual(t, wallet1BIC, iotago.BlockIssuanceCredits(0))
 
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet1.BlockIssuer.AccountID,
+			ID:              wallet1.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet1BIC, block3Slot),
-			OutputID:        wallet1AccountOutput.OutputID(),
+			OutputID:        wallet1AccountOutput.ID,
 			ExpirySlot:      iotago.MaxSlotIndex,
 			BlockIssuerKeys: wallet1.BlockIssuer.BlockIssuerKeys(),
 		}, ts.Nodes()...)
 
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet2.BlockIssuer.AccountID,
+			ID:              wallet2.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet2BIC, block3Slot),
 			ExpirySlot:      iotago.MaxSlotIndex,
-			OutputID:        wallet2AccountOutput.OutputID(),
+			OutputID:        wallet2AccountOutput.ID,
 			BlockIssuerKeys: wallet2.BlockIssuer.BlockIssuerKeys(),
 		}, ts.Nodes()...)
 	}
@@ -1086,7 +1091,7 @@ func Test_NegativeBIC_AccountOwnedBasicOutputLocked(t *testing.T) {
 		)
 
 		// Wallet 1, which has non-negative BIC issues the block.
-		block4 := ts.IssueBasicBlockWithOptions("block4", wallet1, tx4, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block4Commitment))
+		block4 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block4", wallet1, tx4, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block4Commitment)))
 
 		ts.AssertTransactionsInCacheBooked([]*iotago.Transaction{tx4.Transaction}, true, node1)
 
@@ -1096,17 +1101,17 @@ func Test_NegativeBIC_AccountOwnedBasicOutputLocked(t *testing.T) {
 
 		// The outputID of wallet1 and wallet2 account should remain the same as neither was successfully spent.
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet1.BlockIssuer.AccountID,
+			ID:              wallet1.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet1BIC, block4Slot),
-			OutputID:        wallet1.Output("TX4:0").OutputID(),
+			OutputID:        wallet1.OutputData("TX4:0").ID,
 			ExpirySlot:      iotago.MaxSlotIndex,
 			BlockIssuerKeys: wallet1.BlockIssuer.BlockIssuerKeys(),
 		}, ts.Nodes()...)
 
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:              wallet2.BlockIssuer.AccountID,
+			ID:              wallet2.BlockIssuer.AccountData.ID,
 			Credits:         accounts.NewBlockIssuanceCredits(wallet2BIC, block3Slot),
-			OutputID:        wallet2AccountOutput.OutputID(),
+			OutputID:        wallet2AccountOutput.ID,
 			ExpirySlot:      iotago.MaxSlotIndex,
 			BlockIssuerKeys: wallet2.BlockIssuer.BlockIssuerKeys(),
 		}, ts.Nodes()...)

@@ -1,31 +1,27 @@
 package testsuite
 
 import (
-	"github.com/stretchr/testify/assert"
+	"context"
 
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (t *TestSuite) AssertBlock(block *blocks.Block, node *mock.Node) *model.Block {
-	var loadedBlock *model.Block
+func (t *TestSuite) AssertBlock(block *blocks.Block, client mock.Client) *iotago.Block {
+	var loadedBlock *iotago.Block
 	t.Eventually(func() error {
-		var exists bool
-		loadedBlock, exists = node.Protocol.Engines.Main.Get().Block(block.ID())
-		if !exists {
-			return ierrors.Errorf("AssertBlock: %s: block %s does not exist", node.Name, block.ID())
+		var err error
+		loadedBlock, err = client.BlockByBlockID(context.Background(), block.ID())
+		if err != nil {
+			return ierrors.Wrapf(err, "AssertBlock: %s: block %s does not exist", client.Name(), block.ID())
 		}
 
-		if block.ID() != loadedBlock.ID() {
-			return ierrors.Errorf("AssertBlock: %s: expected %s, got %s", node.Name, block.ID(), loadedBlock.ID())
-		}
-		if !assert.Equal(t.fakeTesting, block.ModelBlock().Data(), loadedBlock.Data()) {
-			return ierrors.Errorf("AssertBlock: %s: expected %s, got %s", node.Name, block.ModelBlock().Data(), loadedBlock.Data())
+		if block.ID() != loadedBlock.MustID() {
+			return ierrors.Errorf("AssertBlock: %s: expected %s, got %s", client.Name(), block.ID(), loadedBlock.MustID())
 		}
 
 		return nil
@@ -34,21 +30,20 @@ func (t *TestSuite) AssertBlock(block *blocks.Block, node *mock.Node) *model.Blo
 	return loadedBlock
 }
 
-func (t *TestSuite) AssertBlocksExist(blocks []*blocks.Block, expectedExist bool, nodes ...*mock.Node) {
-	mustNodes(nodes)
-
-	for _, node := range nodes {
+func (t *TestSuite) AssertBlocksExist(blocks []*blocks.Block, expectedExist bool, clients ...mock.Client) {
+	for _, client := range clients {
 		for _, block := range blocks {
 			if block.ID() == iotago.EmptyBlockID {
 				continue
 			}
 
 			if expectedExist {
-				t.AssertBlock(block, node)
+				t.AssertBlock(block, client)
 			} else {
 				t.Eventually(func() error {
-					if lo.Return2(node.Protocol.Engines.Main.Get().Block(block.ID())) {
-						return ierrors.Errorf("AssertBlocksExist: %s: block %s exists but should not", node.Name, block)
+					_, err := client.BlockByBlockID(context.Background(), block.ID())
+					if err == nil {
+						return ierrors.Errorf("AssertBlocksExist: %s: block %s exists but should not", client.Name(), block)
 					}
 
 					return nil
@@ -98,7 +93,7 @@ func (t *TestSuite) assertBlocksInCacheWithFunc(expectedBlocks []*blocks.Block, 
 				return nil
 			})
 
-			t.AssertBlock(block, node)
+			t.AssertBlock(block, node.Client)
 		}
 	}
 }

@@ -251,10 +251,6 @@ func attachEngineLogs(instance *engine.Engine) func() {
 				instance.LogTrace("MemPool.TransactionBooked", "tx", transactionMetadata.ID())
 			})
 
-			transactionMetadata.OnConflicting(func() {
-				instance.LogTrace("MemPool.TransactionConflicting", "tx", transactionMetadata.ID())
-			})
-
 			transactionMetadata.OnAccepted(func() {
 				instance.LogTrace("MemPool.TransactionAccepted", "tx", transactionMetadata.ID())
 			})
@@ -273,10 +269,6 @@ func attachEngineLogs(instance *engine.Engine) func() {
 
 			transactionMetadata.OnCommittedSlotUpdated(func(slot iotago.SlotIndex) {
 				instance.LogTrace("MemPool.TransactionCommittedSlotUpdated", "tx", transactionMetadata.ID(), "slot", slot)
-			})
-
-			transactionMetadata.OnPending(func() {
-				instance.LogTrace("MemPool.TransactionPending", "tx", transactionMetadata.ID())
 			})
 
 			transactionMetadata.OnEvicted(func() {

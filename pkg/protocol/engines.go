@@ -97,7 +97,10 @@ func (e *Engines) ForkAtSlot(slot iotago.SlotIndex) (*engine.Engine, error) {
 	if err = newStorage.Commitments().Rollback(slot, latestCommitment.Slot()); err != nil {
 		return nil, ierrors.Wrap(err, "failed to rollback commitments")
 	}
-	// create temporary components and rollback their permanent state, which will be reflected on disk.
+
+	// some components are automatically rolled back by deleting their data on disk (e.g. slot based storage).
+	// some other components need to be rolled back manually, like the UTXO ledger for example.
+	// we need to create temporary components to rollback their permanent state, which will be reflected on disk.
 	evictionState := eviction.NewState(newStorage.Settings(), newStorage.RootBlocks)
 	evictionState.Initialize(latestCommitment.Slot())
 

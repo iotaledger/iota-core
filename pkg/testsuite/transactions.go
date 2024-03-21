@@ -28,7 +28,7 @@ func (t *TestSuite) AssertTransaction(transaction *iotago.Transaction, node *moc
 			return ierrors.Errorf("AssertTransaction: %s: expected ID %s, got %s", node.Name, transactionID, loadedTransactionMetadata.ID())
 		}
 
-		// nolint: forcetypeassert // we are in a test and want to assert it anyway
+		//nolint:forcetypeassert // we are in a test and want to assert it anyway
 		if !assert.Equal(t.fakeTesting, transaction.TransactionEssence, loadedTransactionMetadata.Transaction().(*iotago.Transaction).TransactionEssence) {
 			return ierrors.Errorf("AssertTransaction: %s: expected TransactionEssence %v, got %v", node.Name, transaction.TransactionEssence, loadedTransactionMetadata.Transaction().(*iotago.Transaction).TransactionEssence)
 		}
@@ -40,7 +40,7 @@ func (t *TestSuite) AssertTransaction(transaction *iotago.Transaction, node *moc
 
 		// TODO: fix this in another PR
 		//if !assert.Equal(t.fakeTesting, transaction.Outputs, typedTransaction.Outputs) {
-		api := t.DefaultWallet().Node.Protocol.APIForSlot(transactionID.Slot())
+		api := t.DefaultWallet().Client.APIForSlot(transactionID.Slot())
 		expected, _ := api.Encode(transaction.Outputs)
 		actual, _ := api.Encode(typedTransaction.Outputs)
 		if !assert.ElementsMatch(t.fakeTesting, expected, actual) {
@@ -89,13 +89,13 @@ func (t *TestSuite) assertTransactionsInCacheWithFunc(expectedTransactions []*io
 			require.NoError(t.Testing, err)
 
 			t.Eventually(func() error {
-				blockFromCache, exists := node.Protocol.Engines.Main.Get().Ledger.TransactionMetadata(transactionID)
+				transactionFromCache, exists := node.Protocol.Engines.Main.Get().Ledger.TransactionMetadata(transactionID)
 				if !exists {
 					return ierrors.Errorf("assertTransactionsInCacheWithFunc: %s: transaction %s does not exist", node.Name, transactionID)
 				}
 
-				if expectedPropertyState != propertyFunc(blockFromCache) {
-					return ierrors.Errorf("assertTransactionsInCacheWithFunc: %s: transaction %s: expected %v, got %v", node.Name, blockFromCache.ID(), expectedPropertyState, propertyFunc(blockFromCache))
+				if expectedPropertyState != propertyFunc(transactionFromCache) {
+					return ierrors.Errorf("assertTransactionsInCacheWithFunc: %s: transaction %s: expected %v, got %v", node.Name, transactionFromCache.ID(), expectedPropertyState, propertyFunc(transactionFromCache))
 				}
 
 				return nil
@@ -116,10 +116,6 @@ func (t *TestSuite) AssertTransactionsInCacheRejected(expectedTransactions []*io
 
 func (t *TestSuite) AssertTransactionsInCacheBooked(expectedTransactions []*iotago.Transaction, expectedFlag bool, nodes ...*mock.Node) {
 	t.assertTransactionsInCacheWithFunc(expectedTransactions, expectedFlag, mempool.TransactionMetadata.IsBooked, nodes...)
-}
-
-func (t *TestSuite) AssertTransactionsInCacheConflicting(expectedTransactions []*iotago.Transaction, expectedFlag bool, nodes ...*mock.Node) {
-	t.assertTransactionsInCacheWithFunc(expectedTransactions, expectedFlag, mempool.TransactionMetadata.IsConflicting, nodes...)
 }
 
 func (t *TestSuite) AssertTransactionsInCacheInvalid(expectedTransactions []*iotago.Transaction, expectedFlag bool, nodes ...*mock.Node) {
