@@ -127,8 +127,8 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 		},
 			// We select one validation tip as a strong parent. This is a security step to ensure that the tangle maintains
 			// acceptance by stitching together validation blocks.
-			types.NewTuple[func(optAmount ...int) []tipmanager.TipMetadata, int](t.tipManager.ValidationTips, 1),
-			types.NewTuple[func(optAmount ...int) []tipmanager.TipMetadata, int](t.tipManager.StrongTips, amount-1),
+			types.NewTuple[func(optAmount ...int) []tipmanager.TipMetadata, int](t.tipManager.ValidationTips, 2),
+			types.NewTuple[func(optAmount ...int) []tipmanager.TipMetadata, int](t.tipManager.StrongTips, amount-2),
 		); len(references[iotago.StrongParentType]) == 0 {
 			references[iotago.StrongParentType] = iotago.BlockIDs{t.rootBlock()}
 		}
