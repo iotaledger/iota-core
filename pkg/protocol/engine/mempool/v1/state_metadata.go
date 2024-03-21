@@ -141,11 +141,12 @@ func (s *StateMetadata) InclusionSlot() iotago.SlotIndex {
 
 func (s *StateMetadata) OnInclusionSlotUpdated(callback func(prevID iotago.SlotIndex, newID iotago.SlotIndex)) {
 	s.inclusionSlot.OnUpdate(func(oldValue *iotago.SlotIndex, newValue *iotago.SlotIndex) {
-		if oldValue == nil {
+		switch {
+		case oldValue == nil:
 			callback(iotago.SlotIndex(0), *newValue)
-		} else if newValue == nil {
+		case newValue == nil:
 			callback(*oldValue, iotago.SlotIndex(0))
-		} else {
+		default:
 			callback(*oldValue, *newValue)
 		}
 	})

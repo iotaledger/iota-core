@@ -20,7 +20,7 @@ type StateMetadata interface {
 
 	InclusionSlot() iotago.SlotIndex
 
-	OnInclusionSlotUpdated(func(prevSlot iotago.SlotIndex, newSlot iotago.SlotIndex))
+	OnInclusionSlotUpdated(callback func(prevSlot iotago.SlotIndex, newSlot iotago.SlotIndex))
 
 	inclusionFlags
 }

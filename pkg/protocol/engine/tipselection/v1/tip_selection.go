@@ -160,7 +160,7 @@ func (t *TipSelection) SelectTips(amount int, optPayload ...iotago.Payload) (ref
 		}
 
 		blocksToWeaklyReference := ds.NewSet[iotago.BlockID]()
-		err = dependenciesToReference.ForEach(func(transactionToReference mempool.TransactionMetadata) error {
+		if err = dependenciesToReference.ForEach(func(transactionToReference mempool.TransactionMetadata) error {
 			validAttachments := transactionToReference.ValidAttachments()
 			if len(validAttachments) == 0 {
 				return ierrors.Errorf("transaction %s has no valid attachments", transactionToReference.ID())
@@ -171,7 +171,9 @@ func (t *TipSelection) SelectTips(amount int, optPayload ...iotago.Payload) (ref
 			blocksToWeaklyReference.Add(validAttachments[0])
 
 			return nil
-		})
+		}); err != nil {
+			panic(err)
+		}
 	}
 
 	references = make(model.ParentReferences)
