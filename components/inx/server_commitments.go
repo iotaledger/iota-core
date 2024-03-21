@@ -158,8 +158,6 @@ func (s *Server) ListenToCommitments(req *inx.SlotRangeRequest, srv inx.INX_List
 }
 
 func (s *Server) ForceCommitUntil(_ context.Context, slot *inx.SlotRequest) (*inx.NoParams, error) {
-	deps.Protocol.Engines.Main.Get().LogTrace("force commit until ", "slot", slot.Unwrap(), "strongTips", len(deps.Protocol.Engines.Main.Get().TipManager.StrongTips()), "weakTips", len(deps.Protocol.Engines.Main.Get().TipManager.StrongTips()), "validatorTips", len(deps.Protocol.Engines.Main.Get().TipManager.ValidationTips()))
-
 	err := deps.Protocol.Engines.Main.Get().Notarization.ForceCommitUntil(slot.Unwrap())
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "error while performing force commit until %d", slot.GetSlot())
