@@ -21,7 +21,6 @@ import (
 )
 
 func generateP2PIdentity(args []string) error {
-
 	fs := configuration.NewUnsortedFlagSet("", flag.ContinueOnError)
 	databasePathFlag := fs.String(FlagToolOutputPath, DefaultValueP2PDatabasePath, "the path to the output folder")
 	privateKeyFlag := fs.String(FlagToolPrivateKey, "", "the p2p private key")
@@ -94,7 +93,6 @@ func generateP2PIdentity(args []string) error {
 }
 
 func printP2PIdentity(libp2pPrivKey crypto.PrivKey, libp2pPubKey crypto.PubKey, outputJSON bool) error {
-
 	type P2PIdentity struct {
 		PrivateKey      string `json:"privateKey"`
 		PublicKey       string `json:"publicKey"`

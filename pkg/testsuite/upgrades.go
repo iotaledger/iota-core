@@ -12,7 +12,6 @@ func (t *TestSuite) AssertEpochVersions(epochVersions map[iotago.Version]iotago.
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-
 			for version, expectedEpoch := range epochVersions {
 				epochForVersion, exists := node.Protocol.Engines.Main.Get().Storage.Settings().APIProvider().EpochForVersion(version)
 				if !exists {
@@ -34,7 +33,6 @@ func (t *TestSuite) AssertVersionAndProtocolParameters(versionsAndProtocolParame
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-
 			for version, expectedProtocolParameters := range versionsAndProtocolParameters {
 				protocolParameters := node.Protocol.Engines.Main.Get().Storage.Settings().APIProvider().ProtocolParameters(version)
 
@@ -69,7 +67,6 @@ func (t *TestSuite) AssertVersionAndProtocolParametersHashes(versionsAndProtocol
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-
 			for version, expectedProtocolParametersHash := range versionsAndProtocolParametersHashes {
 				protocolParametersHash := node.Protocol.Engines.Main.Get().Storage.Settings().APIProvider().ProtocolParametersHash(version)
 

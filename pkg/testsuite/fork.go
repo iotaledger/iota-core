@@ -10,7 +10,6 @@ func (t *TestSuite) AssertForkDetectedCount(expectedCount int, nodes ...*mock.No
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-
 			actualCount := node.ForkDetectedCount()
 			if expectedCount != actualCount {
 				return ierrors.Errorf("AssertForkDetectedCount: %s: expected %v, got %v", node.Name, expectedCount, actualCount)
@@ -26,7 +25,6 @@ func (t *TestSuite) AssertCandidateEngineActivatedCount(expectedCount int, nodes
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-
 			actualCount := node.CandidateEngineActivatedCount()
 			if expectedCount != actualCount {
 				return ierrors.Errorf("AssertCandidateEngineActivatedCount: %s: expected %v, got %v", node.Name, expectedCount, actualCount)
@@ -42,7 +40,6 @@ func (t *TestSuite) AssertMainEngineSwitchedCount(expectedCount int, nodes ...*m
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-
 			actualCount := node.MainEngineSwitchedCount()
 			if expectedCount != actualCount {
 				return ierrors.Errorf("AssertMainEngineSwitchedCount: %s: expected %v, got %v", node.Name, expectedCount, actualCount)

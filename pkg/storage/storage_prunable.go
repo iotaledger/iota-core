@@ -113,7 +113,6 @@ func (s *Storage) Roots(slot iotago.SlotIndex) (*slotstore.Store[iotago.Commitme
 }
 
 func (s *Storage) ExportRoots(writer io.WriteSeeker, targetCommitment *iotago.Commitment) error {
-
 	slotIndex := targetCommitment.Slot
 
 	if slotIndex <= s.Settings().APIProvider().CommittedAPI().ProtocolParameters().GenesisSlot() {
@@ -168,7 +167,6 @@ func (s *Storage) ExportRoots(writer io.WriteSeeker, targetCommitment *iotago.Co
 }
 
 func (s *Storage) ImportRoots(reader io.ReadSeeker, targetCommitment *model.Commitment) error {
-
 	slotIndex := targetCommitment.Commitment().Slot
 
 	if slotIndex <= s.Settings().APIProvider().CommittedAPI().ProtocolParameters().GenesisSlot() {
@@ -244,7 +242,6 @@ func (s *Storage) ImportRoots(reader io.ReadSeeker, targetCommitment *model.Comm
 	}
 
 	return nil
-
 }
 
 func (s *Storage) BlockMetadata(slot iotago.SlotIndex) (*slotstore.BlockMetadataStore, error) {

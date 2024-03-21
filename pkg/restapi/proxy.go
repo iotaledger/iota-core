@@ -84,6 +84,7 @@ func (b *balancer) AddTargetHostAndPort(prefix string, host string, port uint32,
 		return ierrors.New("if path is set, it needs to start with \"/\"")
 	}
 
+	//nolint:nosprintfhostport
 	apiURL, err := url.Parse(fmt.Sprintf("http://%s:%d%s", host, port, path))
 	if err != nil {
 		return err

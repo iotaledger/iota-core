@@ -7,9 +7,9 @@ type SignedTransactionMetadata interface {
 
 	SignedTransaction() SignedTransaction
 
-	OnSignaturesValid(func()) (unsubscribe func())
+	OnSignaturesValid(callback func()) (unsubscribe func())
 
-	OnSignaturesInvalid(func(err error)) (unsubscribe func())
+	OnSignaturesInvalid(callback func(err error)) (unsubscribe func())
 
 	TransactionMetadata() TransactionMetadata
 

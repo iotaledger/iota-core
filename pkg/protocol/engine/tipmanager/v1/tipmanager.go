@@ -107,7 +107,6 @@ func (t *TipManager) RemoveSeat(seat account.SeatIndex) {
 	if removed {
 		latestValidationBlock.Set(nil)
 	}
-
 }
 
 func (t *TipManager) ValidationTips(optAmount ...int) []tipmanager.TipMetadata {
@@ -198,27 +197,27 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 // trackLatestValidationBlock tracks the latest validator block and takes care of marking the corresponding TipMetadata.
 func (t *TipManager) trackLatestValidationBlock(tipMetadata *TipMetadata) (teardown func()) {
 	if _, isValidationBlock := tipMetadata.Block().ValidationBlock(); !isValidationBlock {
-		return
+		return nil
 	}
 
 	committee, exists := t.retrieveCommitteeInSlot(tipMetadata.Block().ID().Slot())
 	if !exists {
-		return
+		return nil
 	}
 
 	seat, exists := committee.GetSeat(tipMetadata.Block().ProtocolBlock().Header.IssuerID)
 	if !exists {
-		return
+		return nil
 	}
 
 	// We only track the validation blocks of validators that are tracked by the TipManager (via AddSeat).
 	latestValidationBlock, exists := t.latestValidationBlocks.Get(seat)
 	if !exists {
-		return
+		return nil
 	}
 
 	if !tipMetadata.registerAsLatestValidationBlock(latestValidationBlock) {
-		return
+		return nil
 	}
 
 	// reset the latest validator block to nil if we are still the latest one during teardown
@@ -250,7 +249,6 @@ func (t *TipManager) forEachParentByType(block *blocks.Block, consumer func(pare
 			if created {
 				t.setupBlockMetadata(parentMetadata)
 			}
-
 		}
 	}
 }

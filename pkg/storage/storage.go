@@ -191,7 +191,6 @@ func (s *Storage) Flush() {
 // Checks the correctness of the latest commitment.
 // Additionally, for non-genesis slots it checks whether the ledger state corresponds to the state root.
 func (s *Storage) CheckCorrectnessCommitmentLedgerState() error {
-
 	// Get the latest commitment
 	latestCommitment := s.Settings().LatestCommitment()
 
@@ -226,7 +225,6 @@ func (s *Storage) CheckCorrectnessCommitmentLedgerState() error {
 		if roots.ID() != latestCommitment.RootsID() {
 			return ierrors.Wrap(err, "root from prunable storage does not correspond to root from commitment")
 		}
-
 	}
 
 	// Verify the correctness of the slot commitment

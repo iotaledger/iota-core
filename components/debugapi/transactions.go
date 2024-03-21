@@ -39,7 +39,6 @@ func storeTransactionsPerSlot(scd *notarization.SlotCommittedDetails) error {
 		if err = mutationsTree.Add(txID); err != nil {
 			return ierrors.Wrapf(err, "failed to add transaction to mutations tree, txID: %s", txID)
 		}
-
 	}
 
 	tcs.MutationsRoot = mutationsTree.Root().String()

@@ -113,6 +113,8 @@ func (t *TestSuite) IssueBasicBlockWithOptions(blockName string, wallet *mock.Wa
 
 	timeProvider := t.API.TimeProvider()
 	issuingTime := timeProvider.SlotStartTime(t.currentSlot).Add(time.Duration(t.uniqueBlockTimeCounter.Add(1)))
+
+	//nolint:gocritic
 	blockHeaderOptions := append(blockOpts, mock.WithIssuingTime(issuingTime))
 
 	block, err := wallet.IssueBasicBlock(context.Background(), blockName, mock.WithBasicBlockHeader(blockHeaderOptions...), mock.WithPayload(payload))
@@ -152,6 +154,7 @@ func (t *TestSuite) issueBlockRow(prefix string, row int, parentsPrefix string, 
 		var err error
 		// Only issue validation blocks if account has staking feature and is part of committee.
 		if node.Validator != nil && lo.Return1(node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(t.currentSlot)).HasAccount(node.Validator.AccountData.ID) {
+			//nolint:gocritic
 			blockHeaderOptions := append(issuingOptionsCopy[node.Name], mock.WithIssuingTime(issuingTime))
 			t.assertParentsCommitmentExistFromBlockOptions(blockHeaderOptions, node.Client)
 			t.assertParentsExistFromBlockOptions(blockHeaderOptions, node.Client)
@@ -188,7 +191,7 @@ func (t *TestSuite) issueBlockRows(prefix string, rows int, initialParentsPrefix
 	var blocksIssued, lastBlockRowIssued []*blocks.Block
 	parentsPrefix := initialParentsPrefix
 
-	for row := 0; row < rows; row++ {
+	for row := range rows {
 		if row > 0 {
 			parentsPrefix = fmt.Sprintf("%s%d.%d", prefix, t.currentSlot, row-1)
 		}
@@ -260,7 +263,6 @@ func (t *TestSuite) SlotsForEpoch(epoch iotago.EpochIndex) []iotago.SlotIndex {
 }
 
 func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parents ...iotago.BlockID) []iotago.BlockID {
-
 	// we need to get accepted tangle time up to slot + minCA + 1
 	// first issue a chain of blocks with step size minCA up until slot + minCA + 1
 	// then issue one more block to accept the last in the chain which will trigger commitment of the second last in the chain

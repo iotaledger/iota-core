@@ -44,8 +44,7 @@ func NewAccountData(id iotago.AccountID, opts ...options.Option[AccountData]) *A
 
 func (a *AccountData) AddBlockIssuerKeys(blockIssuerKeys ...iotago.BlockIssuerKey) {
 	for _, blockIssuerKey := range blockIssuerKeys {
-		k := blockIssuerKey
-		a.BlockIssuerKeys.Add(k)
+		a.BlockIssuerKeys.Add(blockIssuerKey)
 	}
 }
 
@@ -187,8 +186,7 @@ func WithOutputID(outputID iotago.OutputID) options.Option[AccountData] {
 func WithBlockIssuerKeys(blockIssuerKeys ...iotago.BlockIssuerKey) options.Option[AccountData] {
 	return func(a *AccountData) {
 		for _, blockIssuerKey := range blockIssuerKeys {
-			k := blockIssuerKey
-			a.BlockIssuerKeys.Add(k)
+			a.BlockIssuerKeys.Add(blockIssuerKey)
 		}
 	}
 }

@@ -60,7 +60,6 @@ func ShouldHandleTools() bool {
 
 // HandleTools handles available tools.
 func HandleTools() {
-
 	args := os.Args[1:]
 	if len(args) == 1 {
 		listTools()
@@ -114,7 +113,6 @@ func yesOrNo(value bool) string {
 }
 
 func parseFlagSet(fs *flag.FlagSet, args []string) error {
-
 	if err := fs.Parse(args); err != nil {
 		return err
 	}

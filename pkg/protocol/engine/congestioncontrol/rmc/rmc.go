@@ -17,7 +17,7 @@ type Manager struct {
 	// accumulated work from accepted blocks per slot
 	slotWork *shrinkingmap.ShrinkingMap[iotago.SlotIndex, iotago.WorkScore]
 
-	//reference mana cost per slot
+	// reference mana cost per slot
 	rmc *shrinkingmap.ShrinkingMap[iotago.SlotIndex, iotago.Mana]
 
 	// eviction parameters
@@ -101,16 +101,21 @@ func (m *Manager) CommitSlot(index iotago.SlotIndex) (iotago.Mana, error) {
 	// calculate the new RMC
 	var newRMC iotago.Mana
 	ccParameters := m.apiProvider.APIForSlot(index).ProtocolParameters().CongestionControlParameters()
-	if currentSlotWork < ccParameters.DecreaseThreshold && lastRMC > ccParameters.MinReferenceManaCost {
+
+	switch {
+	case currentSlotWork < ccParameters.DecreaseThreshold && lastRMC > ccParameters.MinReferenceManaCost:
 		newRMC, err = safemath.SafeSub(lastRMC, ccParameters.Decrease)
 		if err == nil {
 			newRMC = lo.Max(newRMC, ccParameters.MinReferenceManaCost)
 		}
-	} else if currentSlotWork > ccParameters.IncreaseThreshold {
+
+	case currentSlotWork > ccParameters.IncreaseThreshold:
 		newRMC, err = safemath.SafeAdd(lastRMC, ccParameters.Increase)
-	} else {
+
+	default:
 		newRMC = lastRMC
 	}
+
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to calculate RMC for slot %d", index)
 	}

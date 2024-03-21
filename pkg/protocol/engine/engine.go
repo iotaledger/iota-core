@@ -69,7 +69,7 @@ type Engine struct {
 	TxRetainer          retainer.TransactionRetainer
 	UpgradeOrchestrator upgrade.Orchestrator
 
-	// RootCommitment contains the earliest commitment that that blocks we are solidifying will refer to, and is mainly
+	// RootCommitment contains the earliest commitment that blocks we are solidifying will refer to, and is mainly
 	// used to determine the cut-off point for the actively managed commitments in the protocol.
 	RootCommitment reactive.Variable[*model.Commitment]
 
@@ -217,7 +217,6 @@ func New(
 				if err := e.Storage.Settings().SetSnapshotImported(); err != nil {
 					panic(ierrors.Wrap(err, "failed to set snapshot imported"))
 				}
-
 			} else {
 				// Restore from Disk
 				e.Storage.RestoreFromDisk()

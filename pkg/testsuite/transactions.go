@@ -39,7 +39,7 @@ func (t *TestSuite) AssertTransaction(transaction *iotago.Transaction, node *moc
 		}
 
 		// TODO: fix this in another PR
-		//if !assert.Equal(t.fakeTesting, transaction.Outputs, typedTransaction.Outputs) {
+		// if !assert.Equal(t.fakeTesting, transaction.Outputs, typedTransaction.Outputs) {
 		api := t.DefaultWallet().Client.APIForSlot(transactionID.Slot())
 		expected, _ := api.Encode(transaction.Outputs)
 		actual, _ := api.Encode(typedTransaction.Outputs)
@@ -164,7 +164,6 @@ func (t *TestSuite) AssertTransactionInCacheConflicts(transactionConflicts map[*
 func (t *TestSuite) AssertTransactionFailure(signedTxID iotago.SignedTransactionID, txFailureReason error, nodes ...*mock.Node) {
 	for _, node := range nodes {
 		t.Eventually(func() error {
-
 			txFailure, exists := node.TransactionFailure(signedTxID)
 			if !exists {
 				return ierrors.Errorf("%s: failure for signed transaction %s does not exist", node.Name, signedTxID)

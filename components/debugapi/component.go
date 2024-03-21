@@ -108,7 +108,6 @@ func configure() error {
 				Component.LogWarnf(">> DebugAPI Error: %s\n", err)
 			}
 		}
-
 	}, event.WithWorkerPool(debugAPIWorkerPool))
 
 	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
@@ -155,7 +154,6 @@ func configure() error {
 			response := BlockMetadataResponseFromBlock(block)
 
 			return httpserver.JSONResponse(c, http.StatusOK, response)
-
 		}
 
 		epoch := deps.Protocol.APIForSlot(blockID.Slot()).TimeProvider().EpochFromSlot(blockID.Slot())

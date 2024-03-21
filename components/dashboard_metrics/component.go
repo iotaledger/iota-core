@@ -68,12 +68,7 @@ func configure() error {
 	})
 
 	routeGroup.GET(RouteDatabaseSizes, func(c echo.Context) error {
-		resp, err := databaseSizesMetrics()
-		if err != nil {
-			return err
-		}
-
-		return httpserver.JSONResponse(c, http.StatusOK, resp)
+		return httpserver.JSONResponse(c, http.StatusOK, databaseSizesMetrics())
 	})
 
 	return nil
@@ -102,19 +97,19 @@ func configureComponentCountersEvents() {
 		incComponentCounter(Received)
 	})
 
-	deps.Protocol.Events.Engine.PostSolidFilter.BlockAllowed.Hook(func(_ *blocks.Block) {
+	deps.Protocol.Events.Engine.PostSolidFilter.BlockAllowed.Hook(func(*blocks.Block) {
 		incComponentCounter(Allowed)
 	})
 
-	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(b *blocks.Block) {
+	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(*blocks.Block) {
 		incComponentCounter(Solidified)
 	})
 
-	deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(b *blocks.Block) {
+	deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(*blocks.Block) {
 		incComponentCounter(Booked)
 	})
 
-	deps.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(b *blocks.Block) {
+	deps.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(*blocks.Block) {
 		incComponentCounter(Scheduled)
 	})
 }

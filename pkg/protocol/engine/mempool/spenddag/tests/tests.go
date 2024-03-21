@@ -32,6 +32,8 @@ func TestAll(t *testing.T, frameworkProvider func(*testing.T) *Framework) {
 }
 
 func ExistingSpenderJoinsSpendSets(t *testing.T, tf *Framework) {
+	t.Helper()
+
 	require.NoError(t, tf.CreateOrUpdateSpender("spender1", []string{"resource1"}))
 	require.NoError(t, tf.CreateOrUpdateSpender("spender2", []string{"resource1"}))
 	tf.Assert.SpendSetMembers("resource1", "spender1", "spender2")
@@ -49,6 +51,8 @@ func ExistingSpenderJoinsSpendSets(t *testing.T, tf *Framework) {
 }
 
 func UpdateSpenderParents(t *testing.T, tf *Framework) {
+	t.Helper()
+
 	require.NoError(t, tf.CreateOrUpdateSpender("spender1", []string{"resource1"}))
 	require.NoError(t, tf.CreateOrUpdateSpender("spender2", []string{"resource2"}))
 
@@ -73,6 +77,8 @@ func UpdateSpenderParents(t *testing.T, tf *Framework) {
 }
 
 func CreateSpender(t *testing.T, tf *Framework) {
+	t.Helper()
+
 	require.NoError(t, tf.CreateOrUpdateSpender("spender1", []string{"resource1"}))
 	require.NoError(t, tf.CreateOrUpdateSpender("spender2", []string{"resource1"}))
 	tf.Assert.SpendSetMembers("resource1", "spender1", "spender2")
@@ -90,6 +96,8 @@ func CreateSpender(t *testing.T, tf *Framework) {
 }
 
 func CreateSpendWithoutMembers(t *testing.T, tf *Framework) {
+	t.Helper()
+
 	tf.Accounts.CreateID("nodeID1")
 	tf.Accounts.CreateID("nodeID2")
 	tf.Accounts.CreateID("nodeID3")
@@ -131,6 +139,8 @@ func CreateSpendWithoutMembers(t *testing.T, tf *Framework) {
 }
 
 func LikedInstead(t *testing.T, tf *Framework) {
+	t.Helper()
+
 	tf.Accounts.CreateID("zero-weight")
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender1", []string{"resource1"}))
@@ -150,6 +160,8 @@ func LikedInstead(t *testing.T, tf *Framework) {
 }
 
 func SpendAcceptance(t *testing.T, tf *Framework) {
+	t.Helper()
+
 	tf.Accounts.CreateID("nodeID1")
 	tf.Accounts.CreateID("nodeID2")
 	tf.Accounts.CreateID("nodeID3")
@@ -185,6 +197,8 @@ func SpendAcceptance(t *testing.T, tf *Framework) {
 }
 
 func CastVotes(t *testing.T, tf *Framework) {
+	t.Helper()
+
 	tf.Accounts.CreateID("nodeID1")
 	tf.Accounts.CreateID("nodeID2")
 	tf.Accounts.CreateID("nodeID3")
@@ -221,6 +235,8 @@ func CastVotes(t *testing.T, tf *Framework) {
 }
 
 func CastVotesVoteRank(t *testing.T, tf *Framework) {
+	t.Helper()
+
 	tf.Accounts.CreateID("nodeID1")
 	tf.Accounts.CreateID("nodeID2")
 	tf.Accounts.CreateID("nodeID3")
@@ -274,6 +290,8 @@ func CastVotesVoteRank(t *testing.T, tf *Framework) {
 }
 
 func CastVotesAcceptance(t *testing.T, tf *Framework) {
+	t.Helper()
+
 	tf.Accounts.CreateID("nodeID1")
 	tf.Accounts.CreateID("nodeID2")
 	tf.Accounts.CreateID("nodeID3")
@@ -320,6 +338,8 @@ func CastVotesAcceptance(t *testing.T, tf *Framework) {
 }
 
 func JoinSpendSetTwice(t *testing.T, tf *Framework) {
+	t.Helper()
+
 	var conflictCreatedEventCount, resourceAddedEventCount int
 	tf.Instance.Events().SpenderCreated.Hook(func(_ iotago.TransactionID) {
 		conflictCreatedEventCount++
@@ -352,6 +372,8 @@ func JoinSpendSetTwice(t *testing.T, tf *Framework) {
 }
 
 func EvictAcceptedSpender(t *testing.T, tf *Framework) {
+	t.Helper()
+
 	tf.Accounts.CreateID("nodeID1")
 	tf.Accounts.CreateID("nodeID2")
 	tf.Accounts.CreateID("nodeID3")
@@ -413,6 +435,8 @@ func EvictAcceptedSpender(t *testing.T, tf *Framework) {
 }
 
 func EvictRejectedSpender(t *testing.T, tf *Framework) {
+	t.Helper()
+
 	conflictEvictedEventCount := 0
 	tf.Instance.Events().SpenderEvicted.Hook(func(_ iotago.TransactionID) {
 		conflictEvictedEventCount++

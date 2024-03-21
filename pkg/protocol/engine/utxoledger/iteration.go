@@ -150,7 +150,6 @@ func (m *Manager) ForEachUnspentOutputID(consumer OutputIDConsumer, options ...I
 }
 
 func (m *Manager) ForEachUnspentOutput(consumer OutputConsumer, options ...IterateOption) error {
-
 	var innerErr error
 	if err := m.ForEachUnspentOutputID(func(outputID iotago.OutputID) bool {
 		outputKey := outputStorageKeyForOutputID(outputID)
