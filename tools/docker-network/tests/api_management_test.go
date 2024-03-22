@@ -4,6 +4,7 @@ package tests
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -92,7 +93,8 @@ func Test_PeerManagementAPI(t *testing.T) {
 		{
 			name: "Re-Add the peer to node 1",
 			testFunc: func(t *testing.T) {
-				addedPeerInfo, err := managementClient.AddPeer(getContextWithTimeout(5*time.Second), string(removedPeerInfo.MultiAddresses[0]), removedPeerInfo.Alias)
+				multiAddr := fmt.Sprintf("%s/p2p/%s", removedPeerInfo.MultiAddresses[0], removedPeerInfo.ID)
+				addedPeerInfo, err := managementClient.AddPeer(getContextWithTimeout(5*time.Second), multiAddr, removedPeerInfo.Alias)
 				require.NoError(t, err)
 				require.NotNil(t, addedPeerInfo)
 				require.Equal(t, removedPeerInfo.ID, addedPeerInfo.ID)
