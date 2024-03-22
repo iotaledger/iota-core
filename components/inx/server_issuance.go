@@ -3,6 +3,7 @@ package inx
 import (
 	"context"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	inx "github.com/iotaledger/inx/go"
@@ -11,7 +12,10 @@ import (
 )
 
 func (s *Server) RequestTips(_ context.Context, req *inx.TipsRequest) (*inx.TipsResponse, error) {
-	references := deps.Protocol.Engines.Main.Get().TipSelection.SelectTips(int(req.GetCount()))
+	references, err := deps.Protocol.Engines.Main.Get().TipSelection.SelectTips(int(req.GetCount()))
+	if err != nil {
+		return nil, ierrors.Wrap(err, "failed to select tips")
+	}
 
 	return &inx.TipsResponse{
 		StrongTips:      inx.NewBlockIds(references[iotago.StrongParentType]),
