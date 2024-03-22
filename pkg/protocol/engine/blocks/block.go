@@ -440,7 +440,7 @@ func (b *Block) IsPreAccepted() bool {
 
 // SetPreAccepted sets the Block as preAccepted.
 func (b *Block) SetPreAccepted() (wasUpdated bool) {
-	return !b.accepted.Set(true)
+	return !b.preAccepted.Set(true)
 }
 
 func (b *Block) AddAcceptanceRatifier(seat account.SeatIndex) (added bool) {
