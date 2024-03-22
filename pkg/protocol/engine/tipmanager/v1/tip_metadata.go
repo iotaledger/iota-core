@@ -104,7 +104,7 @@ type TipMetadata struct {
 }
 
 // NewTipMetadata creates a new TipMetadata instance.
-func NewTipMetadata(block *blocks.Block, logger log.Logger) *TipMetadata {
+func NewTipMetadata(logger log.Logger, block *blocks.Block) *TipMetadata {
 	t := &TipMetadata{
 		Logger: logger,
 

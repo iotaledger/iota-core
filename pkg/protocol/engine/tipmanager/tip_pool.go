@@ -26,17 +26,16 @@ func (t TipPool) Max(other TipPool) TipPool {
 	return other
 }
 
+// String returns a human-readable representation of the TipPool.
 func (t TipPool) String() string {
 	switch t {
-	case UndefinedTipPool:
-		return "UndefinedTipPool"
-	case WeakTipPool:
-		return "WeakTipPool"
 	case StrongTipPool:
 		return "StrongTipPool"
+	case WeakTipPool:
+		return "WeakTipPool"
 	case DroppedTipPool:
 		return "DroppedTipPool"
 	default:
-		return "UnknownTipPool"
+		return "UndefinedTipPool"
 	}
 }

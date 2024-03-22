@@ -1,8 +1,6 @@
 package tipmanagerv1
 
 import (
-	"fmt"
-
 	"github.com/iotaledger/hive.go/ds/randommap"
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
@@ -83,12 +81,9 @@ func (t *TipManager) AddBlock(block *blocks.Block) tipmanager.TipMetadata {
 		return nil
 	}
 
-	tipMetadata, created := storage.GetOrCreate(block.ID(), func() *TipMetadata {
-		return NewTipMetadata(block, t.NewChildLogger(block.ID().String()))
-	})
-
+	tipMetadata, created := storage.GetOrCreate(block.ID(), t.tipMetadataFactory(block))
 	if created {
-		t.setupTipMetadata(tipMetadata)
+		t.trackTipMetadata(tipMetadata)
 	}
 
 	return tipMetadata
@@ -171,8 +166,15 @@ func (t *TipManager) initLogging() {
 	})
 }
 
-// setupTipMetadata sets up the tracking of the given TipMetadata in the TipManager.
-func (t *TipManager) setupTipMetadata(tipMetadata *TipMetadata) {
+// tipMetadataFactory creates a function that can be called to create a new TipMetadata instance for the given Block.
+func (t *TipManager) tipMetadataFactory(block *blocks.Block) func() *TipMetadata {
+	return func() *TipMetadata {
+		return NewTipMetadata(t.NewChildLogger(block.ID().String()), block)
+	}
+}
+
+// trackTipMetadata sets up the tracking of the given TipMetadata in the TipManager.
+func (t *TipManager) trackTipMetadata(tipMetadata *TipMetadata) {
 	t.blockAdded.Trigger(tipMetadata)
 
 	tipMetadata.isStrongTipPoolMember.WithNonEmptyValue(func(_ bool) func() {
@@ -250,23 +252,18 @@ func (t *TipManager) trackLatestValidationBlock(tipMetadata *TipMetadata) (teard
 func (t *TipManager) forEachParentByType(block *blocks.Block, consumer func(parentType iotago.ParentsType, parentMetadata *TipMetadata)) {
 	for _, parent := range block.ParentsWithType() {
 		if metadataStorage := t.metadataStorage(parent.ID.Slot()); metadataStorage != nil {
-			// Make sure we don't add root blocks back to the tips.
+			// make sure we don't add root blocks back to the tips.
 			parentBlock, exists := t.retrieveBlock(parent.ID)
-
 			if !exists || parentBlock.IsRootBlock() {
 				continue
 			}
 
-			if parentBlock.ModelBlock() == nil {
-				fmt.Printf(">> parentBlock exists, but parentBlock.ProtocolBlock() == nil\n ParentBlock: %s\n Block: %s\n", parentBlock.String(), block.String())
-			}
-
-			parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, func() *TipMetadata { return NewTipMetadata(parentBlock, t.NewChildLogger(parentBlock.ID().String())) })
-			consumer(parent.Type, parentMetadata)
-
+			parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, t.tipMetadataFactory(parentBlock))
 			if created {
-				t.setupTipMetadata(parentMetadata)
+				t.trackTipMetadata(parentMetadata)
 			}
+
+			consumer(parent.Type, parentMetadata)
 		}
 	}
 }
@@ -303,6 +300,3 @@ func (t *TipManager) selectTips(tipSet *randommap.RandomMap[iotago.BlockID, *Tip
 
 	return lo.Map(tipSet.Values(), func(tip *TipMetadata) tipmanager.TipMetadata { return tip })
 }
-
-// code contract (make sure the type implements all required methods).
-var _ tipmanager.TipManager = new(TipManager)
