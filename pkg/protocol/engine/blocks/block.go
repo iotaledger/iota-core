@@ -636,7 +636,7 @@ func (b *Block) String() string {
 	builder.AddField(stringify.NewStructField("Invalid", b.invalid.Get()))
 	builder.AddField(stringify.NewStructField("Booked", b.booked.Get()))
 	builder.AddField(stringify.NewStructField("Witnesses", b.witnesses))
-	builder.AddField(stringify.NewStructField("PreAccepted", b.preAccepted))
+	builder.AddField(stringify.NewStructField("PreAccepted", b.preAccepted.Get()))
 	builder.AddField(stringify.NewStructField("AcceptanceRatifiers", b.acceptanceRatifiers.String()))
 	builder.AddField(stringify.NewStructField("Accepted", b.accepted.Get()))
 	builder.AddField(stringify.NewStructField("PreConfirmed", b.preConfirmed))
