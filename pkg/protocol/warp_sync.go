@@ -42,8 +42,7 @@ func newWarpSync(protocol *Protocol) *WarpSync {
 		ticker:     eventticker.New[iotago.SlotIndex, iotago.CommitmentID](protocol.Options.WarpSyncRequesterOptions...),
 	}
 
-	// TODO: revert this debug hack
-	//c.ticker.Events.Tick.Hook(c.SendRequest)
+	c.ticker.Events.Tick.Hook(c.SendRequest)
 
 	protocol.ConstructedEvent().OnTrigger(func() {
 		protocol.Chains.WithInitializedEngines(func(chain *Chain, engine *engine.Engine) (shutdown func()) {
