@@ -331,7 +331,12 @@ func (m *Manager) closeStream(s p2pnetwork.Stream) {
 	}
 }
 
-// neighborWithGroup returns neighbor by ID and group.
+// Neighbor returns the neighbor with the given ID.
+func (m *Manager) Neighbor(id peer.ID) (network.Neighbor, error) {
+	return m.neighbor(id)
+}
+
+// neighbor returns the neighbor with the given ID.
 func (m *Manager) neighbor(id peer.ID) (*neighbor, error) {
 	nbr, ok := m.neighbors.Get(id)
 	if !ok {
