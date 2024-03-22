@@ -238,7 +238,7 @@ func (d *DockerTestFramework) prepareAssets(totalAssetsNum int) (coreAPIAssets, 
 		latestSlot = lo.Max[iotago.SlotIndex](latestSlot, blockSlot, valueBlockSlot, delegationOutputID.CreationSlot(), secondAttachment.Slot())
 
 		fmt.Printf("Assets for slot %d\n: dataBlock: %s block: %s\ntx: %s\nbasic output: %s, faucet output: %s\n delegation output: %s\n",
-			valueBlockSlot, block.MustID().String(), valueBlock.MustID().String(), lo.PanicOnErr(signedTx.ID()).String(),
+			valueBlockSlot, block.MustID().String(), valueBlock.MustID().String(), signedTx.MustID().String(),
 			basicOutputID.String(), faucetOutput.ID.String(), delegationOutputID.String())
 	}
 

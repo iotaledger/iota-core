@@ -12,7 +12,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/hive.go/lo"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/nodeclient"
@@ -283,10 +282,22 @@ func Test_CoreAPI(t *testing.T) {
 			},
 		},
 		{
+			name: "Test_TransactionByID",
+			testFunc: func(t *testing.T, nodeAlias string) {
+				assetsPerSlot.forEachTransaction(t, func(t *testing.T, transaction *iotago.SignedTransaction, firstAttachmentID iotago.BlockID) {
+					txID := transaction.Transaction.MustID()
+					resp, err := d.wallet.Clients[nodeAlias].TransactionByID(context.Background(), txID)
+					require.NoError(t, err)
+					require.NotNil(t, resp)
+					require.EqualValues(t, txID, resp.MustID())
+				})
+			},
+		},
+		{
 			name: "Test_TransactionsIncludedBlock",
 			testFunc: func(t *testing.T, nodeAlias string) {
 				assetsPerSlot.forEachTransaction(t, func(t *testing.T, transaction *iotago.SignedTransaction, firstAttachmentID iotago.BlockID) {
-					resp, err := d.wallet.Clients[nodeAlias].TransactionIncludedBlock(context.Background(), lo.PanicOnErr(transaction.Transaction.ID()))
+					resp, err := d.wallet.Clients[nodeAlias].TransactionIncludedBlock(context.Background(), transaction.Transaction.MustID())
 					require.NoError(t, err)
 					require.NotNil(t, resp)
 					require.EqualValues(t, firstAttachmentID, resp.MustID())
@@ -297,7 +308,7 @@ func Test_CoreAPI(t *testing.T) {
 			name: "Test_TransactionsIncludedBlockMetadata",
 			testFunc: func(t *testing.T, nodeAlias string) {
 				assetsPerSlot.forEachTransaction(t, func(t *testing.T, transaction *iotago.SignedTransaction, firstAttachmentID iotago.BlockID) {
-					resp, err := d.wallet.Clients[nodeAlias].TransactionIncludedBlockMetadata(context.Background(), lo.PanicOnErr(transaction.Transaction.ID()))
+					resp, err := d.wallet.Clients[nodeAlias].TransactionIncludedBlockMetadata(context.Background(), transaction.Transaction.MustID())
 					require.NoError(t, err)
 					require.NotNil(t, resp)
 					require.EqualValues(t, api.BlockStateFinalized, resp.BlockState)
@@ -309,7 +320,7 @@ func Test_CoreAPI(t *testing.T) {
 			name: "Test_TransactionsMetadata",
 			testFunc: func(t *testing.T, nodeAlias string) {
 				assetsPerSlot.forEachTransaction(t, func(t *testing.T, transaction *iotago.SignedTransaction, firstAttachmentID iotago.BlockID) {
-					resp, err := d.wallet.Clients[nodeAlias].TransactionMetadata(context.Background(), lo.PanicOnErr(transaction.Transaction.ID()))
+					resp, err := d.wallet.Clients[nodeAlias].TransactionMetadata(context.Background(), transaction.Transaction.MustID())
 					require.NoError(t, err)
 					require.NotNil(t, resp)
 					require.Equal(t, api.TransactionStateFinalized, resp.TransactionState)
