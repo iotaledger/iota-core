@@ -7,6 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -58,7 +59,7 @@ func New(
 	blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool),
 	retrieveCommitteeInSlot func(slot iotago.SlotIndex) (*account.SeatedAccounts, bool),
 ) *TipManager {
-	return module.InitSimpleLifecycle(&TipManager{
+	t := &TipManager{
 		Module:                  subModule,
 		retrieveBlock:           blockRetriever,
 		retrieveCommitteeInSlot: retrieveCommitteeInSlot,
@@ -68,25 +69,26 @@ func New(
 		strongTipSet:            randommap.New[iotago.BlockID, *TipMetadata](),
 		weakTipSet:              randommap.New[iotago.BlockID, *TipMetadata](),
 		blockAdded:              event.New1[tipmanager.TipMetadata](),
-	})
+	}
+
+	t.initLogging()
+
+	return module.InitSimpleLifecycle(t)
 }
 
 // AddBlock adds a Block to the TipManager and returns the TipMetadata if the Block was added successfully.
 func (t *TipManager) AddBlock(block *blocks.Block) tipmanager.TipMetadata {
-	t.LogInfo("adding block to tippool", "blockID", block.ID())
 	storage := t.metadataStorage(block.ID().Slot())
 	if storage == nil {
-		t.LogInfo("storage not found", "blockID", block.ID())
-
 		return nil
 	}
 
 	tipMetadata, created := storage.GetOrCreate(block.ID(), func() *TipMetadata {
-		return NewBlockMetadata(block, t.NewChildLogger(block.ID().String()))
+		return NewTipMetadata(block, t.NewChildLogger(block.ID().String()))
 	})
 
 	if created {
-		t.setupBlockMetadata(tipMetadata)
+		t.setupTipMetadata(tipMetadata)
 	}
 
 	return tipMetadata
@@ -156,9 +158,22 @@ func (t *TipManager) Reset() {
 	lo.ForEach(t.weakTipSet.Keys(), func(id iotago.BlockID) { t.weakTipSet.Delete(id) })
 }
 
-// setupBlockMetadata sets up the behavior of the given Block.
-func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
-	t.LogInfo("setting up tip blockmetadata", "blockID", tipMetadata.ID())
+// initLogging initializes the logging of the TipManager.
+func (t *TipManager) initLogging() {
+	logLevel := log.LevelTrace
+
+	t.blockAdded.Hook(func(metadata tipmanager.TipMetadata) {
+		t.Log("block added", logLevel, "blockID", metadata.ID())
+
+		metadata.Evicted().OnTrigger(func() {
+			t.Log("block evicted", logLevel, "blockID", metadata.ID())
+		})
+	})
+}
+
+// setupTipMetadata sets up the tracking of the given TipMetadata in the TipManager.
+func (t *TipManager) setupTipMetadata(tipMetadata *TipMetadata) {
+	t.blockAdded.Trigger(tipMetadata)
 
 	tipMetadata.isStrongTipPoolMember.WithNonEmptyValue(func(_ bool) func() {
 		return t.trackLatestValidationBlock(tipMetadata)
@@ -195,8 +210,6 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 			tipMetadata.connectWeakParent(parentMetadata)
 		}
 	})
-
-	t.blockAdded.Trigger(tipMetadata)
 }
 
 // trackLatestValidationBlock tracks the latest validator block and takes care of marking the corresponding TipMetadata.
@@ -248,11 +261,11 @@ func (t *TipManager) forEachParentByType(block *blocks.Block, consumer func(pare
 				fmt.Printf(">> parentBlock exists, but parentBlock.ProtocolBlock() == nil\n ParentBlock: %s\n Block: %s\n", parentBlock.String(), block.String())
 			}
 
-			parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, func() *TipMetadata { return NewBlockMetadata(parentBlock, t.NewChildLogger(parentBlock.ID().String())) })
+			parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, func() *TipMetadata { return NewTipMetadata(parentBlock, t.NewChildLogger(parentBlock.ID().String())) })
 			consumer(parent.Type, parentMetadata)
 
 			if created {
-				t.setupBlockMetadata(parentMetadata)
+				t.setupTipMetadata(parentMetadata)
 			}
 		}
 	}
