@@ -6,7 +6,6 @@ import (
 
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/reactive"
-	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/stringify"
@@ -24,6 +23,7 @@ type Block struct {
 	strongChildren      []*Block
 	weakChildren        []*Block
 	shallowLikeChildren []*Block
+	allChildren         ds.Set[*Block]
 
 	// Booker block
 	booked    reactive.Variable[bool]
@@ -74,47 +74,42 @@ func (r *rootBlock) String() string {
 	return builder.String()
 }
 
-// NewBlock creates a new Block with the given options.
-func NewBlock(modelBlock *model.Block) *Block {
+func newEmptyBlock() *Block {
 	return &Block{
 		witnesses:             ds.NewSet[account.SeatIndex](),
 		spenderIDs:            ds.NewSet[iotago.TransactionID](),
 		payloadSpenderIDs:     ds.NewSet[iotago.TransactionID](),
 		acceptanceRatifiers:   ds.NewSet[account.SeatIndex](),
 		confirmationRatifiers: ds.NewSet[account.SeatIndex](),
-		modelBlock:            modelBlock,
 		solid:                 reactive.NewVariable[bool](),
 		invalid:               reactive.NewVariable[bool](),
 		booked:                reactive.NewVariable[bool](),
 		accepted:              reactive.NewVariable[bool](),
 		weightPropagated:      reactive.NewVariable[bool](),
 		notarized:             reactive.NewEvent(),
-		workScore:             modelBlock.WorkScore(),
+		allChildren:           ds.NewSet[*Block](),
 	}
 }
 
-func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issuingTime time.Time) *Block {
-	b := &Block{
-		witnesses:             ds.NewSet[account.SeatIndex](),
-		spenderIDs:            ds.NewSet[iotago.TransactionID](),
-		payloadSpenderIDs:     ds.NewSet[iotago.TransactionID](),
-		acceptanceRatifiers:   ds.NewSet[account.SeatIndex](),
-		confirmationRatifiers: ds.NewSet[account.SeatIndex](),
+// NewBlock creates a new Block with the given options.
+func NewBlock(modelBlock *model.Block) *Block {
+	b := newEmptyBlock()
+	b.modelBlock = modelBlock
+	b.workScore = modelBlock.WorkScore()
 
-		rootBlock: &rootBlock{
-			blockID:      blockID,
-			commitmentID: commitmentID,
-			issuingTime:  issuingTime,
-		},
-		solid:            reactive.NewVariable[bool](),
-		invalid:          reactive.NewVariable[bool](),
-		booked:           reactive.NewVariable[bool](),
-		preAccepted:      true,
-		accepted:         reactive.NewVariable[bool](),
-		weightPropagated: reactive.NewVariable[bool](),
-		notarized:        reactive.NewEvent(),
-		scheduled:        true,
+	return b
+}
+
+func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issuingTime time.Time) *Block {
+	b := newEmptyBlock()
+	b.rootBlock = &rootBlock{
+		blockID:      blockID,
+		commitmentID: commitmentID,
+		issuingTime:  issuingTime,
 	}
+
+	b.preAccepted = true
+	b.scheduled = true
 
 	// This should be true since we commit and evict on acceptance.
 	b.solid.Set(true)
@@ -127,21 +122,11 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 }
 
 func NewMissingBlock(blockID iotago.BlockID) *Block {
-	return &Block{
-		missing:               true,
-		missingBlockID:        blockID,
-		witnesses:             ds.NewSet[account.SeatIndex](),
-		spenderIDs:            ds.NewSet[iotago.TransactionID](),
-		payloadSpenderIDs:     ds.NewSet[iotago.TransactionID](),
-		acceptanceRatifiers:   ds.NewSet[account.SeatIndex](),
-		confirmationRatifiers: ds.NewSet[account.SeatIndex](),
-		solid:                 reactive.NewVariable[bool](),
-		invalid:               reactive.NewVariable[bool](),
-		booked:                reactive.NewVariable[bool](),
-		accepted:              reactive.NewVariable[bool](),
-		weightPropagated:      reactive.NewVariable[bool](),
-		notarized:             reactive.NewEvent(),
-	}
+	b := newEmptyBlock()
+	b.missing = true
+	b.missingBlockID = blockID
+
+	return b
 }
 
 func (b *Block) ProtocolBlock() *iotago.Block {
@@ -294,25 +279,11 @@ func (b *Block) SetInvalid() (wasUpdated bool) {
 }
 
 // Children returns the children of the Block.
-func (b *Block) Children() (children []*Block) {
+func (b *Block) Children() ds.Set[*Block] {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
-	seenBlockIDs := make(map[iotago.BlockID]types.Empty)
-	for _, parentsByType := range [][]*Block{
-		b.strongChildren,
-		b.weakChildren,
-		b.shallowLikeChildren,
-	} {
-		for _, childMetadata := range parentsByType {
-			if _, exists := seenBlockIDs[childMetadata.ID()]; !exists {
-				children = append(children, childMetadata)
-				seenBlockIDs[childMetadata.ID()] = types.Void
-			}
-		}
-	}
-
-	return children
+	return b.allChildren.Clone()
 }
 
 func (b *Block) StrongChildren() []*Block {
@@ -348,6 +319,8 @@ func (b *Block) AppendChild(child *Block, childType iotago.ParentsType) {
 	case iotago.ShallowLikeParentType:
 		b.shallowLikeChildren = append(b.shallowLikeChildren, child)
 	}
+
+	b.allChildren.Add(child)
 }
 
 // Update publishes the given Block data to the underlying Block and marks it as no longer missing.
