@@ -4,6 +4,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/kvstore"
 
 	"github.com/iotaledger/iota-core/pkg/retainer/txretainer"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -16,6 +17,10 @@ func (r *RequestHandler) BlockIDFromTransactionID(transactionID iotago.Transacti
 
 	output, spent, err := r.protocol.Engines.Main.Get().Ledger.OutputOrSpent(outputID)
 	if err != nil {
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+			return iotago.EmptyBlockID, ierrors.WithMessagef(echo.ErrNotFound, "output %s not found", outputID.ToHex())
+		}
+
 		return iotago.EmptyBlockID, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to get output %s: %w", outputID.ToHex(), err)
 	}
 
