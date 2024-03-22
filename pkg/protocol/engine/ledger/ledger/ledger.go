@@ -773,8 +773,6 @@ func (l *Ledger) blockPreAccepted(block *blocks.Block) {
 		return
 	}
 
-	l.LogTrace("cast vote", "blockID", block.ID(), "seat", seat, "voteRank", block.ProtocolBlock().Header.IssuingTime.String(), "issuerID", block.ProtocolBlock().Header.IssuerID.String(), "transactionIDs", block.SpenderIDs().String())
-
 	if err := l.spendDAG.CastVotes(vote.NewVote(seat, voteRank), block.SpenderIDs()); err != nil {
 		l.errorHandler(ierrors.Wrapf(err, "failed to cast votes for block %s", block.ID()))
 	}
