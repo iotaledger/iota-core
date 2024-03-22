@@ -1,6 +1,9 @@
 package management
 
 import (
+	"context"
+	"time"
+
 	"github.com/labstack/echo/v4"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
@@ -90,7 +93,7 @@ func removePeer(c echo.Context) error {
 	// error is ignored because we don't care about the config here
 	_ = deps.PeeringConfigManager.RemovePeer(peerID)
 
-	return deps.NetworkManager.DropNeighbor(peerID)
+	return deps.NetworkManager.RemoveNeighbor(peerID)
 }
 
 // listPeers returns the list of all peers.
@@ -126,8 +129,29 @@ func addPeer(c echo.Context) (*api.PeerInfo, error) {
 		return nil, ierrors.WithMessagef(httpserver.ErrInvalidParameter, "invalid address info from multiAddress (%s): %w", request.MultiAddress, err)
 	}
 
+	if deps.NetworkManager.ManualNeighborExists(addrInfo.ID) {
+		return nil, ierrors.WithMessagef(echo.ErrBadRequest, "manual peer already exists, peerID: %s", addrInfo.ID.String())
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 5*time.Second)
+	defer cancel()
+
+	unhook := deps.NetworkManager.OnNeighborAdded(func(neighbor network.Neighbor) {
+		if neighbor.Peer().ID == addrInfo.ID {
+			// cancel the context to stop waiting
+			cancel()
+		}
+	}).Unhook
+	defer unhook()
+
 	if err := deps.NetworkManager.AddManualPeers(multiAddr); err != nil {
 		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to add peer: %w", err)
+	}
+
+	// wait for the peer to be added or the context to be done
+	<-ctx.Done()
+	if ierrors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to add peer: timeout")
 	}
 
 	peerID := addrInfo.ID

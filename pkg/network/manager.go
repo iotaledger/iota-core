@@ -18,17 +18,24 @@ type Manager interface {
 	OnNeighborAdded(handler func(Neighbor)) *event.Hook[func(Neighbor)]
 	OnNeighborRemoved(handler func(Neighbor)) *event.Hook[func(Neighbor)]
 
+	// Neighbor returns the neighbor with the given ID.
 	Neighbor(peerID peer.ID) (Neighbor, error)
+	// NeighborExists checks if a neighbor with the given ID exists.
+	NeighborExists(peerID peer.ID) bool
+	// ManualNeighborExists checks if a neighbor with the given ID exists in the manual peering layer.
+	ManualNeighborExists(peerID peer.ID) bool
+	// RemoveNeighbor disconnects the neighbor with the given ID
+	// and removes it from manual peering in case it was added manually.
+	RemoveNeighbor(peerID peer.ID) error
+	// DropNeighbor disconnects the neighbor with the given ID.
+	DropNeighbor(peerID peer.ID) error
+
 	AllNeighbors() []Neighbor
 	AutopeeringNeighbors() []Neighbor
-
-	DropNeighbor(peerID peer.ID) error
-	NeighborExists(peerID peer.ID) bool
+	AddManualPeers(multiAddresses ...multiaddr.Multiaddr) error
 
 	P2PHost() host.Host
 
 	Start(ctx context.Context, networkID string) error
 	Shutdown()
-
-	AddManualPeers(multiAddresses ...multiaddr.Multiaddr) error
 }

@@ -207,7 +207,26 @@ func (m *Manager) P2PHost() host.Host {
 	return m.libp2pHost
 }
 
-// DropNeighbor disconnects the neighbor with the given ID and the group.
+// RemoveNeighbor disconnects the neighbor with the given ID
+// and removes it from manual peering in case it was added manually.
+func (m *Manager) RemoveNeighbor(id peer.ID) error {
+	if m.manualPeering.IsPeerKnown(id) {
+		// RemovePeer calls DropNeighbor internally
+		if err := m.manualPeering.RemovePeer(id); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if err := m.DropNeighbor(id); err != nil && !ierrors.Is(err, network.ErrUnknownPeer) {
+		return ierrors.Wrapf(err, "failed to drop peer %s in the gossip layer", id.String())
+	}
+
+	return nil
+}
+
+// DropNeighbor disconnects the neighbor with the given ID.
 func (m *Manager) DropNeighbor(id peer.ID) error {
 	nbr, err := m.neighbor(id)
 	if err != nil {
@@ -407,6 +426,10 @@ func (m *Manager) addNeighbor(ctx context.Context, peer *network.Peer, ps *Packe
 
 func (m *Manager) NeighborExists(id peer.ID) bool {
 	return m.neighbors.Has(id)
+}
+
+func (m *Manager) ManualNeighborExists(id peer.ID) bool {
+	return m.manualPeering.IsPeerKnown(id)
 }
 
 func (m *Manager) deleteNeighbor(nbr *neighbor) {
