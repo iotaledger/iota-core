@@ -284,7 +284,13 @@ func (e *EventAPIDockerTestFramework) AssertTransactionMetadataByTransactionID(c
 			select {
 			case metadata := <-acceptedChan:
 				if txID.Compare(metadata.TransactionID) == 0 {
+					// make sure the transaction state is available from the core API
+					resp, err := eventClt.Client.TransactionMetadata(ctx, txID)
+					require.NoError(e.Testing, err)
+					require.NotNil(e.Testing, resp)
+
 					e.finishChan <- struct{}{}
+
 					return
 				}
 

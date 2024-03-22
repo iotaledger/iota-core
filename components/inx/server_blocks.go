@@ -186,7 +186,7 @@ func (s *Server) attachBlock(ctx context.Context, block *iotago.Block) (*inx.Blo
 	mergedCtx, mergedCtxCancel := contextutils.MergeContexts(ctx, Component.Daemon().ContextStopped())
 	defer mergedCtxCancel()
 
-	blockID, err := deps.RequestHandler.SubmitBlockAndAwaitBooking(mergedCtx, block)
+	blockID, err := deps.RequestHandler.SubmitBlockAndAwaitRetainer(mergedCtx, block)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to attach block: %s", err.Error())
 	}

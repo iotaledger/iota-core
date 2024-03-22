@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
+	"github.com/iotaledger/iota-core/pkg/retainer/txretainer"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -24,27 +25,53 @@ func (r *RequestHandler) SubmitBlockWithoutAwaitingBooking(block *model.Block) e
 	return r.submitBlock(block)
 }
 
-// submitBlockAndAwaitEvent submits a block to be processed and waits for the event to be triggered.
-func (r *RequestHandler) submitBlockAndAwaitEvent(ctx context.Context, block *model.Block, evt *event.Event1[*blocks.Block]) error {
+// submitBlockAndAwaitRetainer submits a block to be processed and waits for the block gets retained.
+func (r *RequestHandler) submitBlockAndAwaitRetainer(ctx context.Context, block *model.Block) error {
 	filtered := make(chan error, 1)
 	exit := make(chan struct{})
 	defer close(exit)
 
 	// Make sure we don't wait forever here. If the block is not dispatched to the main engine,
 	// it will never trigger one of the below events.
-	processingCtx, processingCtxCancel := context.WithTimeout(ctx, 5*time.Second)
+	processingCtx, processingCtxCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer processingCtxCancel()
 	// Calculate the blockID so that we don't capture the block pointer in the event handlers.
 	blockID := block.ID()
-	evtUnhook := evt.Hook(func(eventBlock *blocks.Block) {
-		if blockID != eventBlock.ID() {
-			return
+
+	var successUnhook func()
+	// Hook to TransactionAttached event if the block contains a transaction.
+	signedTx, isTx := block.SignedTransaction()
+	if isTx {
+		txID := signedTx.Transaction.MustID()
+		// Check if the transaction is already retained. The onTransactionAttached event is only triggered if it's a new transaction.
+		// If the transaction is already retained, we hook to the BlockRetained event.
+		_, err := r.protocol.Engines.Main.Get().TxRetainer.TransactionMetadata(txID)
+		if ierrors.Is(err, txretainer.ErrEntryNotFound) {
+			successUnhook = r.protocol.Events.Engine.TransactionRetainer.TransactionRetained.Hook(func(transactionID iotago.TransactionID) {
+				if transactionID != txID {
+					return
+				}
+				select {
+				case filtered <- nil:
+				case <-exit:
+				}
+			}, event.WithWorkerPool(r.workerPool)).Unhook
 		}
-		select {
-		case filtered <- nil:
-		case <-exit:
-		}
-	}, event.WithWorkerPool(r.workerPool)).Unhook
+	}
+
+	// if no hook was set, hook to the block retained event.
+	if successUnhook == nil {
+		successUnhook = r.protocol.Events.Engine.BlockRetainer.BlockRetained.Hook(func(eventBlock *blocks.Block) {
+			if blockID != eventBlock.ID() {
+				return
+			}
+			select {
+			case filtered <- nil:
+			case <-exit:
+			}
+		}, event.WithWorkerPool(r.workerPool)).Unhook
+	}
+
 	prefilteredUnhook := r.protocol.Events.Engine.PreSolidFilter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
 		if blockID != event.Block.ID() {
 			return
@@ -65,7 +92,7 @@ func (r *RequestHandler) submitBlockAndAwaitEvent(ctx context.Context, block *mo
 		}
 	}, event.WithWorkerPool(r.workerPool)).Unhook
 
-	defer lo.BatchReverse(evtUnhook, prefilteredUnhook, postfilteredUnhook)()
+	defer lo.BatchReverse(successUnhook, prefilteredUnhook, postfilteredUnhook)()
 
 	if err := r.submitBlock(block); err != nil {
 		return ierrors.Wrapf(err, "failed to issue block %s", blockID)
@@ -82,13 +109,13 @@ func (r *RequestHandler) submitBlockAndAwaitEvent(ctx context.Context, block *mo
 	}
 }
 
-func (r *RequestHandler) SubmitBlockAndAwaitBooking(ctx context.Context, iotaBlock *iotago.Block) (iotago.BlockID, error) {
+func (r *RequestHandler) SubmitBlockAndAwaitRetainer(ctx context.Context, iotaBlock *iotago.Block) (iotago.BlockID, error) {
 	modelBlock, err := model.BlockFromBlock(iotaBlock)
 	if err != nil {
 		return iotago.EmptyBlockID, ierrors.Wrap(err, "error serializing block to model block")
 	}
 
-	if err = r.submitBlockAndAwaitEvent(ctx, modelBlock, r.protocol.Events.Engine.Retainer.BlockRetained); err != nil {
+	if err = r.submitBlockAndAwaitRetainer(ctx, modelBlock); err != nil {
 		return iotago.EmptyBlockID, ierrors.Wrap(err, "error issuing model block")
 	}
 

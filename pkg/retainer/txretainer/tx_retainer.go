@@ -90,6 +90,7 @@ type (
 
 // TransactionRetainer keeps and resolves all the transaction-related metadata needed in the API and INX.
 type TransactionRetainer struct {
+	events                  *retainer.TransactionRetainerEvents
 	workerPool              *workerpool.WorkerPool
 	txRetainerDatabase      *transactionRetainerDatabase
 	latestCommittedSlotFunc SlotFunc
@@ -113,6 +114,7 @@ func WithDebugStoreErrorMessages(store bool) options.Option[TransactionRetainer]
 func New(parentModule module.Module, workersGroup *workerpool.Group, dbExecFunc storage.SQLDatabaseExecFunc, latestCommittedSlotFunc SlotFunc, finalizedSlotFunc SlotFunc, errorHandler func(error), opts ...options.Option[TransactionRetainer]) *TransactionRetainer {
 	return module.InitSimpleLifecycle(options.Apply(&TransactionRetainer{
 		Module:                  parentModule.NewSubModule("TransactionRetainer"),
+		events:                  retainer.NewTransactionRetainerEvents(),
 		workerPool:              workersGroup.CreatePool("TxRetainer", workerpool.WithWorkerCount(1)),
 		txRetainerCache:         NewTransactionRetainerCache(),
 		txRetainerDatabase:      NewTransactionRetainerDB(dbExecFunc),
@@ -157,6 +159,8 @@ func NewProvider(opts ...options.Option[TransactionRetainer]) module.Provider[*e
 				// if there is already an entry with a valid signature, it should not be overwritten,
 				// therefore we use false for the "validSignature" argument.
 				r.UpdateTransactionMetadata(transactionMetadata.ID(), false, transactionMetadata.EarliestIncludedAttachment().Slot(), api.TransactionStatePending, nil)
+
+				r.events.TransactionRetained.Trigger(transactionMetadata.ID())
 
 				// the transaction was accepted
 				transactionMetadata.OnAccepted(func() {
@@ -241,6 +245,10 @@ func NewProvider(opts ...options.Option[TransactionRetainer]) module.Provider[*e
 				}
 			}, asyncOpt)
 		})
+
+		e.Events.TransactionRetainer.TransactionRetained.LinkTo(r.events.TransactionRetained)
+
+		r.InitializedEvent().Trigger()
 
 		return r
 	})

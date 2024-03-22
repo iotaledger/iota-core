@@ -42,7 +42,7 @@ func sendBlock(c echo.Context) (*api.BlockCreatedResponse, error) {
 		return nil, err
 	}
 
-	blockID, err := deps.RequestHandler.SubmitBlockAndAwaitBooking(c.Request().Context(), iotaBlock)
+	blockID, err := deps.RequestHandler.SubmitBlockAndAwaitRetainer(c.Request().Context(), iotaBlock)
 	if err != nil {
 		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to attach block: %w", err)
 	}
