@@ -17,7 +17,7 @@ func (r *RequestHandler) GetCommitmentBySlot(slot iotago.SlotIndex) (*model.Comm
 	latest := r.protocol.Engines.Main.Get().SyncManager.LatestCommitment()
 
 	if slot > latest.Slot() {
-		return nil, ierrors.WithMessagef(echo.ErrBadRequest, "commitment is from a future slot (%d > %d)", slot, latest.Slot())
+		return nil, ierrors.WithMessagef(echo.ErrNotFound, "commitment is from a future slot (%d > %d)", slot, latest.Slot())
 	}
 
 	commitment, err := r.protocol.Engines.Main.Get().Storage.Commitments().Load(slot)
@@ -37,29 +37,18 @@ func (r *RequestHandler) GetCommitmentBySlot(slot iotago.SlotIndex) (*model.Comm
 
 // GetCommitmentByID returns the commitment for the given commitmentID. If commitmentID is empty, the latest commitment is returned.
 func (r *RequestHandler) GetCommitmentByID(commitmentID iotago.CommitmentID) (*model.Commitment, error) {
-	latest := r.protocol.Engines.Main.Get().SyncManager.LatestCommitment()
 	if commitmentID == iotago.EmptyCommitmentID {
-		return latest, nil
+		// this returns the latest commitment in the case that the commitmentID is empty
+		return r.protocol.Engines.Main.Get().SyncManager.LatestCommitment(), nil
 	}
 
-	if commitmentID.Slot() > latest.Slot() {
-		return nil, ierrors.WithMessagef(echo.ErrBadRequest, "commitment ID (%s) is from a future slot (%d > %d)", commitmentID, commitmentID.Slot(), latest.Slot())
-	}
-
-	commitment, err := r.protocol.Engines.Main.Get().Storage.Commitments().Load(commitmentID.Slot())
+	commitment, err := r.GetCommitmentBySlot(commitmentID.Slot())
 	if err != nil {
-		if ierrors.Is(err, permanent.ErrCommitmentBeforeGenesis) {
-			return nil, ierrors.Chain(httpserver.ErrInvalidParameter, err)
-		}
-		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			return nil, ierrors.WithMessagef(echo.ErrNotFound, "commitment not found, commitmentID: %s, slot: %d", commitmentID, commitmentID.Slot())
-		}
-
-		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to load commitment, commitmentID: %s, slot: %d, error: %w", commitmentID, commitmentID.Slot(), err)
+		return nil, err
 	}
 
 	if commitment.ID() != commitmentID {
-		return nil, ierrors.WithMessagef(echo.ErrBadRequest, "commitment in the store for slot %d does not match the given commitmentID (%s != %s)", commitmentID.Slot(), commitment.ID(), commitmentID)
+		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "commitment in the store for slot %d does not match the given commitmentID (%s != %s)", commitmentID.Slot(), commitment.ID(), commitmentID)
 	}
 
 	return commitment, nil
@@ -120,6 +109,10 @@ func (r *RequestHandler) GetUTXOChangesFullBySlot(slot iotago.SlotIndex) (*api.U
 func (r *RequestHandler) getUTXOChanges(commitmentID iotago.CommitmentID) (*api.UTXOChangesResponse, error) {
 	diffs, err := r.protocol.Engines.Main.Get().Ledger.SlotDiffs(commitmentID.Slot())
 	if err != nil {
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+			return nil, ierrors.WithMessagef(echo.ErrNotFound, "slot diffs not found, commitmentID: %s, slot: %d", commitmentID, commitmentID.Slot())
+		}
+
 		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to get slot diffs, commitmentID: %s, slot: %d, error: %w", commitmentID, commitmentID.Slot(), err)
 	}
 
@@ -144,6 +137,10 @@ func (r *RequestHandler) getUTXOChanges(commitmentID iotago.CommitmentID) (*api.
 func (r *RequestHandler) getUTXOChangesFull(commitmentID iotago.CommitmentID) (*api.UTXOChangesFullResponse, error) {
 	diffs, err := r.protocol.Engines.Main.Get().Ledger.SlotDiffs(commitmentID.Slot())
 	if err != nil {
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+			return nil, ierrors.WithMessagef(echo.ErrNotFound, "slot diffs not found, commitmentID: %s, slot: %d", commitmentID, commitmentID.Slot())
+		}
+
 		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to get slot diffs, commitmentID: %s, slot: %d, error: %w", commitmentID, commitmentID.Slot(), err)
 	}
 

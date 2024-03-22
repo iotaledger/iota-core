@@ -14,6 +14,7 @@ import (
 )
 
 func getContextWithTimeout(duration time.Duration) context.Context {
+	//nolint:lostcancel
 	ctx, _ := context.WithTimeout(context.Background(), duration)
 	return ctx
 }

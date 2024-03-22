@@ -54,7 +54,7 @@ func transactionFromTransactionID(c echo.Context) (*iotago.Transaction, error) {
 
 	tx, isTransaction := block.SignedTransaction()
 	if !isTransaction {
-		return nil, ierrors.WithMessagef(echo.ErrBadRequest, "block %s does not contain a transaction", blockID)
+		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "block %s does not contain a transaction", blockID)
 	}
 
 	return tx.Transaction, nil

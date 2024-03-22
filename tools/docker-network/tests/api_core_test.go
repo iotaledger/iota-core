@@ -489,7 +489,7 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 				slot := iotago.SlotIndex(1000_000_000)
 				resp, err := d.wallet.Clients[nodeAlias].CommitmentBySlot(context.Background(), slot)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.True(t, isStatusCode(err, http.StatusNotFound))
 				require.Nil(t, resp)
 			},
 		},
@@ -499,7 +499,7 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 				committmentID := tpkg.RandCommitmentID()
 				resp, err := d.wallet.Clients[nodeAlias].CommitmentByID(context.Background(), committmentID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.True(t, isStatusCode(err, http.StatusNotFound))
 				require.Nil(t, resp)
 			},
 		},
@@ -532,7 +532,7 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 				slot := iotago.SlotIndex(1000_000_000)
 				resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesBySlot(context.Background(), slot)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.True(t, isStatusCode(err, http.StatusNotFound))
 				require.Nil(t, resp)
 			},
 		},
@@ -543,7 +543,7 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 
 				resp, err := d.wallet.Clients[nodeAlias].CommitmentUTXOChangesFullBySlot(context.Background(), slot)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.True(t, isStatusCode(err, http.StatusNotFound))
 				require.Nil(t, resp)
 			},
 		},
@@ -586,7 +586,7 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 				txID := tpkg.RandTransactionID()
 				resp, err := d.wallet.Clients[nodeAlias].TransactionIncludedBlock(context.Background(), txID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.True(t, isStatusCode(err, http.StatusNotFound))
 				require.Nil(t, resp)
 			},
 		},
@@ -597,7 +597,7 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 
 				resp, err := d.wallet.Clients[nodeAlias].TransactionIncludedBlockMetadata(context.Background(), txID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.True(t, isStatusCode(err, http.StatusNotFound))
 				require.Nil(t, resp)
 			},
 		},
@@ -619,7 +619,7 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 				commitmentID := tpkg.RandCommitmentID()
 				resp, err := d.wallet.Clients[nodeAlias].Congestion(context.Background(), accountAddress, 0, commitmentID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.True(t, isStatusCode(err, http.StatusNotFound))
 				require.Nil(t, resp)
 			},
 		},
