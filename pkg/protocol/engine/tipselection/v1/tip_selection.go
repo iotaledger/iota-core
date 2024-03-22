@@ -23,7 +23,7 @@ import (
 
 // TipSelection is a component that is used to abstract away the tip selection strategy, used to issue new blocks.
 type TipSelection struct {
-	memPool mempool.MemPool[ledger.BlockVoteRank]
+	payloadUtils *PayloadUtils
 
 	// tipManager is the TipManager that is used to access the tip related metadata.
 	tipManager tipmanager.TipManager
@@ -103,80 +103,28 @@ func (t *TipSelection) Construct(tipManager tipmanager.TipManager, spendDAG spen
 	return module.InitSimpleLifecycle(t)
 }
 
-func (t *TipSelection) unacceptedInputs(payload iotago.Payload) (inputs []mempool.StateMetadata, err error) {
-	if payload.PayloadType() != iotago.PayloadSignedTransaction {
-		return nil, nil
-	}
-
-	signedTransaction, isSignedTransaction := payload.(*iotago.SignedTransaction)
-	if !isSignedTransaction {
-		return nil, ierrors.New("failed to cast payload to signed transaction")
-	}
-
-	inputReferences, inputReferencesErr := t.memPool.VM().Inputs(signedTransaction.Transaction)
-	if inputReferencesErr != nil {
-		return nil, ierrors.Wrap(inputReferencesErr, "failed to retrieve input references")
-	}
-
-	for _, inputReference := range inputReferences {
-		stateMetadata, stateMetadataErr := t.memPool.StateMetadata(inputReference)
-		if stateMetadataErr != nil {
-			return nil, ierrors.Wrap(stateMetadataErr, "failed to retrieve state metadata")
-		}
-
-		if !stateMetadata.IsAccepted() {
-			inputs = append(inputs, stateMetadata)
-		}
-	}
-
-	return inputs, nil
-}
-
-func (t *TipSelection) payloadDependenciesToReference(payload iotago.Payload) (dependencies ds.Set[mempool.TransactionMetadata], err error) {
-	unacceptedInputs, unacceptedInputsErr := t.unacceptedInputs(payload)
-	if unacceptedInputsErr != nil {
-		return nil, ierrors.Wrap(unacceptedInputsErr, "failed to retrieve unaccepted inputs")
-	}
-
-	dependencies = ds.NewSet[mempool.TransactionMetadata]()
-	for _, unacceptedInput := range unacceptedInputs {
-		creatingTransaction := unacceptedInput.CreatingTransaction()
-		if creatingTransaction == nil {
-			return nil, ierrors.New("unable to reference non-accepted input - creating transaction not found")
-		}
-
-		dependencies.Add(creatingTransaction)
-	}
-
-	return dependencies, nil
-}
-
 // SelectTips selects the tips that should be used as references for a new block.
 func (t *TipSelection) SelectTips(amount int, optPayload ...iotago.Payload) (references model.ParentReferences) {
+	references = make(model.ParentReferences)
+
 	if len(optPayload) != 0 {
-		dependenciesToReference, err := t.payloadDependenciesToReference(optPayload[0])
+		dependenciesToReference, err := t.payloadUtils.UnacceptedTransactionDependencies(optPayload[0])
 		if err != nil {
 			panic(err)
 		}
 
-		blocksToWeaklyReference := ds.NewSet[iotago.BlockID]()
-		if err = dependenciesToReference.ForEach(func(transactionToReference mempool.TransactionMetadata) error {
-			validAttachments := transactionToReference.ValidAttachments()
-			if len(validAttachments) == 0 {
-				return ierrors.Errorf("transaction %s has no valid attachments", transactionToReference.ID())
-			}
-
-			// TODO: FIND LAST VALID ATTACHMENT TO REFERENCE AND CHECK FOR ORPHANAGE / BELOW TSC INSTEAD OF JUST TAKING
-			// THE FIRST ONE
-			blocksToWeaklyReference.Add(validAttachments[0])
-
-			return nil
-		}); err != nil {
+		latestValidAttachments, err := t.payloadUtils.LatestValidAttachments(dependenciesToReference)
+		if err != nil {
 			panic(err)
 		}
+
+		if latestValidAttachments.Size() > t.optMaxWeakReferences {
+			panic("payload requires too many weak references")
+		}
+
+		references[iotago.WeakParentType] = latestValidAttachments.ToSlice()
 	}
 
-	references = make(model.ParentReferences)
 	strongParents := ds.NewSet[iotago.BlockID]()
 	shallowLikedParents := ds.NewSet[iotago.BlockID]()
 	_ = t.spendDAG.ReadConsistent(func(_ spenddag.ReadLockedSpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]) error {
