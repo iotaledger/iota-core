@@ -21,7 +21,7 @@ const (
 
 // parsePeerIDParam parses the peerID parameter from the request.
 func parsePeerIDParam(c echo.Context) (peer.ID, error) {
-	peerID, err := peer.Decode(c.Param("peerID"))
+	peerID, err := peer.Decode(c.Param(api.ParameterPeerID))
 	if err != nil {
 		return "", ierrors.WithMessagef(httpserver.ErrInvalidParameter, "invalid peerID: %w", err)
 	}
