@@ -73,13 +73,16 @@ func New(
 
 // AddBlock adds a Block to the TipManager and returns the TipMetadata if the Block was added successfully.
 func (t *TipManager) AddBlock(block *blocks.Block) tipmanager.TipMetadata {
+	t.LogInfo("adding block to tippool", "blockID", block.ID())
 	storage := t.metadataStorage(block.ID().Slot())
 	if storage == nil {
+		t.LogInfo("storage not found", "blockID", block.ID())
+
 		return nil
 	}
 
 	tipMetadata, created := storage.GetOrCreate(block.ID(), func() *TipMetadata {
-		return NewBlockMetadata(block)
+		return NewBlockMetadata(block, t.NewChildLogger(block.ID().String()))
 	})
 
 	if created {
@@ -155,6 +158,8 @@ func (t *TipManager) Reset() {
 
 // setupBlockMetadata sets up the behavior of the given Block.
 func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
+	t.LogInfo("setting up tip blockmetadata", "blockID", tipMetadata.ID())
+
 	tipMetadata.isStrongTipPoolMember.WithNonEmptyValue(func(_ bool) func() {
 		return t.trackLatestValidationBlock(tipMetadata)
 	})
@@ -168,6 +173,7 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 	})
 
 	tipMetadata.isStrongTip.OnUpdate(func(_ bool, isStrongTip bool) {
+
 		if isStrongTip {
 			t.strongTipSet.Set(tipMetadata.ID(), tipMetadata)
 		} else {
@@ -243,7 +249,7 @@ func (t *TipManager) forEachParentByType(block *blocks.Block, consumer func(pare
 				fmt.Printf(">> parentBlock exists, but parentBlock.ProtocolBlock() == nil\n ParentBlock: %s\n Block: %s\n", parentBlock.String(), block.String())
 			}
 
-			parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, func() *TipMetadata { return NewBlockMetadata(parentBlock) })
+			parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, func() *TipMetadata { return NewBlockMetadata(parentBlock, t.NewChildLogger(parentBlock.ID().String())) })
 			consumer(parent.Type, parentMetadata)
 
 			if created {

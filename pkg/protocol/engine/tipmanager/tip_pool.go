@@ -25,3 +25,18 @@ func (t TipPool) Max(other TipPool) TipPool {
 
 	return other
 }
+
+func (t TipPool) String() string {
+	switch t {
+	case UndefinedTipPool:
+		return "UndefinedTipPool"
+	case WeakTipPool:
+		return "WeakTipPool"
+	case StrongTipPool:
+		return "StrongTipPool"
+	case DroppedTipPool:
+		return "DroppedTipPool"
+	default:
+		return "UnknownTipPool"
+	}
+}

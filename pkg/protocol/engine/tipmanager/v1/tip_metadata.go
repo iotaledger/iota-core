@@ -5,6 +5,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -99,10 +100,12 @@ type TipMetadata struct {
 
 	// parentsReferencingLatestValidationBlock holds the number of parents that reference the latest validator block.
 	parentsReferencingLatestValidationBlock reactive.Counter[bool]
+
+	log.Logger
 }
 
 // NewBlockMetadata creates a new TipMetadata instance.
-func NewBlockMetadata(block *blocks.Block) *TipMetadata {
+func NewBlockMetadata(block *blocks.Block, logger log.Logger) *TipMetadata {
 	t := &TipMetadata{
 		block:                                   block,
 		tipPool:                                 reactive.NewVariable[tipmanager.TipPool](tipmanager.TipPool.Max),
@@ -114,7 +117,18 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 		stronglyOrphanedStrongParents:           reactive.NewCounter[bool](),
 		weaklyOrphanedWeakParents:               reactive.NewCounter[bool](),
 		parentsReferencingLatestValidationBlock: reactive.NewCounter[bool](),
+		Logger:                                  logger,
 	}
+
+	t.tipPool.LogUpdates(logger, log.LevelInfo, "TipPool")
+	t.livenessThresholdReached.LogUpdates(logger, log.LevelInfo, "LivenessThresholdReached")
+	t.evicted.LogUpdates(logger, log.LevelInfo, "Evicted")
+	t.isLatestValidationBlock.LogUpdates(logger, log.LevelInfo, "IsLatestValidationBlock")
+	t.evicted.LogUpdates(logger, log.LevelInfo, "Evicted")
+	t.isLatestValidationBlock.LogUpdates(logger, log.LevelInfo, "IsLatestValidationBlock")
+	t.stronglyConnectedStrongChildren.LogUpdates(logger, log.LevelInfo, "StronglyConnectedStrongChildren")
+	t.weaklyOrphanedWeakParents.LogUpdates(logger, log.LevelInfo, "WeaklyOrphanedWeakParents")
+	t.parentsReferencingLatestValidationBlock.LogUpdates(logger, log.LevelInfo, "ParentsReferencingLatestValidationBlock")
 
 	t.referencesLatestValidationBlock = reactive.NewDerivedVariable2(func(_ bool, isLatestValidationBlock bool, parentsReferencingLatestValidationBlock int) bool {
 		return isLatestValidationBlock || parentsReferencingLatestValidationBlock > 0
