@@ -239,7 +239,7 @@ func (t *TipSelection) collectReferences(callback func(tipmanager.TipMetadata), 
 	for _, tipSelectorAmount := range tipSelectorsAmount {
 		// Make sure we select the total number of unique tips and not just the number of tips from the given tip pool,
 		// because of how selectUniqueTips works.
-		accumulatedTipAmount += tipSelectorAmount.B
+		accumulatedTipAmount += max(0, tipSelectorAmount.B)
 
 		tipCandidates := selectUniqueTips(tipSelectorAmount.A, referencesCountCallback(), accumulatedTipAmount)
 
