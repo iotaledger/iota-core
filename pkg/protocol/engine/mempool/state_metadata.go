@@ -6,6 +6,8 @@ import (
 )
 
 type StateMetadata interface {
+	CreatingTransaction() TransactionMetadata
+
 	State() State
 
 	SpenderIDs() reactive.Set[iotago.TransactionID]
@@ -15,6 +17,10 @@ type StateMetadata interface {
 	AcceptedSpender() (TransactionMetadata, bool)
 
 	OnAcceptedSpenderUpdated(callback func(spender TransactionMetadata))
+
+	InclusionSlot() iotago.SlotIndex
+
+	OnInclusionSlotUpdated(callback func(prevSlot iotago.SlotIndex, newSlot iotago.SlotIndex))
 
 	inclusionFlags
 }

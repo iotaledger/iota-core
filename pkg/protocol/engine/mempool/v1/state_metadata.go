@@ -12,7 +12,8 @@ import (
 )
 
 type StateMetadata struct {
-	state mempool.State
+	state  mempool.State
+	source *TransactionMetadata
 
 	// lifecycle
 	spenderCount       uint64
@@ -20,6 +21,7 @@ type StateMetadata struct {
 	doubleSpent        *promise.Event
 	spendAccepted      reactive.Variable[*TransactionMetadata]
 	spendCommitted     reactive.Variable[*TransactionMetadata]
+	inclusionSlot      reactive.Variable[*iotago.SlotIndex]
 	allSpendersRemoved *event.Event
 
 	spenderIDs reactive.DerivedSet[iotago.TransactionID]
@@ -29,12 +31,14 @@ type StateMetadata struct {
 
 func NewStateMetadata(state mempool.State, optSource ...*TransactionMetadata) *StateMetadata {
 	return (&StateMetadata{
-		state: state,
+		state:  state,
+		source: lo.First(optSource),
 
 		spent:              promise.NewEvent(),
 		doubleSpent:        promise.NewEvent(),
 		spendAccepted:      reactive.NewVariable[*TransactionMetadata](),
 		spendCommitted:     reactive.NewVariable[*TransactionMetadata](),
+		inclusionSlot:      reactive.NewVariable[*iotago.SlotIndex](),
 		allSpendersRemoved: event.New(),
 
 		spenderIDs: reactive.NewDerivedSet[iotago.TransactionID](),
@@ -51,12 +55,30 @@ func (s *StateMetadata) setup(optSource ...*TransactionMetadata) *StateMetadata 
 
 	s.spenderIDs.InheritFrom(source.spenderIDs)
 
+	source.earliestIncludedValidAttachment.OnUpdate(func(_, newValue iotago.BlockID) {
+		s.inclusionSlot.Compute(func(currentValue *iotago.SlotIndex) *iotago.SlotIndex {
+			if newSlot := newValue.Slot(); currentValue == nil || newSlot < *currentValue {
+				return &newSlot
+			}
+
+			return currentValue
+		})
+	})
+
 	source.OnAccepted(func() { s.accepted.Set(true) })
 	source.OnRejected(func() { s.rejected.Trigger() })
 	source.OnCommittedSlotUpdated(lo.Void(s.committedSlot.Set))
 	source.OnOrphanedSlotUpdated(lo.Void(s.orphanedSlot.Set))
 
 	return s
+}
+
+func (s *StateMetadata) CreatingTransaction() mempool.TransactionMetadata {
+	if s.source == nil {
+		return nil
+	}
+
+	return s.source
 }
 
 func (s *StateMetadata) State() mempool.State {
@@ -111,6 +133,23 @@ func (s *StateMetadata) PendingSpenderCount() int {
 
 func (s *StateMetadata) HasNoSpenders() bool {
 	return atomic.LoadUint64(&s.spenderCount) == 0
+}
+
+func (s *StateMetadata) InclusionSlot() iotago.SlotIndex {
+	return *s.inclusionSlot.Get()
+}
+
+func (s *StateMetadata) OnInclusionSlotUpdated(callback func(prevID iotago.SlotIndex, newID iotago.SlotIndex)) {
+	s.inclusionSlot.OnUpdate(func(oldValue *iotago.SlotIndex, newValue *iotago.SlotIndex) {
+		switch {
+		case oldValue == nil:
+			callback(iotago.SlotIndex(0), *newValue)
+		case newValue == nil:
+			callback(*oldValue, iotago.SlotIndex(0))
+		default:
+			callback(*oldValue, *newValue)
+		}
+	})
 }
 
 func (s *StateMetadata) increaseSpenderCount() {

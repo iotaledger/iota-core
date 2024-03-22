@@ -15,6 +15,9 @@ type State interface {
 
 	// Whether the state is read only.
 	IsReadOnly() bool
+
+	// SlotBooked returns the slot index of the state if it is booked, otherwise -1.
+	SlotBooked() iotago.SlotIndex
 }
 
 // A thin wrapper around a resolved commitment.
@@ -32,6 +35,10 @@ func (s CommitmentInputState) Type() StateType {
 
 func (s CommitmentInputState) IsReadOnly() bool {
 	return true
+}
+
+func (s CommitmentInputState) SlotBooked() iotago.SlotIndex {
+	return s.Commitment.Slot
 }
 
 func CommitmentInputStateFromCommitment(commitment *iotago.Commitment) CommitmentInputState {

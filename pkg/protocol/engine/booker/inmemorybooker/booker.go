@@ -94,25 +94,18 @@ func (b *Booker) Init(ledger ledger.Ledger, loadBlockFromStorage func(iotago.Blo
 // Queue checks if payload is solid and then sets up the block to react to its parents.
 func (b *Booker) Queue(block *blocks.Block) error {
 	signedTransactionMetadata, containsTransaction := b.ledger.AttachTransaction(block)
-
 	if !containsTransaction {
 		b.setupBlock(block)
-		return nil
-	}
 
-	if signedTransactionMetadata == nil {
+		return nil
+	} else if signedTransactionMetadata == nil {
 		return ierrors.Errorf("transaction in block %s was not attached", block.ID())
 	}
+	block.SignedTransactionMetadata.Set(signedTransactionMetadata)
 
 	// Based on the assumption that we always fork and the UTXO and Tangle past cones are always fully known.
 	signedTransactionMetadata.OnSignaturesValid(func() {
 		transactionMetadata := signedTransactionMetadata.TransactionMetadata()
-
-		if orphanedSlot, isOrphaned := transactionMetadata.OrphanedSlot(); isOrphaned && orphanedSlot <= block.SlotCommitmentID().Slot() {
-			block.SetInvalid()
-
-			return
-		}
 
 		transactionMetadata.OnBooked(func() {
 			block.SetPayloadSpenderIDs(transactionMetadata.SpenderIDs())
@@ -135,6 +128,12 @@ func (b *Booker) Queue(block *blocks.Block) error {
 func (b *Booker) Reset() { /* nothing to reset but comply with interface */ }
 
 func (b *Booker) setupBlock(block *blocks.Block) {
+	var utxoDependencies, directlyReferencedUTXODependencies ds.Set[mempool.StateMetadata]
+	if signedTransactionMetadata := block.SignedTransactionMetadata.Get(); signedTransactionMetadata != nil && signedTransactionMetadata.SignaturesInvalid() == nil && !signedTransactionMetadata.TransactionMetadata().IsInvalid() {
+		utxoDependencies = signedTransactionMetadata.TransactionMetadata().Inputs()
+		directlyReferencedUTXODependencies = ds.NewSet[mempool.StateMetadata]()
+	}
+
 	var unbookedParentsCount atomic.Int32
 	unbookedParentsCount.Store(int32(len(block.Parents())))
 
@@ -147,12 +146,14 @@ func (b *Booker) setupBlock(block *blocks.Block) {
 		}
 
 		parentBlock.Booked().OnUpdateOnce(func(_ bool, _ bool) {
-			if unbookedParentsCount.Add(-1) == 0 {
-				if err := b.book(block); err != nil {
-					if block.SetInvalid() {
-						b.events.BlockInvalid.Trigger(block, ierrors.Wrap(err, "failed to book block"))
-					}
+			if directlyReferencedUTXODependencies != nil {
+				if parentTransactionMetadata := parentBlock.SignedTransactionMetadata.Get(); parentTransactionMetadata != nil {
+					directlyReferencedUTXODependencies.AddAll(parentTransactionMetadata.TransactionMetadata().Outputs())
 				}
+			}
+
+			if unbookedParentsCount.Add(-1) == 0 {
+				block.AllParentsBooked.Trigger()
 			}
 		})
 
@@ -161,6 +162,22 @@ func (b *Booker) setupBlock(block *blocks.Block) {
 				b.events.BlockInvalid.Trigger(block, ierrors.Errorf("block marked as invalid in Booker because parent block %s is invalid", parentBlock.ID()))
 			}
 		})
+	})
+
+	block.AllParentsBooked.OnTrigger(func() {
+		if directlyReferencedUTXODependencies != nil {
+			utxoDependencies.DeleteAll(directlyReferencedUTXODependencies)
+		}
+
+		block.WaitForUTXODependencies(utxoDependencies)
+	})
+
+	block.AllDependenciesReady.OnTrigger(func() {
+		if err := b.book(block); err != nil {
+			if block.SetInvalid() {
+				b.events.BlockInvalid.Trigger(block, ierrors.Wrap(err, "failed to book block"))
+			}
+		}
 	})
 }
 

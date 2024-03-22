@@ -3,6 +3,7 @@ package testsuite
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -34,6 +35,33 @@ func (t *TestSuite) assertParentsExistFromBlockOptions(blockOpts []options.Optio
 	t.AssertBlocksExist(t.Blocks(lo.Map(parents, func(id iotago.BlockID) string { return id.Alias() })...), true, client)
 }
 
+func (t *TestSuite) addReferenceToDependencies(blockOpts []options.Option[mock.BlockHeaderParams], inputTxName string) []options.Option[mock.BlockHeaderParams] {
+	if inputTxName != "Genesis" {
+		if attachments, exists := t.attachments.Get(inputTxName); !exists {
+			panic(fmt.Sprintf("input transaction %s does not have an attachment", inputTxName))
+		} else if params := options.Apply(&mock.BlockHeaderParams{}, blockOpts); !t.blockReferencesDependency(params, attachments[0].ID()) {
+			blockOpts = append(blockOpts, mock.WithWeakParents(append(params.References[iotago.WeakParentType], attachments[0].ID())...))
+		}
+	}
+
+	return blockOpts
+}
+
+func (t *TestSuite) blockReferencesDependency(params *mock.BlockHeaderParams, attachment iotago.BlockID) bool {
+	parents := slices.Concat(lo.Values(params.References)...)
+	if slices.Contains(parents, attachment) || (params.SlotCommitment != nil && attachment.Slot() <= params.SlotCommitment.Slot) {
+		return true
+	}
+
+	for _, block := range t.Blocks(lo.Map(parents, iotago.BlockID.Alias)...) {
+		if block.SlotCommitmentID().Slot() >= attachment.Slot() {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (t *TestSuite) limitParentsCountInBlockOptions(blockOpts []options.Option[mock.BlockHeaderParams], maxCount int) []options.Option[mock.BlockHeaderParams] {
 	params := options.Apply(&mock.BlockHeaderParams{}, blockOpts)
 	if len(params.References[iotago.StrongParentType]) > maxCount {
@@ -59,6 +87,16 @@ func (t *TestSuite) RegisterBlock(blockName string, block *blocks.Block) {
 func (t *TestSuite) registerBlock(blockName string, block *blocks.Block) {
 	t.blocks.Set(blockName, block)
 	block.ID().RegisterAlias(blockName)
+
+	if tx, hasTransaction := block.SignedTransaction(); hasTransaction {
+		t.attachments.Compute(lo.Return1(tx.Transaction.ID()).Alias(), func(currentValue []*blocks.Block, _ bool) []*blocks.Block {
+			if currentValue == nil {
+				currentValue = make([]*blocks.Block, 0)
+			}
+
+			return append(currentValue, block)
+		})
+	}
 }
 
 func (t *TestSuite) IssueValidationBlockWithHeaderOptions(blockName string, node *mock.Node, blockHeaderOpts ...options.Option[mock.BlockHeaderParams]) (*blocks.Block, error) {
@@ -166,14 +204,16 @@ func (t *TestSuite) issueBlockRow(prefix string, row int, parentsPrefix string, 
 			txCount := t.automaticTransactionIssuingCounters.Compute(node.Partition, func(currentValue int, exists bool) int {
 				return currentValue + 1
 			})
-			inputName := fmt.Sprintf("automaticSpent-%d:0", txCount-1)
-			txName := fmt.Sprintf("automaticSpent-%d", txCount)
+			inputTxName := fmt.Sprintf("automaticSpent-%d", txCount-1)
 			if txCount == 1 {
-				inputName = "Genesis:0"
+				inputTxName = "Genesis"
 			}
+			inputName := inputTxName + ":0"
+			txName := fmt.Sprintf("automaticSpent-%d", txCount)
 			tx := t.DefaultWallet().CreateBasicOutputsEquallyFromInput(txName, 1, inputName)
 
 			issuingOptionsCopy[node.Name] = t.limitParentsCountInBlockOptions(issuingOptionsCopy[node.Name], iotago.BasicBlockMaxParents)
+			issuingOptionsCopy[node.Name] = t.addReferenceToDependencies(issuingOptionsCopy[node.Name], inputTxName)
 			t.assertParentsCommitmentExistFromBlockOptions(issuingOptionsCopy[node.Name], node.Client)
 			t.assertParentsExistFromBlockOptions(issuingOptionsCopy[node.Name], node.Client)
 

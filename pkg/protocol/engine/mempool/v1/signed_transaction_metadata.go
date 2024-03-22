@@ -50,6 +50,10 @@ func (s *SignedTransactionMetadata) OnSignaturesInvalid(callback func(error)) (u
 	})
 }
 
+func (s *SignedTransactionMetadata) SignaturesInvalid() error {
+	return s.signaturesInvalid.Get()
+}
+
 func (s *SignedTransactionMetadata) OnSignaturesValid(callback func()) (unsubscribe func()) {
 	return s.signaturesValid.OnTrigger(callback)
 }
