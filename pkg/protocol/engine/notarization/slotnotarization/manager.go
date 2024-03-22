@@ -144,13 +144,13 @@ func (m *Manager) ForceCommit(slot iotago.SlotIndex) (*model.Commitment, error) 
 }
 
 func (m *Manager) ForceCommitUntil(commitUntilSlot iotago.SlotIndex) error {
-	m.LogInfof("Force commit until slot %d", commitUntilSlot)
+	m.LogInfo("force committing", "slot", commitUntilSlot)
 
-	//for i := m.storage.Settings().LatestCommitment().Slot() + 1; i <= commitUntilSlot; i++ {
-	//	if _, err := m.ForceCommit(i); err != nil {
-	//		return ierrors.Wrapf(err, "failed to force commit slot %d", i)
-	//	}
-	//}
+	for i := m.storage.Settings().LatestCommitment().Slot() + 1; i <= commitUntilSlot; i++ {
+		if _, err := m.ForceCommit(i); err != nil {
+			return ierrors.Wrapf(err, "failed to force commit slot %d", i)
+		}
+	}
 
 	return nil
 }
