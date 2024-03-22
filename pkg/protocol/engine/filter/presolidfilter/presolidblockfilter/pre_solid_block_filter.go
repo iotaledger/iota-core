@@ -82,7 +82,7 @@ func (f *PreSolidBlockFilter) ProcessReceivedBlock(block *model.Block, source pe
 	}
 
 	if _, isValidation := block.ValidationBlock(); isValidation {
-		blockSlot := block.ProtocolBlock().API.TimeProvider().SlotFromTime(block.ProtocolBlock().Header.IssuingTime)
+		blockSlot := block.ProtocolBlock().Slot()
 		committee, exists := f.committeeFunc(blockSlot)
 		if !exists {
 			f.events.BlockPreFiltered.Trigger(&presolidfilter.BlockPreFilteredEvent{
