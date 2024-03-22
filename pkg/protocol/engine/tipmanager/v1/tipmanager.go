@@ -110,10 +110,7 @@ func (t *TipManager) RemoveSeat(seat account.SeatIndex) {
 }
 
 func (t *TipManager) ValidationTips(optAmount ...int) []tipmanager.TipMetadata {
-	a := t.selectTips(t.validationTipSet, optAmount...)
-	fmt.Println(">> selecting validation tips", lo.Map(a, tipmanager.TipMetadata.ID))
-
-	return a
+	return t.selectTips(t.validationTipSet, optAmount...)
 }
 
 // StrongTips returns the strong tips of the TipManager (with an optional limit).
