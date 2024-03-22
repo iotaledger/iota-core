@@ -124,9 +124,9 @@ func NewBlockMetadata(block *blocks.Block, logger log.Logger) *TipMetadata {
 		return isLatestValidationBlock || parentsReferencingLatestValidationBlock > 0
 	}, t.isLatestValidationBlock, t.parentsReferencingLatestValidationBlock)
 
-	t.isMarkedOrphaned = reactive.NewDerivedVariable2[bool, bool](func(_ bool, isLivenessThresholdReached bool, isAccepted bool) bool {
-		return isLivenessThresholdReached && !isAccepted
-	}, t.livenessThresholdReached, block.Accepted())
+	t.isMarkedOrphaned = reactive.NewDerivedVariable2[bool, bool](func(_ bool, isLivenessThresholdReached bool, isPreAccepted bool) bool {
+		return isLivenessThresholdReached && !isPreAccepted
+	}, t.livenessThresholdReached, block.PreAccepted())
 
 	t.anyStrongParentStronglyOrphaned = reactive.NewDerivedVariable[bool, int](func(_ bool, stronglyOrphanedStrongParents int) bool {
 		return stronglyOrphanedStrongParents > 0

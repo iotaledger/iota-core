@@ -34,7 +34,7 @@ type Block struct {
 	payloadSpenderIDs ds.Set[iotago.TransactionID]
 
 	// BlockGadget block
-	preAccepted           bool
+	preAccepted           reactive.Variable[bool]
 	acceptanceRatifiers   ds.Set[account.SeatIndex]
 	accepted              reactive.Variable[bool]
 	preConfirmed          bool
@@ -109,7 +109,7 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 		solid:            reactive.NewVariable[bool](),
 		invalid:          reactive.NewVariable[bool](),
 		booked:           reactive.NewVariable[bool](),
-		preAccepted:      true,
+		preAccepted:      reactive.NewVariable[bool](),
 		accepted:         reactive.NewVariable[bool](),
 		weightPropagated: reactive.NewVariable[bool](),
 		notarized:        reactive.NewEvent(),
@@ -428,24 +428,19 @@ func (b *Block) SetPayloadSpenderIDs(payloadSpenderIDs ds.Set[iotago.Transaction
 	b.payloadSpenderIDs = payloadSpenderIDs
 }
 
+// PreAccepted returns a reactive variable that is true if the Block was pre accepted.
+func (b *Block) PreAccepted() reactive.Variable[bool] {
+	return b.preAccepted
+}
+
 // IsPreAccepted returns true if the Block was preAccepted.
 func (b *Block) IsPreAccepted() bool {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
-
-	return b.preAccepted
+	return b.preAccepted.Get()
 }
 
 // SetPreAccepted sets the Block as preAccepted.
 func (b *Block) SetPreAccepted() (wasUpdated bool) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-
-	if wasUpdated = !b.preAccepted; wasUpdated {
-		b.preAccepted = true
-	}
-
-	return wasUpdated
+	return !b.accepted.Set(true)
 }
 
 func (b *Block) AddAcceptanceRatifier(seat account.SeatIndex) (added bool) {
