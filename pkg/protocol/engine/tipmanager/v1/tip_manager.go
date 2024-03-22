@@ -159,10 +159,6 @@ func (t *TipManager) initLogging() {
 
 	t.blockAdded.Hook(func(metadata tipmanager.TipMetadata) {
 		t.Log("block added", logLevel, "blockID", metadata.ID())
-
-		metadata.Evicted().OnTrigger(func() {
-			t.Log("block evicted", logLevel, "blockID", metadata.ID())
-		})
 	})
 }
 
