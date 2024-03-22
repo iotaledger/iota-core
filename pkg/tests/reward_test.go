@@ -250,7 +250,7 @@ func Test_RewardInputCannotPointToNFTOutput(t *testing.T) {
 	ts.Wait(node1, node2)
 
 	ts.AssertTransactionsExist([]*iotago.Transaction{tx2.Transaction}, true, node1, node2)
-	signedTx2ID := lo.PanicOnErr(tx2.ID())
+	signedTx2ID := tx2.MustID()
 	ts.AssertTransactionFailure(signedTx2ID, iotago.ErrRewardInputReferenceInvalid, node1, node2)
 }
 

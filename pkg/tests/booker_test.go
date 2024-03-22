@@ -871,7 +871,7 @@ func Test_BlockWithInvalidTransactionGetsBooked(t *testing.T) {
 	ts.AssertBlocksInCacheConfirmed(ts.Blocks("block1"), true, ts.Nodes()...)
 
 	ts.AssertTransactionsExist([]*iotago.Transaction{tx1.Transaction}, true, ts.Nodes()...)
-	ts.AssertTransactionFailure(lo.PanicOnErr(tx1.ID()), iotago.ErrIssuerFeatureNotUnlocked, ts.Nodes()...)
+	ts.AssertTransactionFailure(tx1.MustID(), iotago.ErrIssuerFeatureNotUnlocked, ts.Nodes()...)
 	ts.AssertTransactionsInCacheAccepted([]*iotago.Transaction{tx1.Transaction}, false, ts.Nodes()...)
 
 	ts.CommitUntilSlot(block1Slot, vblock3.ID())
