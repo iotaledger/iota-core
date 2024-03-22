@@ -118,12 +118,12 @@ func addPeer(c echo.Context) (*api.PeerInfo, error) {
 
 	multiAddr, err := multiaddr.NewMultiaddr(request.MultiAddress)
 	if err != nil {
-		return nil, ierrors.WithMessagef(httpserver.ErrInvalidParameter, "invalid multiAddress: %w", err)
+		return nil, ierrors.WithMessagef(httpserver.ErrInvalidParameter, "invalid multiAddress (%s): %w", request.MultiAddress, err)
 	}
 
 	addrInfo, err := peer.AddrInfoFromP2pAddr(multiAddr)
 	if err != nil {
-		return nil, ierrors.WithMessagef(httpserver.ErrInvalidParameter, "invalid multiAddress: %w", err)
+		return nil, ierrors.WithMessagef(httpserver.ErrInvalidParameter, "invalid address info from multiAddress (%s): %w", request.MultiAddress, err)
 	}
 
 	if err := deps.NetworkManager.AddManualPeers(multiAddr); err != nil {
