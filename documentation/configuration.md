@@ -235,7 +235,7 @@ Example:
 
 | Name               | Description                               | Type    | Default value |
 | ------------------ | ----------------------------------------- | ------- | ------------- |
-| enabled            | Whether the DebugAPI component is enabled | boolean | true          |
+| enabled            | Whether the DebugAPI component is enabled | boolean | false         |
 | [db](#debugapi_db) | Configuration for db                      | object  |               |
 
 ### <a id="debugapi_db"></a> Db
@@ -258,7 +258,7 @@ Example:
 ```json
   {
     "debugAPI": {
-      "enabled": true,
+      "enabled": false,
       "db": {
         "path": "testnet/debug",
         "maxOpenDBs": 2,
