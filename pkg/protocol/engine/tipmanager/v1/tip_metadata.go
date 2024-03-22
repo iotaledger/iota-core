@@ -120,33 +120,6 @@ func NewBlockMetadata(block *blocks.Block, logger log.Logger) *TipMetadata {
 		Logger:                                  logger,
 	}
 
-	t.tipPool.LogUpdates(logger, log.LevelInfo, "TipPool")
-	t.livenessThresholdReached.LogUpdates(logger, log.LevelInfo, "LivenessThresholdReached")
-	t.evicted.LogUpdates(logger, log.LevelInfo, "Evicted")
-	t.isStrongTipPoolMember.LogUpdates(logger, log.LevelInfo, "IsStrongTipPoolMember")
-	t.isWeakTipPoolMember.LogUpdates(logger, log.LevelInfo, "IsWeakTipPoolMember")
-	t.isStronglyConnectedToTips.LogUpdates(logger, log.LevelInfo, "IsStronglyConnectedToTips")
-	t.isConnectedToTips.LogUpdates(logger, log.LevelInfo, "IsConnectedToTips")
-	t.isStronglyReferencedByTips.LogUpdates(logger, log.LevelInfo, "IsStronglyReferencedByTips")
-	t.isWeaklyReferencedByTips.LogUpdates(logger, log.LevelInfo, "IsWeaklyReferencedByTips")
-	t.isReferencedByTips.LogUpdates(logger, log.LevelInfo, "IsReferencedByTips")
-	t.isLatestValidationBlock.LogUpdates(logger, log.LevelInfo, "IsLatestValidationBlock")
-	t.referencesLatestValidationBlock.LogUpdates(logger, log.LevelInfo, "ReferencesLatestValidationBlock")
-	t.isStrongTip.LogUpdates(logger, log.LevelInfo, "IsStrongTip")
-	t.isWeakTip.LogUpdates(logger, log.LevelInfo, "IsWeakTip")
-	t.isValidationTip.LogUpdates(logger, log.LevelInfo, "IsValidationTip")
-	t.isMarkedOrphaned.LogUpdates(logger, log.LevelInfo, "IsMarkedOrphaned")
-	t.isOrphaned.LogUpdates(logger, log.LevelInfo, "IsOrphaned")
-	t.anyStrongParentStronglyOrphaned.LogUpdates(logger, log.LevelInfo, "AnyStrongParentStronglyOrphaned")
-	t.anyWeakParentWeaklyOrphaned.LogUpdates(logger, log.LevelInfo, "AnyWeakParentWeaklyOrphaned")
-	t.isStronglyOrphaned.LogUpdates(logger, log.LevelInfo, "IsStronglyOrphaned")
-	t.isWeaklyOrphaned.LogUpdates(logger, log.LevelInfo, "IsWeaklyOrphaned")
-	t.stronglyConnectedStrongChildren.LogUpdates(logger, log.LevelInfo, "StronglyConnectedStrongChildren")
-	t.connectedWeakChildren.LogUpdates(logger, log.LevelInfo, "ConnectedWeakChildren")
-	t.stronglyOrphanedStrongParents.LogUpdates(logger, log.LevelInfo, "StronglyOrphanedStrongParents")
-	t.weaklyOrphanedWeakParents.LogUpdates(logger, log.LevelInfo, "WeaklyOrphanedWeakParents")
-	t.parentsReferencingLatestValidationBlock.LogUpdates(logger, log.LevelInfo, "ParentsReferencingLatestValidationBlock")
-
 	t.referencesLatestValidationBlock = reactive.NewDerivedVariable2(func(_ bool, isLatestValidationBlock bool, parentsReferencingLatestValidationBlock int) bool {
 		return isLatestValidationBlock || parentsReferencingLatestValidationBlock > 0
 	}, t.isLatestValidationBlock, t.parentsReferencingLatestValidationBlock)
@@ -214,6 +187,33 @@ func NewBlockMetadata(block *blocks.Block, logger log.Logger) *TipMetadata {
 	t.isValidationTip = reactive.NewDerivedVariable2(func(_ bool, isStrongTip bool, referencesLatestValidationBlock bool) bool {
 		return isStrongTip && referencesLatestValidationBlock
 	}, t.isStrongTip, t.referencesLatestValidationBlock)
+
+	t.tipPool.LogUpdates(logger, log.LevelInfo, "TipPool")
+	t.livenessThresholdReached.LogUpdates(logger, log.LevelInfo, "LivenessThresholdReached")
+	t.evicted.LogUpdates(logger, log.LevelInfo, "Evicted")
+	t.isStrongTipPoolMember.LogUpdates(logger, log.LevelInfo, "IsStrongTipPoolMember")
+	t.isWeakTipPoolMember.LogUpdates(logger, log.LevelInfo, "IsWeakTipPoolMember")
+	t.isStronglyConnectedToTips.LogUpdates(logger, log.LevelInfo, "IsStronglyConnectedToTips")
+	t.isConnectedToTips.LogUpdates(logger, log.LevelInfo, "IsConnectedToTips")
+	t.isStronglyReferencedByTips.LogUpdates(logger, log.LevelInfo, "IsStronglyReferencedByTips")
+	t.isWeaklyReferencedByTips.LogUpdates(logger, log.LevelInfo, "IsWeaklyReferencedByTips")
+	t.isReferencedByTips.LogUpdates(logger, log.LevelInfo, "IsReferencedByTips")
+	t.isLatestValidationBlock.LogUpdates(logger, log.LevelInfo, "IsLatestValidationBlock")
+	t.referencesLatestValidationBlock.LogUpdates(logger, log.LevelInfo, "ReferencesLatestValidationBlock")
+	t.isStrongTip.LogUpdates(logger, log.LevelInfo, "IsStrongTip")
+	t.isWeakTip.LogUpdates(logger, log.LevelInfo, "IsWeakTip")
+	t.isValidationTip.LogUpdates(logger, log.LevelInfo, "IsValidationTip")
+	t.isMarkedOrphaned.LogUpdates(logger, log.LevelInfo, "IsMarkedOrphaned")
+	t.isOrphaned.LogUpdates(logger, log.LevelInfo, "IsOrphaned")
+	t.anyStrongParentStronglyOrphaned.LogUpdates(logger, log.LevelInfo, "AnyStrongParentStronglyOrphaned")
+	t.anyWeakParentWeaklyOrphaned.LogUpdates(logger, log.LevelInfo, "AnyWeakParentWeaklyOrphaned")
+	t.isStronglyOrphaned.LogUpdates(logger, log.LevelInfo, "IsStronglyOrphaned")
+	t.isWeaklyOrphaned.LogUpdates(logger, log.LevelInfo, "IsWeaklyOrphaned")
+	t.stronglyConnectedStrongChildren.LogUpdates(logger, log.LevelInfo, "StronglyConnectedStrongChildren")
+	t.connectedWeakChildren.LogUpdates(logger, log.LevelInfo, "ConnectedWeakChildren")
+	t.stronglyOrphanedStrongParents.LogUpdates(logger, log.LevelInfo, "StronglyOrphanedStrongParents")
+	t.weaklyOrphanedWeakParents.LogUpdates(logger, log.LevelInfo, "WeaklyOrphanedWeakParents")
+	t.parentsReferencingLatestValidationBlock.LogUpdates(logger, log.LevelInfo, "ParentsReferencingLatestValidationBlock")
 
 	return t
 }

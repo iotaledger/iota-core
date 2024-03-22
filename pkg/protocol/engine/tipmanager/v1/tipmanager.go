@@ -173,7 +173,6 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 	})
 
 	tipMetadata.isStrongTip.OnUpdate(func(_ bool, isStrongTip bool) {
-
 		if isStrongTip {
 			t.strongTipSet.Set(tipMetadata.ID(), tipMetadata)
 		} else {
