@@ -400,7 +400,8 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	// Check that issuing still produces the same commitments on the nodes that upgraded. The nodes that did not upgrade
 	// should not be able to issue and process blocks with the new version.
 	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{64, 65}, 4, "63.3", ts.Nodes("nodeB", "nodeC"), false, false)
-	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{66, 67, 68, 69, 70, 71}, 4, "65.3", ts.Nodes("nodeB", "nodeC"), true, true)
+	ts.Wait()
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{65, 66, 67, 68, 69, 70, 71}, 4, "65.3", ts.Nodes("nodeB", "nodeC"), true, false)
 
 	// Nodes that did not set up the new protocol parameters are not able to process blocks with the new version.
 	ts.AssertNodeState(ts.Nodes("nodeA", "nodeD", "nodeF", "nodeG"),
