@@ -98,7 +98,7 @@ func New[VoteRank spenddag.VoteRankType[VoteRank]](
 		cachedSignedTransactions:   shrinkingmap.New[iotago.SignedTransactionID, *SignedTransactionMetadata](),
 		cachedStateRequests:        shrinkingmap.New[mempool.StateID, *promise.Promise[*StateMetadata]](),
 		stateDiffs:                 shrinkingmap.New[iotago.SlotIndex, *StateDiff](),
-		executionWorkers:           workers.CreatePool("executionWorkers", workerpool.WithWorkerCount(1)),
+		executionWorkers:           workers.CreatePool("executionWorkers", workerpool.WithWorkerCount(6)),
 		delayedTransactionEviction: shrinkingmap.New[iotago.SlotIndex, ds.Set[iotago.TransactionID]](),
 		delayedOutputStateEviction: shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.Identifier, *StateMetadata]](),
 		spendDAG:                   spendDAG,
