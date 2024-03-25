@@ -14,6 +14,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 func (s *Server) ReadActiveRootBlocks(_ context.Context, _ *inx.NoParams) (*inx.RootBlocksResponse, error) {
@@ -78,7 +79,10 @@ func (s *Server) ListenToAcceptedBlocks(_ *inx.NoParams, srv inx.INX_ListenToAcc
 	wp := workerpool.New("ListenToAcceptedBlocks", workerpool.WithWorkerCount(workerCount)).Start()
 
 	unhook := deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-		payload, err := getINXBlockMetadata(block.ID())
+		payload, err := inx.WrapBlockMetadata(&api.BlockMetadataResponse{
+			BlockID:    block.ID(),
+			BlockState: api.BlockStateAccepted,
+		})
 		if err != nil {
 			Component.LogErrorf("get block metadata error: %v", err)
 			cancel()
@@ -115,7 +119,10 @@ func (s *Server) ListenToConfirmedBlocks(_ *inx.NoParams, srv inx.INX_ListenToCo
 	wp := workerpool.New("ListenToConfirmedBlocks", workerpool.WithWorkerCount(workerCount)).Start()
 
 	unhook := deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
-		payload, err := getINXBlockMetadata(block.ID())
+		payload, err := inx.WrapBlockMetadata(&api.BlockMetadataResponse{
+			BlockID:    block.ID(),
+			BlockState: api.BlockStateConfirmed,
+		})
 		if err != nil {
 			Component.LogErrorf("get block metadata error: %v", err)
 			cancel()
