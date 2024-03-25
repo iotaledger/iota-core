@@ -27,7 +27,7 @@ var (
 	ProtocolParamsDocker = iotago.NewV3SnapshotProtocolParameters(
 		iotago.WithNetworkOptions(fmt.Sprintf("docker-%d", time.Now().Unix()), iotago.PrefixTestnet),
 		iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 13),
-		iotago.WithLivenessOptions(20, 30, 5, 10, 15),
+		iotago.WithLivenessOptions(10, 15, 3, 6, 8),
 	)
 
 	// use defaults from iota.go.
