@@ -77,6 +77,8 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 				p.initNetwork(),
 
 				shutdownSubComponents,
+
+				logger.Shutdown,
 			)
 
 			p.ShutdownEvent().OnTrigger(shutdown)
