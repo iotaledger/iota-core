@@ -302,7 +302,7 @@ func (n *Node) Shutdown() {
 	}
 
 	<-stopped
-	n.logger.UnsubscribeFromParentLogger()
+	n.logger.Shutdown()
 }
 
 func (n *Node) ProtocolParametersHash() iotago.Identifier {

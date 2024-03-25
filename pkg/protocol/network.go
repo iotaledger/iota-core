@@ -34,7 +34,7 @@ func newNetwork(protocol *Protocol, networkEndpoint network.Endpoint) *Network {
 		protocol: protocol,
 	}
 
-	protocol.ShutdownEvent().OnTrigger(n.Logger.UnsubscribeFromParentLogger)
+	protocol.ShutdownEvent().OnTrigger(n.Logger.Shutdown)
 
 	return n
 }

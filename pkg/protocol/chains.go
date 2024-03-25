@@ -310,7 +310,7 @@ func (c *Chains) initLogger(logger log.Logger) (shutdown func()) {
 		c.HeaviestAttestedCandidate.LogUpdates(c, log.LevelTrace, "HeaviestAttestedCandidate", (*Chain).LogName),
 		c.HeaviestVerifiedCandidate.LogUpdates(c, log.LevelTrace, "HeaviestVerifiedCandidate", (*Chain).LogName),
 
-		logger.UnsubscribeFromParentLogger,
+		logger.Shutdown,
 	)
 }
 

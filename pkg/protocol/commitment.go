@@ -226,7 +226,7 @@ func (c *Commitment) initLogger() (shutdown func()) {
 		c.ReplayDroppedBlocks.LogUpdates(c, log.LevelTrace, "ReplayDroppedBlocks"),
 		c.IsEvicted.LogUpdates(c, log.LevelTrace, "IsEvicted"),
 
-		c.Logger.UnsubscribeFromParentLogger,
+		c.Logger.Shutdown,
 	)
 }
 
