@@ -416,9 +416,9 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 }
 
 func (m *MemPool[VoteRank]) executeTransaction(executionContext context.Context, transaction *TransactionMetadata) {
-	m.executionWorkers.Submit(func() {
-		start3 := time.Now()
+	start3 := time.Now()
 
+	m.executionWorkers.Submit(func() {
 		if outputStates, err := m.vm.Execute(executionContext, transaction.Transaction()); err != nil {
 			transaction.setInvalid(err)
 		} else {
