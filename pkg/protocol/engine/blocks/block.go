@@ -279,11 +279,11 @@ func (b *Block) SetInvalid() (wasUpdated bool) {
 }
 
 // Children returns the children of the Block.
-func (b *Block) Children() ds.Set[*Block] {
+func (b *Block) Children() ds.ReadableSet[*Block] {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
-	return b.allChildren.Clone()
+	return b.allChildren
 }
 
 func (b *Block) StrongChildren() []*Block {
@@ -640,6 +640,10 @@ func (b *Block) String() string {
 
 	for index, child := range b.shallowLikeChildren {
 		builder.AddField(stringify.NewStructField(fmt.Sprintf("shallowLikeChildren%d", index), child.ID().String()))
+	}
+
+	for index, child := range b.allChildren.ToSlice() {
+		builder.AddField(stringify.NewStructField(fmt.Sprintf("allChildren%d", index), child.ID().String()))
 	}
 
 	if b.rootBlock != nil {
