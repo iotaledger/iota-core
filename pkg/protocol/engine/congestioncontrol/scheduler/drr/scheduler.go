@@ -709,7 +709,7 @@ func (s *Scheduler) updateChildrenWithLocking(block *blocks.Block) {
 // updateChildrenWithoutLocking iterates over the direct children of the given blockID and
 // tries to mark them as ready.
 func (s *Scheduler) updateChildrenWithoutLocking(block *blocks.Block) {
-	for _, childBlock := range block.Children() {
+	block.Children().Range(func(childBlock *blocks.Block) {
 		if _, childBlockExists := s.blockCache.Block(childBlock.ID()); childBlockExists && childBlock.IsEnqueued() {
 			if _, isBasic := childBlock.BasicBlock(); isBasic {
 				s.tryReady(childBlock)
@@ -719,7 +719,7 @@ func (s *Scheduler) updateChildrenWithoutLocking(block *blocks.Block) {
 				panic("invalid block type")
 			}
 		}
-	}
+	})
 }
 
 func (s *Scheduler) maxDeficit() Deficit {
