@@ -107,8 +107,8 @@ func (b *Booker) Queue(block *blocks.Block) error {
 
 	// Based on the assumption that we always fork and the UTXO and Tangle past cones are always fully known.
 	signedTransactionMetadata.OnSignaturesValid(func() {
-		b.LogTrace("signatures valid", "blockID", block.ID())
 		transactionMetadata := signedTransactionMetadata.TransactionMetadata()
+		b.LogTrace("signatures valid", "blockID", block.ID(), "transactionID", transactionMetadata.ID())
 
 		if orphanedSlot, isOrphaned := transactionMetadata.OrphanedSlot(); isOrphaned && orphanedSlot <= block.SlotCommitmentID().Slot() {
 			block.SetInvalid()

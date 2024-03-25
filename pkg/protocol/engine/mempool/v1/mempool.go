@@ -2,6 +2,8 @@ package mempoolv1
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds"
@@ -114,7 +116,9 @@ func (m *MemPool[VoteRank]) VM() mempool.VM {
 
 // AttachSignedTransaction adds a transaction to the MemPool that was attached by the given block.
 func (m *MemPool[VoteRank]) AttachSignedTransaction(signedTransaction mempool.SignedTransaction, transaction mempool.Transaction, blockID iotago.BlockID) (signedTransactionMetadata mempool.SignedTransactionMetadata, err error) {
+	start := time.Now()
 	storedSignedTransaction, isNewSignedTransaction, isNewTransaction, err := m.storeTransaction(signedTransaction, transaction, blockID)
+	fmt.Println(">> store transaction took", time.Since(start), " - ")
 	if err != nil {
 		err = ierrors.Wrap(err, "failed to store signedTransaction")
 		m.attachTransactionFailed.Trigger(transaction.MustID(), blockID, err)
@@ -381,6 +385,7 @@ func (m *MemPool[VoteRank]) storeTransaction(signedTransaction mempool.SignedTra
 }
 
 func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
+	start := time.Now()
 	for index, inputReference := range transaction.inputReferences {
 		request, created := m.cachedStateRequests.GetOrCreate(inputReference.ReferencedStateID(), func() *promise.Promise[*StateMetadata] {
 			return m.requestState(inputReference, true)
@@ -394,7 +399,10 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 			}
 
 			if transaction.markInputSolid() {
+				fmt.Println(">> solidification took ", time.Since(start), " - ", transaction.ID())
+				start2 := time.Now()
 				transaction.executionContext.OnUpdate(func(_ context.Context, executionContext context.Context) {
+					fmt.Println(">> providing execution context took ", time.Since(start2), " - ", transaction.ID())
 					m.executeTransaction(executionContext, transaction)
 				})
 			}
@@ -409,9 +417,13 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 
 func (m *MemPool[VoteRank]) executeTransaction(executionContext context.Context, transaction *TransactionMetadata) {
 	m.executionWorkers.Submit(func() {
+		start3 := time.Now()
+
 		if outputStates, err := m.vm.Execute(executionContext, transaction.Transaction()); err != nil {
 			transaction.setInvalid(err)
 		} else {
+			fmt.Println(">> execution took", time.Since(start3), " - ", transaction.ID())
+
 			transaction.setExecuted(outputStates)
 
 			m.bookTransaction(transaction)
@@ -420,6 +432,7 @@ func (m *MemPool[VoteRank]) executeTransaction(executionContext context.Context,
 }
 
 func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
+	start := time.Now()
 	inputsToFork := lo.Filter(transaction.inputs, func(metadata *StateMetadata) bool {
 		return !metadata.state.IsReadOnly()
 	})
@@ -427,11 +440,15 @@ func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
 	m.forkTransaction(transaction, ds.NewSet(lo.Map(inputsToFork, func(stateMetadata *StateMetadata) mempool.StateID {
 		return stateMetadata.state.StateID()
 	})...))
+	fmt.Println(">> forking took", time.Since(start), " - ", transaction.ID())
 
+	start2 := time.Now()
 	// if !lo.Return2(transaction.IsOrphaned()) && transaction.setBooked() {
 	if transaction.setBooked() {
 		m.publishOutputStates(transaction)
 	}
+	fmt.Println(">> marking as booked took", time.Since(start2), " - ", transaction.ID())
+
 }
 
 func (m *MemPool[VoteRank]) forkTransaction(transactionMetadata *TransactionMetadata, resourceIDs ds.Set[mempool.StateID]) {
