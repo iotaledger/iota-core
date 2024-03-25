@@ -34,7 +34,7 @@ type Block struct {
 	payloadSpenderIDs ds.Set[iotago.TransactionID]
 
 	// BlockGadget block
-	preAccepted           bool
+	preAccepted           reactive.Variable[bool]
 	acceptanceRatifiers   ds.Set[account.SeatIndex]
 	accepted              reactive.Variable[bool]
 	preConfirmed          bool
@@ -86,6 +86,7 @@ func NewBlock(modelBlock *model.Block) *Block {
 		solid:                 reactive.NewVariable[bool](),
 		invalid:               reactive.NewVariable[bool](),
 		booked:                reactive.NewVariable[bool](),
+		preAccepted:           reactive.NewVariable[bool](),
 		accepted:              reactive.NewVariable[bool](),
 		weightPropagated:      reactive.NewVariable[bool](),
 		notarized:             reactive.NewEvent(),
@@ -106,22 +107,17 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 			commitmentID: commitmentID,
 			issuingTime:  issuingTime,
 		},
-		solid:            reactive.NewVariable[bool](),
+		solid:            reactive.NewVariable[bool]().Init(true),
 		invalid:          reactive.NewVariable[bool](),
-		booked:           reactive.NewVariable[bool](),
-		preAccepted:      true,
-		accepted:         reactive.NewVariable[bool](),
-		weightPropagated: reactive.NewVariable[bool](),
+		booked:           reactive.NewVariable[bool]().Init(true),
+		preAccepted:      reactive.NewVariable[bool]().Init(true),
+		accepted:         reactive.NewVariable[bool]().Init(true),
+		weightPropagated: reactive.NewVariable[bool]().Init(true),
 		notarized:        reactive.NewEvent(),
 		scheduled:        true,
 	}
 
-	// This should be true since we commit and evict on acceptance.
-	b.solid.Set(true)
-	b.booked.Set(true)
-	b.weightPropagated.Set(true)
-	b.notarized.Set(true)
-	b.accepted.Set(true)
+	b.notarized.Trigger()
 
 	return b
 }
@@ -138,6 +134,7 @@ func NewMissingBlock(blockID iotago.BlockID) *Block {
 		solid:                 reactive.NewVariable[bool](),
 		invalid:               reactive.NewVariable[bool](),
 		booked:                reactive.NewVariable[bool](),
+		preAccepted:           reactive.NewVariable[bool](),
 		accepted:              reactive.NewVariable[bool](),
 		weightPropagated:      reactive.NewVariable[bool](),
 		notarized:             reactive.NewEvent(),
@@ -428,24 +425,19 @@ func (b *Block) SetPayloadSpenderIDs(payloadSpenderIDs ds.Set[iotago.Transaction
 	b.payloadSpenderIDs = payloadSpenderIDs
 }
 
+// PreAccepted returns a reactive variable that is true if the Block was pre accepted.
+func (b *Block) PreAccepted() reactive.Variable[bool] {
+	return b.preAccepted
+}
+
 // IsPreAccepted returns true if the Block was preAccepted.
 func (b *Block) IsPreAccepted() bool {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
-
-	return b.preAccepted
+	return b.preAccepted.Get()
 }
 
 // SetPreAccepted sets the Block as preAccepted.
 func (b *Block) SetPreAccepted() (wasUpdated bool) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-
-	if wasUpdated = !b.preAccepted; wasUpdated {
-		b.preAccepted = true
-	}
-
-	return wasUpdated
+	return !b.preAccepted.Set(true)
 }
 
 func (b *Block) AddAcceptanceRatifier(seat account.SeatIndex) (added bool) {
@@ -644,7 +636,7 @@ func (b *Block) String() string {
 	builder.AddField(stringify.NewStructField("Invalid", b.invalid.Get()))
 	builder.AddField(stringify.NewStructField("Booked", b.booked.Get()))
 	builder.AddField(stringify.NewStructField("Witnesses", b.witnesses))
-	builder.AddField(stringify.NewStructField("PreAccepted", b.preAccepted))
+	builder.AddField(stringify.NewStructField("PreAccepted", b.preAccepted.Get()))
 	builder.AddField(stringify.NewStructField("AcceptanceRatifiers", b.acceptanceRatifiers.String()))
 	builder.AddField(stringify.NewStructField("Accepted", b.accepted.Get()))
 	builder.AddField(stringify.NewStructField("PreConfirmed", b.preConfirmed))

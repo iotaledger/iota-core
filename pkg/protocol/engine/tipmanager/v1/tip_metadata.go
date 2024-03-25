@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/iotaledger/hive.go/ds/reactive"
-	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -99,16 +99,37 @@ type TipMetadata struct {
 
 	// parentsReferencingLatestValidationBlock holds the number of parents that reference the latest validator block.
 	parentsReferencingLatestValidationBlock reactive.Counter[bool]
+
+	log.Logger
 }
 
-// NewBlockMetadata creates a new TipMetadata instance.
-func NewBlockMetadata(block *blocks.Block) *TipMetadata {
+// NewTipMetadata creates a new TipMetadata instance.
+func NewTipMetadata(logger log.Logger, block *blocks.Block) *TipMetadata {
 	t := &TipMetadata{
+		Logger: logger,
+
 		block:                                   block,
 		tipPool:                                 reactive.NewVariable[tipmanager.TipPool](tipmanager.TipPool.Max),
 		livenessThresholdReached:                reactive.NewEvent(),
 		evicted:                                 reactive.NewEvent(),
+		isStrongTipPoolMember:                   reactive.NewVariable[bool](),
+		isWeakTipPoolMember:                     reactive.NewVariable[bool](),
+		isStronglyConnectedToTips:               reactive.NewVariable[bool](),
+		isConnectedToTips:                       reactive.NewVariable[bool](),
+		isStronglyReferencedByTips:              reactive.NewVariable[bool](),
+		isWeaklyReferencedByTips:                reactive.NewVariable[bool](),
+		isReferencedByTips:                      reactive.NewVariable[bool](),
 		isLatestValidationBlock:                 reactive.NewVariable[bool](),
+		referencesLatestValidationBlock:         reactive.NewVariable[bool](),
+		isStrongTip:                             reactive.NewVariable[bool](),
+		isWeakTip:                               reactive.NewVariable[bool](),
+		isValidationTip:                         reactive.NewVariable[bool](),
+		isMarkedOrphaned:                        reactive.NewVariable[bool](),
+		isOrphaned:                              reactive.NewVariable[bool](),
+		anyStrongParentStronglyOrphaned:         reactive.NewVariable[bool](),
+		anyWeakParentWeaklyOrphaned:             reactive.NewVariable[bool](),
+		isStronglyOrphaned:                      reactive.NewVariable[bool](),
+		isWeaklyOrphaned:                        reactive.NewVariable[bool](),
 		stronglyConnectedStrongChildren:         reactive.NewCounter[bool](),
 		connectedWeakChildren:                   reactive.NewCounter[bool](),
 		stronglyOrphanedStrongParents:           reactive.NewCounter[bool](),
@@ -116,73 +137,8 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 		parentsReferencingLatestValidationBlock: reactive.NewCounter[bool](),
 	}
 
-	t.referencesLatestValidationBlock = reactive.NewDerivedVariable2(func(_ bool, isLatestValidationBlock bool, parentsReferencingLatestValidationBlock int) bool {
-		return isLatestValidationBlock || parentsReferencingLatestValidationBlock > 0
-	}, t.isLatestValidationBlock, t.parentsReferencingLatestValidationBlock)
-
-	t.isMarkedOrphaned = reactive.NewDerivedVariable2[bool, bool](func(_ bool, isLivenessThresholdReached bool, isAccepted bool) bool {
-		return isLivenessThresholdReached && !isAccepted
-	}, t.livenessThresholdReached, block.Accepted())
-
-	t.anyStrongParentStronglyOrphaned = reactive.NewDerivedVariable[bool, int](func(_ bool, stronglyOrphanedStrongParents int) bool {
-		return stronglyOrphanedStrongParents > 0
-	}, t.stronglyOrphanedStrongParents)
-
-	t.anyWeakParentWeaklyOrphaned = reactive.NewDerivedVariable[bool, int](func(_ bool, weaklyOrphanedWeakParents int) bool {
-		return weaklyOrphanedWeakParents > 0
-	}, t.weaklyOrphanedWeakParents)
-
-	t.isStronglyOrphaned = reactive.NewDerivedVariable3[bool, bool, bool, bool](func(_ bool, isMarkedOrphaned bool, anyStrongParentStronglyOrphaned bool, anyWeakParentWeaklyOrphaned bool) bool {
-		return isMarkedOrphaned || anyStrongParentStronglyOrphaned || anyWeakParentWeaklyOrphaned
-	}, t.isMarkedOrphaned, t.anyStrongParentStronglyOrphaned, t.anyWeakParentWeaklyOrphaned)
-
-	t.isWeaklyOrphaned = reactive.NewDerivedVariable2[bool, bool, bool](func(_ bool, isMarkedOrphaned bool, anyWeakParentWeaklyOrphaned bool) bool {
-		return isMarkedOrphaned || anyWeakParentWeaklyOrphaned
-	}, t.isMarkedOrphaned, t.anyWeakParentWeaklyOrphaned)
-
-	t.isOrphaned = reactive.NewDerivedVariable2[bool, bool, bool](func(_ bool, isStronglyOrphaned bool, isWeaklyOrphaned bool) bool {
-		return isStronglyOrphaned || isWeaklyOrphaned
-	}, t.isStronglyOrphaned, t.isWeaklyOrphaned)
-
-	t.isStrongTipPoolMember = reactive.NewDerivedVariable3(func(_ bool, tipPool tipmanager.TipPool, isOrphaned bool, isEvicted bool) bool {
-		return tipPool == tipmanager.StrongTipPool && !isOrphaned && !isEvicted
-	}, t.tipPool, t.isOrphaned, t.evicted)
-
-	t.isWeakTipPoolMember = reactive.NewDerivedVariable3(func(_ bool, tipPool tipmanager.TipPool, isOrphaned bool, isEvicted bool) bool {
-		return tipPool == tipmanager.WeakTipPool && !isOrphaned && !isEvicted
-	}, t.tipPool, t.isOrphaned, t.evicted)
-
-	t.isStronglyReferencedByTips = reactive.NewDerivedVariable[bool, int](func(_ bool, stronglyConnectedStrongChildren int) bool {
-		return stronglyConnectedStrongChildren > 0
-	}, t.stronglyConnectedStrongChildren)
-
-	t.isWeaklyReferencedByTips = reactive.NewDerivedVariable[bool, int](func(_ bool, connectedWeakChildren int) bool {
-		return connectedWeakChildren > 0
-	}, t.connectedWeakChildren)
-
-	t.isReferencedByTips = reactive.NewDerivedVariable2[bool, bool, bool](func(_ bool, isWeaklyReferencedByTips bool, isStronglyReferencedByTips bool) bool {
-		return isWeaklyReferencedByTips || isStronglyReferencedByTips
-	}, t.isWeaklyReferencedByTips, t.isStronglyReferencedByTips)
-
-	t.isStronglyConnectedToTips = reactive.NewDerivedVariable2(func(_ bool, isStrongTipPoolMember bool, isStronglyReferencedByTips bool) bool {
-		return isStrongTipPoolMember || isStronglyReferencedByTips
-	}, t.isStrongTipPoolMember, t.isStronglyReferencedByTips)
-
-	t.isConnectedToTips = reactive.NewDerivedVariable3(func(_ bool, isReferencedByTips bool, isStrongTipPoolMember bool, isWeakTipPoolMember bool) bool {
-		return isReferencedByTips || isStrongTipPoolMember || isWeakTipPoolMember
-	}, t.isReferencedByTips, t.isStrongTipPoolMember, t.isWeakTipPoolMember)
-
-	t.isStrongTip = reactive.NewDerivedVariable2[bool, bool, bool](func(_ bool, isStrongTipPoolMember bool, isStronglyReferencedByTips bool) bool {
-		return isStrongTipPoolMember && !isStronglyReferencedByTips
-	}, t.isStrongTipPoolMember, t.isStronglyReferencedByTips)
-
-	t.isWeakTip = reactive.NewDerivedVariable2[bool, bool, bool](func(_ bool, isWeakTipPoolMember bool, isReferencedByTips bool) bool {
-		return isWeakTipPoolMember && !isReferencedByTips
-	}, t.isWeakTipPoolMember, t.isReferencedByTips)
-
-	t.isValidationTip = reactive.NewDerivedVariable2(func(_ bool, isStrongTip bool, referencesLatestValidationBlock bool) bool {
-		return isStrongTip && referencesLatestValidationBlock
-	}, t.isStrongTip, t.referencesLatestValidationBlock)
+	t.initLogging()
+	t.initBehavior()
 
 	return t
 }
@@ -225,50 +181,6 @@ func (t *TipMetadata) IsOrphaned() reactive.ReadableVariable[bool] {
 // Evicted exposes an event that is triggered when the block is evicted.
 func (t *TipMetadata) Evicted() reactive.Event {
 	return t.evicted
-}
-
-// registerAsLatestValidationBlock registers the TipMetadata as the latest validation block if it is newer than the
-// currently registered block and sets the isLatestValidationBlock variable accordingly. The function returns true if the
-// operation was successful.
-func (t *TipMetadata) registerAsLatestValidationBlock(latestValidationBlock reactive.Variable[*TipMetadata]) (registered bool) {
-	latestValidationBlock.Compute(func(currentLatestValidationBlock *TipMetadata) *TipMetadata {
-		registered = currentLatestValidationBlock == nil || currentLatestValidationBlock.block.IssuingTime().Before(t.block.IssuingTime())
-
-		return lo.Cond(registered, t, currentLatestValidationBlock)
-	})
-
-	if registered {
-		t.isLatestValidationBlock.Set(true)
-
-		// Once the latestValidationBlock is updated again (by another block), we need to reset the isLatestValidationBlock
-		// variable.
-		latestValidationBlock.OnUpdateOnce(func(_ *TipMetadata, _ *TipMetadata) {
-			t.isLatestValidationBlock.Set(false)
-		}, func(_ *TipMetadata, latestValidationBlock *TipMetadata) bool {
-			return latestValidationBlock != t
-		})
-	}
-
-	return registered
-}
-
-// connectStrongParent sets up the parent and children related properties for a strong parent.
-func (t *TipMetadata) connectStrongParent(strongParent *TipMetadata) {
-	t.stronglyOrphanedStrongParents.Monitor(strongParent.isStronglyOrphaned)
-	t.parentsReferencingLatestValidationBlock.Monitor(strongParent.referencesLatestValidationBlock)
-
-	// unsubscribe when the parent is evicted, since we otherwise continue to hold a reference to it.
-	unsubscribe := strongParent.stronglyConnectedStrongChildren.Monitor(t.isStronglyConnectedToTips)
-	strongParent.evicted.OnUpdate(func(_ bool, _ bool) { unsubscribe() })
-}
-
-// connectWeakParent sets up the parent and children related properties for a weak parent.
-func (t *TipMetadata) connectWeakParent(weakParent *TipMetadata) {
-	t.weaklyOrphanedWeakParents.Monitor(weakParent.isWeaklyOrphaned)
-
-	// unsubscribe when the parent is evicted, since we otherwise continue to hold a reference to it.
-	unsubscribe := weakParent.connectedWeakChildren.Monitor(t.isConnectedToTips)
-	weakParent.evicted.OnUpdate(func(_ bool, _ bool) { unsubscribe() })
 }
 
 // String returns a human-readable representation of the TipMetadata.
@@ -321,5 +233,156 @@ func (t *TipMetadata) String() string {
 	)
 }
 
-// code contract (make sure the type implements all required methods).
-var _ tipmanager.TipMetadata = new(TipMetadata)
+// initLogging initializes the logging for the TipMetadata.
+func (t *TipMetadata) initLogging() {
+	logLevel := log.LevelTrace
+
+	t.tipPool.LogUpdates(t, logLevel, "TipPool")
+	t.livenessThresholdReached.LogUpdates(t, logLevel, "LivenessThresholdReached")
+	t.evicted.LogUpdates(t, logLevel, "Evicted")
+	t.isStrongTipPoolMember.LogUpdates(t, logLevel, "IsStrongTipPoolMember")
+	t.isWeakTipPoolMember.LogUpdates(t, logLevel, "IsWeakTipPoolMember")
+	t.isStronglyConnectedToTips.LogUpdates(t, logLevel, "IsStronglyConnectedToTips")
+	t.isConnectedToTips.LogUpdates(t, logLevel, "IsConnectedToTips")
+	t.isStronglyReferencedByTips.LogUpdates(t, logLevel, "IsStronglyReferencedByTips")
+	t.isWeaklyReferencedByTips.LogUpdates(t, logLevel, "IsWeaklyReferencedByTips")
+	t.isReferencedByTips.LogUpdates(t, logLevel, "IsReferencedByTips")
+	t.isLatestValidationBlock.LogUpdates(t, logLevel, "IsLatestValidationBlock")
+	t.referencesLatestValidationBlock.LogUpdates(t, logLevel, "ReferencesLatestValidationBlock")
+	t.isStrongTip.LogUpdates(t, logLevel, "IsStrongTip")
+	t.isWeakTip.LogUpdates(t, logLevel, "IsWeakTip")
+	t.isValidationTip.LogUpdates(t, logLevel, "IsValidationTip")
+	t.isMarkedOrphaned.LogUpdates(t, logLevel, "IsMarkedOrphaned")
+	t.isOrphaned.LogUpdates(t, logLevel, "IsOrphaned")
+	t.anyStrongParentStronglyOrphaned.LogUpdates(t, logLevel, "AnyStrongParentStronglyOrphaned")
+	t.anyWeakParentWeaklyOrphaned.LogUpdates(t, logLevel, "AnyWeakParentWeaklyOrphaned")
+	t.isStronglyOrphaned.LogUpdates(t, logLevel, "IsStronglyOrphaned")
+	t.isWeaklyOrphaned.LogUpdates(t, logLevel, "IsWeaklyOrphaned")
+	t.stronglyConnectedStrongChildren.LogUpdates(t, logLevel, "StronglyConnectedStrongChildren")
+	t.connectedWeakChildren.LogUpdates(t, logLevel, "ConnectedWeakChildren")
+	t.stronglyOrphanedStrongParents.LogUpdates(t, logLevel, "StronglyOrphanedStrongParents")
+	t.weaklyOrphanedWeakParents.LogUpdates(t, logLevel, "WeaklyOrphanedWeakParents")
+	t.parentsReferencingLatestValidationBlock.LogUpdates(t, logLevel, "ParentsReferencingLatestValidationBlock")
+
+	t.evicted.OnTrigger(t.UnsubscribeFromParentLogger)
+}
+
+// initBehavior initializes the behavior of the TipMetadata.
+func (t *TipMetadata) initBehavior() {
+	t.referencesLatestValidationBlock.DeriveValueFrom(reactive.NewDerivedVariable2(func(_ bool, isLatestValidationBlock bool, parentsReferencingLatestValidationBlock int) bool {
+		return isLatestValidationBlock || parentsReferencingLatestValidationBlock > 0
+	}, t.isLatestValidationBlock, t.parentsReferencingLatestValidationBlock))
+
+	t.anyStrongParentStronglyOrphaned.DeriveValueFrom(reactive.NewDerivedVariable[bool, int](func(_ bool, stronglyOrphanedStrongParents int) bool {
+		return stronglyOrphanedStrongParents > 0
+	}, t.stronglyOrphanedStrongParents))
+
+	t.anyWeakParentWeaklyOrphaned.DeriveValueFrom(reactive.NewDerivedVariable[bool, int](func(_ bool, weaklyOrphanedWeakParents int) bool {
+		return weaklyOrphanedWeakParents > 0
+	}, t.weaklyOrphanedWeakParents))
+
+	t.isStronglyOrphaned.DeriveValueFrom(reactive.NewDerivedVariable3[bool, bool, bool, bool](func(_ bool, isMarkedOrphaned bool, anyStrongParentStronglyOrphaned bool, anyWeakParentWeaklyOrphaned bool) bool {
+		return isMarkedOrphaned || anyStrongParentStronglyOrphaned || anyWeakParentWeaklyOrphaned
+	}, t.isMarkedOrphaned, t.anyStrongParentStronglyOrphaned, t.anyWeakParentWeaklyOrphaned))
+
+	t.isWeaklyOrphaned.DeriveValueFrom(reactive.NewDerivedVariable2[bool, bool, bool](func(_ bool, isMarkedOrphaned bool, anyWeakParentWeaklyOrphaned bool) bool {
+		return isMarkedOrphaned || anyWeakParentWeaklyOrphaned
+	}, t.isMarkedOrphaned, t.anyWeakParentWeaklyOrphaned))
+
+	t.isOrphaned.DeriveValueFrom(reactive.NewDerivedVariable2[bool, bool, bool](func(_ bool, isStronglyOrphaned bool, isWeaklyOrphaned bool) bool {
+		return isStronglyOrphaned || isWeaklyOrphaned
+	}, t.isStronglyOrphaned, t.isWeaklyOrphaned))
+
+	t.isStrongTipPoolMember.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, tipPool tipmanager.TipPool, isOrphaned bool, isEvicted bool) bool {
+		return tipPool == tipmanager.StrongTipPool && !isOrphaned && !isEvicted
+	}, t.tipPool, t.isOrphaned, t.evicted))
+
+	t.isWeakTipPoolMember.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, tipPool tipmanager.TipPool, isOrphaned bool, isEvicted bool) bool {
+		return tipPool == tipmanager.WeakTipPool && !isOrphaned && !isEvicted
+	}, t.tipPool, t.isOrphaned, t.evicted))
+
+	t.isStronglyReferencedByTips.DeriveValueFrom(reactive.NewDerivedVariable[bool, int](func(_ bool, stronglyConnectedStrongChildren int) bool {
+		return stronglyConnectedStrongChildren > 0
+	}, t.stronglyConnectedStrongChildren))
+
+	t.isWeaklyReferencedByTips.DeriveValueFrom(reactive.NewDerivedVariable[bool, int](func(_ bool, connectedWeakChildren int) bool {
+		return connectedWeakChildren > 0
+	}, t.connectedWeakChildren))
+
+	t.isReferencedByTips.DeriveValueFrom(reactive.NewDerivedVariable2[bool, bool, bool](func(_ bool, isWeaklyReferencedByTips bool, isStronglyReferencedByTips bool) bool {
+		return isWeaklyReferencedByTips || isStronglyReferencedByTips
+	}, t.isWeaklyReferencedByTips, t.isStronglyReferencedByTips))
+
+	t.isStronglyConnectedToTips.DeriveValueFrom(reactive.NewDerivedVariable2(func(_ bool, isStrongTipPoolMember bool, isStronglyReferencedByTips bool) bool {
+		return isStrongTipPoolMember || isStronglyReferencedByTips
+	}, t.isStrongTipPoolMember, t.isStronglyReferencedByTips))
+
+	t.isConnectedToTips.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, isReferencedByTips bool, isStrongTipPoolMember bool, isWeakTipPoolMember bool) bool {
+		return isReferencedByTips || isStrongTipPoolMember || isWeakTipPoolMember
+	}, t.isReferencedByTips, t.isStrongTipPoolMember, t.isWeakTipPoolMember))
+
+	t.isStrongTip.DeriveValueFrom(reactive.NewDerivedVariable2[bool, bool, bool](func(_ bool, isStrongTipPoolMember bool, isStronglyReferencedByTips bool) bool {
+		return isStrongTipPoolMember && !isStronglyReferencedByTips
+	}, t.isStrongTipPoolMember, t.isStronglyReferencedByTips))
+
+	t.isWeakTip.DeriveValueFrom(reactive.NewDerivedVariable2[bool, bool, bool](func(_ bool, isWeakTipPoolMember bool, isReferencedByTips bool) bool {
+		return isWeakTipPoolMember && !isReferencedByTips
+	}, t.isWeakTipPoolMember, t.isReferencedByTips))
+
+	t.isValidationTip.DeriveValueFrom(reactive.NewDerivedVariable2(func(_ bool, isStrongTip bool, referencesLatestValidationBlock bool) bool {
+		return isStrongTip && referencesLatestValidationBlock
+	}, t.isStrongTip, t.referencesLatestValidationBlock))
+
+	// unsubscribe from external properties when the block is evicted.
+	t.evicted.OnTrigger(
+		t.isMarkedOrphaned.DeriveValueFrom(reactive.NewDerivedVariable2[bool, bool](func(_ bool, isLivenessThresholdReached bool, isPreAccepted bool) bool {
+			return isLivenessThresholdReached && !isPreAccepted
+		}, t.livenessThresholdReached, t.block.PreAccepted())),
+	)
+}
+
+// registerAsLatestValidationBlock registers the TipMetadata as the latest validation block if it is newer than the
+// currently registered block and sets the isLatestValidationBlock variable accordingly. The function returns true if the
+// operation was successful.
+func (t *TipMetadata) registerAsLatestValidationBlock(latestValidationBlock reactive.Variable[*TipMetadata]) (registered bool) {
+	latestValidationBlock.Compute(func(currentBlock *TipMetadata) *TipMetadata {
+		if registered = currentBlock == nil || currentBlock.block.IssuingTime().Before(t.block.IssuingTime()); registered {
+			return t
+		}
+
+		return currentBlock
+	})
+
+	if registered {
+		t.isLatestValidationBlock.Set(true)
+
+		// Once the latestValidationBlock is updated again (by another block), we need to reset the
+		// isLatestValidationBlock variable.
+		latestValidationBlock.OnUpdateOnce(func(_ *TipMetadata, _ *TipMetadata) {
+			t.isLatestValidationBlock.Set(false)
+		}, func(_ *TipMetadata, latestValidationBlock *TipMetadata) bool {
+			return latestValidationBlock != t
+		})
+	}
+
+	return registered
+}
+
+// connectStrongParent sets up the parent and children related properties for a strong parent.
+func (t *TipMetadata) connectStrongParent(strongParent *TipMetadata) {
+	t.stronglyOrphanedStrongParents.Monitor(strongParent.isStronglyOrphaned)
+	t.parentsReferencingLatestValidationBlock.Monitor(strongParent.referencesLatestValidationBlock)
+
+	// unsubscribe when the parent is evicted, since we otherwise continue to hold a reference to it.
+	unsubscribe := strongParent.stronglyConnectedStrongChildren.Monitor(t.isStronglyConnectedToTips)
+	strongParent.evicted.OnTrigger(unsubscribe)
+}
+
+// connectWeakParent sets up the parent and children related properties for a weak parent.
+func (t *TipMetadata) connectWeakParent(weakParent *TipMetadata) {
+	t.weaklyOrphanedWeakParents.Monitor(weakParent.isWeaklyOrphaned)
+
+	// unsubscribe when the parent is evicted, since we otherwise continue to hold a reference to it.
+	unsubscribe := weakParent.connectedWeakChildren.Monitor(t.isConnectedToTips)
+	weakParent.evicted.OnUpdate(func(_ bool, _ bool) { unsubscribe() })
+}
