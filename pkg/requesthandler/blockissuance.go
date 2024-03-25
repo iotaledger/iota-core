@@ -107,6 +107,10 @@ func (r *RequestHandler) submitBlockAndAwaitRetainer(ctx context.Context, block 
 
 	select {
 	case <-processingCtx.Done():
+		if ierrors.Is(processingCtx.Err(), context.DeadlineExceeded) {
+			return ierrors.Errorf("context deadline exceeded whilst waiting for event on block %s", blockID)
+		}
+
 		return ierrors.Errorf("context canceled whilst waiting for event on block %s", blockID)
 
 	case err := <-blockFiltered:
@@ -117,6 +121,10 @@ func (r *RequestHandler) submitBlockAndAwaitRetainer(ctx context.Context, block 
 		if txRetained != nil {
 			select {
 			case <-processingCtx.Done():
+				if ierrors.Is(processingCtx.Err(), context.DeadlineExceeded) {
+					return ierrors.Errorf("context deadline exceeded whilst waiting for transaction retained event on block %s", blockID)
+				}
+
 				return ierrors.Errorf("context canceled whilst waiting for transaction retained event on block %s", blockID)
 
 			case <-txRetained:
