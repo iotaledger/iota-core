@@ -7,7 +7,7 @@ import (
 // ParametersDebugAPI contains the definition of configuration parameters used by the debug API.
 type ParametersDebugAPI struct {
 	// Enabled whether the DebugAPI component is enabled.
-	Enabled bool `default:"true" usage:"whether the DebugAPI component is enabled"`
+	Enabled bool `default:"false" usage:"whether the DebugAPI component is enabled"`
 
 	Database struct {
 		Path        string `default:"testnet/debug" usage:"the path to the database folder"`

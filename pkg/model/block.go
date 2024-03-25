@@ -31,7 +31,18 @@ func BlockFromBlock(block *iotago.Block, opts ...serix.Option) (*Block, error) {
 		return nil, err
 	}
 
-	blockID, err := block.ID()
+	blockIdentifier, err := iotago.BlockIdentifierFromBlockBytes(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return newBlock(block.IDWithBlockIdentifier(blockIdentifier), block, data)
+}
+
+// BlockFromIDAndBytes creates a new Block from the given blockID and the serialized block data.
+// This is used when loading a block back from storage where we have both the blockID and the bytes available.
+func BlockFromIDAndBytes(blockID iotago.BlockID, data []byte, api iotago.API) (*Block, error) {
+	block, _, err := iotago.BlockFromBytes(iotago.SingleVersionProvider(api))(data)
 	if err != nil {
 		return nil, err
 	}
@@ -39,27 +50,25 @@ func BlockFromBlock(block *iotago.Block, opts ...serix.Option) (*Block, error) {
 	return newBlock(blockID, block, data)
 }
 
-func BlockFromIDAndBytes(blockID iotago.BlockID, data []byte, api iotago.API, opts ...serix.Option) (*Block, error) {
-	block := new(iotago.Block)
-	if _, err := api.Decode(data, block, opts...); err != nil {
+// BlockFromBlockIdentifierAndBytes creates a new Block from the given blockIdentifier and the serialized block data.
+// This is used when receiving blocks from the network where we pre-compute the blockIdentifier for filtering duplicates.
+func BlockFromBlockIdentifierAndBytes(blockIdentifier iotago.Identifier, data []byte, apiProvider iotago.APIProvider) (*Block, error) {
+	block, _, err := iotago.BlockFromBytes(apiProvider)(data)
+	if err != nil {
 		return nil, err
 	}
 
-	return newBlock(blockID, block, data)
+	return newBlock(block.IDWithBlockIdentifier(blockIdentifier), block, data)
 }
 
+// BlockFromBytes creates a new Block from the serialized block data.
 func BlockFromBytes(data []byte, apiProvider iotago.APIProvider) (*Block, error) {
-	iotaBlock, _, err := iotago.BlockFromBytes(apiProvider)(data)
+	blockIdentifier, err := iotago.BlockIdentifierFromBlockBytes(data)
 	if err != nil {
 		return nil, err
 	}
 
-	blockID, err := iotaBlock.ID()
-	if err != nil {
-		return nil, err
-	}
-
-	return newBlock(blockID, iotaBlock, data)
+	return BlockFromBlockIdentifierAndBytes(blockIdentifier, data, apiProvider)
 }
 
 func BlockFromBytesFunc(apiProvider iotago.APIProvider) func(data []byte) (*Block, int, error) {

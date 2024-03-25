@@ -4,32 +4,41 @@ import (
 	"context"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	inx "github.com/iotaledger/inx/go"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
 )
 
-func inxNodeStatus(status *syncmanager.SyncStatus) *inx.NodeStatus {
-	finalizedCommitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(status.LatestFinalizedSlot)
+func inxNodeStatus(syncStatus *syncmanager.SyncStatus) (*inx.NodeStatus, error) {
+	finalizedCommitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(syncStatus.LatestFinalizedSlot)
 	if err != nil {
-		return nil
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+			return nil, status.Errorf(codes.NotFound, "finalized commitment (slot %d) not found", syncStatus.LatestFinalizedSlot)
+		}
+
+		return nil, status.Errorf(codes.Internal, "failed to load finalized commitment (slot %d): %s", syncStatus.LatestFinalizedSlot, err.Error())
 	}
 
 	return &inx.NodeStatus{
-		IsHealthy:                 status.NodeSynced,
-		IsBootstrapped:            status.NodeBootstrapped,
-		LastAcceptedBlockSlot:     uint32(status.LastAcceptedBlockSlot),
-		LastConfirmedBlockSlot:    uint32(status.LastConfirmedBlockSlot),
-		LatestCommitment:          inxCommitment(status.LatestCommitment),
+		IsHealthy:                 syncStatus.NodeSynced,
+		IsBootstrapped:            syncStatus.NodeBootstrapped,
+		LastAcceptedBlockSlot:     uint32(syncStatus.LastAcceptedBlockSlot),
+		LastConfirmedBlockSlot:    uint32(syncStatus.LastConfirmedBlockSlot),
+		LatestCommitment:          inxCommitment(syncStatus.LatestCommitment),
 		LatestFinalizedCommitment: inxCommitment(finalizedCommitment),
-		PruningEpoch:              uint32(status.LastPrunedEpoch),
-		HasPruned:                 status.HasPruned,
-	}
+		PruningEpoch:              uint32(syncStatus.LastPrunedEpoch),
+		HasPruned:                 syncStatus.HasPruned,
+	}, nil
 }
 
 func (s *Server) ReadNodeStatus(context.Context, *inx.NoParams) (*inx.NodeStatus, error) {
-	return inxNodeStatus(deps.Protocol.Engines.Main.Get().SyncManager.SyncStatus()), nil
+	return inxNodeStatus(deps.Protocol.Engines.Main.Get().SyncManager.SyncStatus())
 }
 
 func (s *Server) ListenToNodeStatus(req *inx.NodeStatusRequest, srv inx.INX_ListenToNodeStatusServer) error {
@@ -56,7 +65,11 @@ func (s *Server) ListenToNodeStatus(req *inx.NodeStatusRequest, srv inx.INX_List
 			lastUpdateTimer = nil
 		}
 
-		nodeStatus := inxNodeStatus(status)
+		nodeStatus, err := inxNodeStatus(status)
+		if err != nil {
+			Component.LogErrorf("failed to convert sync status to inx node status: %s", err.Error())
+			return
+		}
 
 		// Use cool-down if the node is syncing
 		if coolDownDuration > 0 && !nodeStatus.GetIsHealthy() {

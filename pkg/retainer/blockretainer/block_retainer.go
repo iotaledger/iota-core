@@ -23,7 +23,7 @@ type (
 )
 
 type BlockRetainer struct {
-	events *retainer.Events
+	events *retainer.BlockRetainerEvents
 	store  StoreFunc
 	cache  *cache
 
@@ -39,7 +39,7 @@ type BlockRetainer struct {
 func New(module module.Module, workersGroup *workerpool.Group, retainerStoreFunc StoreFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *BlockRetainer {
 	b := &BlockRetainer{
 		Module:            module,
-		events:            retainer.NewEvents(),
+		events:            retainer.NewBlockRetainerEvents(),
 		workerPool:        workersGroup.CreatePool("Retainer", workerpool.WithWorkerCount(1)),
 		store:             retainerStoreFunc,
 		cache:             newCache(),
@@ -99,7 +99,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.BlockRetainer] {
 			}
 		}, asyncOpt)
 
-		e.Events.Retainer.BlockRetained.LinkTo(r.events.BlockRetained)
+		e.Events.BlockRetainer.BlockRetained.LinkTo(r.events.BlockRetained)
 
 		r.InitializedEvent().Trigger()
 

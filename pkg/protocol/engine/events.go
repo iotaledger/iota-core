@@ -29,23 +29,24 @@ type Events struct {
 	AcceptedBlockProcessed *event.Event1[*blocks.Block]
 	Evict                  *event.Event1[iotago.SlotIndex]
 
-	PreSolidFilter  *presolidfilter.Events
-	PostSolidFilter *postsolidfilter.Events
-	BlockRequester  *eventticker.Events[iotago.SlotIndex, iotago.BlockID]
-	TipManager      *tipmanager.Events
-	BlockDAG        *blockdag.Events
-	Booker          *booker.Events
-	Clock           *clock.Events
-	BlockGadget     *blockgadget.Events
-	SlotGadget      *slotgadget.Events
-	SybilProtection *sybilprotection.Events
-	Ledger          *ledger.Events
-	Notarization    *notarization.Events
-	SpendDAG        *spenddag.Events[iotago.TransactionID, mempool.StateID]
-	Scheduler       *scheduler.Events
-	SeatManager     *seatmanager.Events
-	SyncManager     *syncmanager.Events
-	Retainer        *retainer.Events
+	PreSolidFilter      *presolidfilter.Events
+	PostSolidFilter     *postsolidfilter.Events
+	BlockRequester      *eventticker.Events[iotago.SlotIndex, iotago.BlockID]
+	TipManager          *tipmanager.Events
+	BlockDAG            *blockdag.Events
+	Booker              *booker.Events
+	Clock               *clock.Events
+	BlockGadget         *blockgadget.Events
+	SlotGadget          *slotgadget.Events
+	SybilProtection     *sybilprotection.Events
+	Ledger              *ledger.Events
+	Notarization        *notarization.Events
+	SpendDAG            *spenddag.Events[iotago.TransactionID, mempool.StateID]
+	Scheduler           *scheduler.Events
+	SeatManager         *seatmanager.Events
+	SyncManager         *syncmanager.Events
+	BlockRetainer       *retainer.BlockRetainerEvents
+	TransactionRetainer *retainer.TransactionRetainerEvents
 	event.Group[Events, *Events]
 }
 
@@ -71,6 +72,7 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		Scheduler:              scheduler.NewEvents(),
 		SeatManager:            seatmanager.NewEvents(),
 		SyncManager:            syncmanager.NewEvents(),
-		Retainer:               retainer.NewEvents(),
+		BlockRetainer:          retainer.NewBlockRetainerEvents(),
+		TransactionRetainer:    retainer.NewTransactionRetainerEvents(),
 	}
 })

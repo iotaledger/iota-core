@@ -250,7 +250,7 @@ func Test_RewardInputCannotPointToNFTOutput(t *testing.T) {
 	ts.Wait(node1, node2)
 
 	ts.AssertTransactionsExist([]*iotago.Transaction{tx2.Transaction}, true, node1, node2)
-	signedTx2ID := lo.PanicOnErr(tx2.ID())
+	signedTx2ID := tx2.MustID()
 	ts.AssertTransactionFailure(signedTx2ID, iotago.ErrRewardInputReferenceInvalid, node1, node2)
 }
 
@@ -373,10 +373,13 @@ func Test_Account_StakeAmountCalculation(t *testing.T) {
 	)
 	block7 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block7", ts.DefaultWallet(), tx7, mock.WithStrongParents(latestParents...)))
 
-	tx8 := ts.DefaultWallet().ClaimDelegatorRewards("TX8", "TX7:0")
-	block8 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block8", ts.DefaultWallet(), tx8, mock.WithStrongParents(block7.ID())))
+	latestParents = ts.CommitUntilSlot(block7_8Slot, block7.ID())
 
-	latestParents = ts.CommitUntilSlot(block7_8Slot, block8.ID())
+	tx8 := ts.DefaultWallet().ClaimDelegatorRewards("TX8", "TX7:0")
+	block8 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block8", ts.DefaultWallet(), tx8, mock.WithStrongParents(latestParents...)))
+
+	block8Slot := ts.CurrentSlot()
+	latestParents = ts.CommitUntilSlot(block8Slot, block8.ID())
 
 	// Delegated Stake should be unaffected since no new delegation was effectively added in that slot.
 	ts.AssertAccountStake(accountID, stakedAmount, deleg1+deleg2, ts.Nodes()...)

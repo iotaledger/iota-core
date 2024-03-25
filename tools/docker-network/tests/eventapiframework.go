@@ -85,6 +85,8 @@ func (e *EventAPIDockerTestFramework) AssertBlockMetadataStateAcceptedBlocks(ctx
 		for {
 			select {
 			case blk := <-acceptedChan:
+				require.Equal(e.Testing, api.BlockStateAccepted, blk.BlockState, "Block %s is pending in BlockMetadataAccepted topic", blk.BlockID.ToHex())
+
 				resp, err := eventClt.Client.BlockMetadataByBlockID(ctx, blk.BlockID)
 				require.NoError(e.Testing, err)
 				// accepted, confirmed are accepted
@@ -110,6 +112,8 @@ func (e *EventAPIDockerTestFramework) AssertBlockMetadataStateConfirmedBlocks(ct
 		for {
 			select {
 			case blk := <-acceptedChan:
+				require.Equal(e.Testing, api.BlockStateConfirmed, blk.BlockState, "Block %s is pending in BlockMetadataConfirmed topic", blk.BlockID.ToHex())
+
 				resp, err := eventClt.Client.BlockMetadataByBlockID(ctx, blk.BlockID)
 				require.NoError(e.Testing, err)
 				require.NotEqualf(e.Testing, api.BlockStatePending, resp.BlockState, "Block %s is pending in BlockMetadataConfirmed endpoint", blk.BlockID.ToHex())
@@ -284,7 +288,13 @@ func (e *EventAPIDockerTestFramework) AssertTransactionMetadataByTransactionID(c
 			select {
 			case metadata := <-acceptedChan:
 				if txID.Compare(metadata.TransactionID) == 0 {
+					// make sure the transaction state is available from the core API
+					resp, err := eventClt.Client.TransactionMetadata(ctx, txID)
+					require.NoError(e.Testing, err)
+					require.NotNil(e.Testing, resp)
+
 					e.finishChan <- struct{}{}
+
 					return
 				}
 

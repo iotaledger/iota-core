@@ -241,7 +241,7 @@ func (c *TestSuiteClient) Routes(_ context.Context) (*api.RoutesResponse, error)
 }
 
 func (c *TestSuiteClient) SubmitBlock(ctx context.Context, block *iotago.Block) (iotago.BlockID, error) {
-	return c.Node.RequestHandler.SubmitBlockAndAwaitBooking(ctx, block)
+	return c.Node.RequestHandler.SubmitBlockAndAwaitRetainer(ctx, block)
 }
 
 func (c *TestSuiteClient) TransactionIncludedBlock(_ context.Context, txID iotago.TransactionID) (*iotago.Block, error) {
