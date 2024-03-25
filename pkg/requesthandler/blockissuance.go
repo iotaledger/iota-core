@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
@@ -34,21 +35,36 @@ func (r *RequestHandler) submitBlockAndAwaitEvent(ctx context.Context, block *mo
 	// it will never trigger one of the below events.
 	processingCtx, processingCtxCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer processingCtxCancel()
+
 	// Calculate the blockID so that we don't capture the block pointer in the event handlers.
 	blockID := block.ID()
 	evtUnhook := evt.Hook(func(eventBlock *blocks.Block) {
 		if blockID != eventBlock.ID() {
 			return
 		}
+
 		select {
 		case filtered <- nil:
 		case <-exit:
 		}
 	}, event.WithWorkerPool(r.workerPool)).Unhook
+
+	protocolFilteredUnhook := r.protocol.Events.ProtocolFilter.Hook(func(event *protocol.BlockFilteredEvent) {
+		if blockID != event.Block.ID() {
+			return
+		}
+
+		select {
+		case filtered <- event.Reason:
+		case <-exit:
+		}
+	}, event.WithWorkerPool(r.workerPool)).Unhook
+
 	prefilteredUnhook := r.protocol.Events.Engine.PreSolidFilter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
 		if blockID != event.Block.ID() {
 			return
 		}
+
 		select {
 		case filtered <- event.Reason:
 		case <-exit:
@@ -65,11 +81,12 @@ func (r *RequestHandler) submitBlockAndAwaitEvent(ctx context.Context, block *mo
 		}
 	}, event.WithWorkerPool(r.workerPool)).Unhook
 
-	defer lo.BatchReverse(evtUnhook, prefilteredUnhook, postfilteredUnhook)()
+	defer lo.BatchReverse(evtUnhook, protocolFilteredUnhook, prefilteredUnhook, postfilteredUnhook)()
 
 	if err := r.submitBlock(block); err != nil {
 		return ierrors.Wrapf(err, "failed to issue block %s", blockID)
 	}
+
 	select {
 	case <-processingCtx.Done():
 		return ierrors.Errorf("context canceled whilst waiting for event on block %s", blockID)
