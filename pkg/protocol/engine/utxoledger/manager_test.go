@@ -2,13 +2,20 @@
 package utxoledger_test
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
+	"github.com/fjl/memsize"
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/ads"
+	"github.com/iotaledger/hive.go/db"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
+	"github.com/iotaledger/iota-core/pkg/storage/database"
 	iotago "github.com/iotaledger/iota.go/v4"
 	iotago_tpkg "github.com/iotaledger/iota.go/v4/tpkg"
 )
@@ -237,4 +244,109 @@ func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
 		return true
 	}))
 	require.Empty(t, spentByOutputID)
+}
+
+func TestMemLeakStateTree(t *testing.T) {
+	t.Skip("This test is not meant to be run in CI, it's for local testing only")
+
+	dbConfig := database.Config{
+		Engine:       db.EngineRocksDB,
+		Directory:    t.TempDir(),
+		Version:      1,
+		PrefixHealth: []byte{2},
+	}
+	rocksDB := database.NewDBInstance(dbConfig, nil)
+	kvStore := rocksDB.KVStore()
+	stateTree := ads.NewMap[iotago.Identifier](kvStore,
+		iotago.Identifier.Bytes,
+		iotago.IdentifierFromBytes,
+		iotago.OutputID.Bytes,
+		iotago.OutputIDFromBytes,
+		(*stateTreeMetadata).Bytes,
+		stateMetadataFromBytes,
+	)
+
+	var totalOutputs int
+	var allOutputs []*utxoledger.Output
+	runTest := func(reInit bool, outputCount int) {
+		totalOutputs += outputCount
+		fmt.Println(">>> Running with", outputCount, "outputs, reInit:", reInit)
+		fmt.Println(">>> Total outputs:", totalOutputs)
+
+		start := time.Now()
+		if reInit {
+			stateTree = ads.NewMap[iotago.Identifier](kvStore,
+				iotago.Identifier.Bytes,
+				iotago.IdentifierFromBytes,
+				iotago.OutputID.Bytes,
+				iotago.OutputIDFromBytes,
+				(*stateTreeMetadata).Bytes,
+				stateMetadataFromBytes,
+			)
+		}
+
+		newOutputs := make([]*utxoledger.Output, outputCount)
+		{
+			for i := 0; i < outputCount; i++ {
+				newOutputs[i] = tpkg.RandLedgerStateOutputWithType(iotago.OutputBasic)
+				allOutputs = append(allOutputs, newOutputs[i])
+			}
+
+			for _, output := range newOutputs {
+				if err := stateTree.Set(output.OutputID(), newStateMetadata(output)); err != nil {
+					panic(ierrors.Wrapf(err, "failed to set new oputput in state tree, outputID: %s", output.OutputID().ToHex()))
+				}
+			}
+
+			if err := stateTree.Commit(); err != nil {
+				panic(ierrors.Wrap(err, "failed to commit state tree"))
+			}
+		}
+
+		memConsumptionEnd := memsize.Scan(stateTree)
+		fmt.Println(">>> Took: ", time.Since(start).String())
+		fmt.Println()
+		fmt.Println(">>> Memory:", memConsumptionEnd.Report())
+
+		// Check that all outputs are in the tree
+		for _, output := range allOutputs {
+			exists, err := stateTree.Has(output.OutputID())
+			require.NoError(t, err)
+			require.True(t, exists)
+		}
+
+		fmt.Printf("----------------------------------------------------------------\n\n")
+	}
+
+	runTest(false, 1000000)
+	runTest(false, 1000000)
+	runTest(false, 1000000)
+	runTest(false, 10000)
+}
+
+type stateTreeMetadata struct {
+	Slot iotago.SlotIndex
+}
+
+func newStateMetadata(output *utxoledger.Output) *stateTreeMetadata {
+	return &stateTreeMetadata{
+		Slot: output.SlotCreated(),
+	}
+}
+
+func stateMetadataFromBytes(b []byte) (*stateTreeMetadata, int, error) {
+	s := new(stateTreeMetadata)
+
+	var err error
+	var n int
+	s.Slot, n, err = iotago.SlotIndexFromBytes(b)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return s, n, nil
+}
+
+func (s *stateTreeMetadata) Bytes() ([]byte, error) {
+	return s.Slot.Bytes()
 }
