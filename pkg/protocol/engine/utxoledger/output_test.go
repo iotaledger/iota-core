@@ -41,7 +41,7 @@ func AssertOutputUnspentAndSpentTransitions(t *testing.T, output *utxoledger.Out
 	require.True(t, has)
 
 	// Spent it with a slot.
-	require.NoError(t, manager.ApplyDiff(spent.SlotSpent(), utxoledger.Outputs{}, utxoledger.Spents{spent}))
+	require.NoError(t, lo.Return2(manager.ApplyDiff(spent.SlotSpent(), utxoledger.Outputs{}, utxoledger.Spents{spent})))
 
 	// Read Spent from DB and compare
 	readSpent, err := manager.ReadSpentForOutputIDWithoutLocking(outputID)

@@ -13,6 +13,7 @@ import (
 	"github.com/iotaledger/hive.go/db"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
@@ -41,7 +42,7 @@ func TestConfirmationApplyAndRollbackToEmptyLedger(t *testing.T) {
 		tpkg.RandLedgerStateSpentWithOutput(outputs[2], slot),
 	}
 
-	require.NoError(t, manager.ApplyDiffWithoutLocking(slot, outputs, spents))
+	require.NoError(t, lo.Return2(manager.ApplyDiffWithoutLocking(slot, outputs, spents)))
 
 	require.NotEqual(t, manager.StateTreeRoot(), iotago.Identifier{})
 	require.True(t, manager.CheckStateTree())
@@ -107,7 +108,7 @@ func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
 	previousSpents := utxoledger.Spents{
 		tpkg.RandLedgerStateSpentWithOutput(previousOutputs[1], previousMsIndex),
 	}
-	require.NoError(t, manager.ApplyDiffWithoutLocking(previousMsIndex, previousOutputs, previousSpents))
+	require.NoError(t, lo.Return2(manager.ApplyDiffWithoutLocking(previousMsIndex, previousOutputs, previousSpents)))
 
 	require.True(t, manager.CheckStateTree())
 
@@ -129,7 +130,7 @@ func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
 		tpkg.RandLedgerStateSpentWithOutput(previousOutputs[2], index),
 		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index),
 	}
-	require.NoError(t, manager.ApplyDiffWithoutLocking(index, outputs, spents))
+	require.NoError(t, lo.Return2(manager.ApplyDiffWithoutLocking(index, outputs, spents)))
 
 	require.True(t, manager.CheckStateTree())
 
