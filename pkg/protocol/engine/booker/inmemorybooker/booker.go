@@ -93,9 +93,8 @@ func (b *Booker) Init(ledger ledger.Ledger, loadBlockFromStorage func(iotago.Blo
 
 // Queue checks if payload is solid and then sets up the block to react to its parents.
 func (b *Booker) Queue(block *blocks.Block) error {
-	b.LogTrace("attaching transaction...", "blockID", block.ID())
 	signedTransactionMetadata, containsTransaction := b.ledger.AttachTransaction(block)
-	b.LogTrace("transaction attached, waiting for signature check", "blockID", block.ID())
+
 	if !containsTransaction {
 		b.setupBlock(block)
 		return nil
@@ -108,7 +107,6 @@ func (b *Booker) Queue(block *blocks.Block) error {
 	// Based on the assumption that we always fork and the UTXO and Tangle past cones are always fully known.
 	signedTransactionMetadata.OnSignaturesValid(func() {
 		transactionMetadata := signedTransactionMetadata.TransactionMetadata()
-		b.LogTrace("signatures valid", "blockID", block.ID(), "transactionID", transactionMetadata.ID())
 
 		if orphanedSlot, isOrphaned := transactionMetadata.OrphanedSlot(); isOrphaned && orphanedSlot <= block.SlotCommitmentID().Slot() {
 			block.SetInvalid()
@@ -117,8 +115,6 @@ func (b *Booker) Queue(block *blocks.Block) error {
 		}
 
 		transactionMetadata.OnBooked(func() {
-			b.LogTrace("transactionMetadata booked, setup block", "blockID", block.ID())
-
 			block.SetPayloadSpenderIDs(transactionMetadata.SpenderIDs())
 			b.setupBlock(block)
 		})
@@ -152,7 +148,6 @@ func (b *Booker) setupBlock(block *blocks.Block) {
 
 		parentBlock.Booked().OnUpdateOnce(func(_ bool, _ bool) {
 			if unbookedParentsCount.Add(-1) == 0 {
-				b.LogTrace("start booking ", "blockID", block.ID())
 				if err := b.book(block); err != nil {
 					if block.SetInvalid() {
 						b.events.BlockInvalid.Trigger(block, ierrors.Wrap(err, "failed to book block"))
