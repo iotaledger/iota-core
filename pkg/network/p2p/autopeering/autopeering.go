@@ -214,7 +214,7 @@ func (m *Manager) discoverAndDialPeers() {
 		neighborsToDrop := randomSubset(autopeeringNeighbors, -peersToFind)
 		m.logger.LogDebugf("Too many autopeering neighbors connected %d, disconnecting some", len(neighborsToDrop))
 		for _, peer := range neighborsToDrop {
-			if err := m.networkManager.DropNeighbor(peer.Peer().ID); err != nil {
+			if err := m.networkManager.DisconnectNeighbor(peer.Peer().ID); err != nil {
 				m.logger.LogDebugf("Failed to disconnect neighbor %s", peer.Peer().ID)
 			}
 		}

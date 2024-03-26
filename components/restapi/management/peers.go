@@ -1,9 +1,6 @@
 package management
 
 import (
-	"context"
-	"time"
-
 	"github.com/labstack/echo/v4"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
@@ -32,8 +29,47 @@ func parsePeerIDParam(c echo.Context) (peer.ID, error) {
 	return peerID, nil
 }
 
-// getPeerInfo returns the peer info for the given neighbor.
-func getPeerInfo(neighbor network.Neighbor) *api.PeerInfo {
+// getPeerInfoFromNeighbor returns the peer info for the given neighbor.
+func getPeerInfoFromPeer(peer *network.Peer) *api.PeerInfo {
+	multiAddresses := make([]iotago.PrefixedStringUint8, len(peer.PeerAddresses))
+	for i, multiAddress := range peer.PeerAddresses {
+		multiAddresses[i] = iotago.PrefixedStringUint8(multiAddress.String())
+	}
+
+	var alias string
+	relation := PeerRelationAutopeered
+
+	if peerConfigItem := deps.PeeringConfigManager.Peer(peer.ID); peerConfigItem != nil {
+		alias = peerConfigItem.Alias
+
+		// if the peer exists in the config, it is a manual peered peer
+		relation = PeerRelationManual
+	}
+
+	packetsReceived := uint32(0)
+	packetsSent := uint32(0)
+
+	neighbor, err := deps.NetworkManager.Neighbor(peer.ID)
+	if err == nil {
+		packetsReceived = uint32(neighbor.PacketsRead())
+		packetsSent = uint32(neighbor.PacketsWritten())
+	}
+
+	return &api.PeerInfo{
+		ID:             peer.ID.String(),
+		MultiAddresses: multiAddresses,
+		Alias:          alias,
+		Relation:       relation,
+		Connected:      peer.ConnStatus.Load() == network.ConnStatusConnected,
+		GossipMetrics: &api.PeerGossipMetrics{
+			PacketsReceived: packetsReceived,
+			PacketsSent:     packetsSent,
+		},
+	}
+}
+
+// getPeerInfoFromNeighbor returns the peer info for the given neighbor.
+func getPeerInfoFromNeighbor(neighbor network.Neighbor) *api.PeerInfo {
 	peer := neighbor.Peer()
 
 	multiAddresses := make([]iotago.PrefixedStringUint8, len(peer.PeerAddresses))
@@ -80,7 +116,7 @@ func getPeer(c echo.Context) (*api.PeerInfo, error) {
 		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to get peer: %w", err)
 	}
 
-	return getPeerInfo(neighbor), nil
+	return getPeerInfoFromNeighbor(neighbor), nil
 }
 
 // removePeer drops the connection to the peer with the given peerID and removes it from the known peers.
@@ -93,7 +129,7 @@ func removePeer(c echo.Context) error {
 	// error is ignored because we don't care about the config here
 	_ = deps.PeeringConfigManager.RemovePeer(peerID)
 
-	return deps.NetworkManager.RemoveNeighbor(peerID)
+	return deps.NetworkManager.RemovePeer(peerID)
 }
 
 // listPeers returns the list of all peers.
@@ -105,13 +141,13 @@ func listPeers() *api.PeersResponse {
 	}
 
 	for i, info := range allNeighbors {
-		result.Peers[i] = getPeerInfo(info)
+		result.Peers[i] = getPeerInfoFromNeighbor(info)
 	}
 
 	return result
 }
 
-// addPeer tries to establish a connection to the given peer and adds it to the known peers.
+// addPeer adds the peer with the given multiAddress to the manual peering layer.
 func addPeer(c echo.Context) (*api.PeerInfo, error) {
 	request := &api.AddPeerRequest{}
 
@@ -124,52 +160,14 @@ func addPeer(c echo.Context) (*api.PeerInfo, error) {
 		return nil, ierrors.WithMessagef(httpserver.ErrInvalidParameter, "invalid multiAddress (%s): %w", request.MultiAddress, err)
 	}
 
-	addrInfo, err := peer.AddrInfoFromP2pAddr(multiAddr)
+	_, err = peer.AddrInfoFromP2pAddr(multiAddr)
 	if err != nil {
 		return nil, ierrors.WithMessagef(httpserver.ErrInvalidParameter, "invalid address info from multiAddress (%s): %w", request.MultiAddress, err)
 	}
 
-	// we don't need to add the peer if it is already marked as a manual peer
-	if deps.NetworkManager.ManualNeighborExists(addrInfo.ID) {
-		return nil, ierrors.WithMessagef(echo.ErrBadRequest, "manual peer already exists, peerID: %s", addrInfo.ID.String())
-	}
-
-	connectedCtx, connectedCtxCancel := context.WithTimeout(c.Request().Context(), 5*time.Second)
-	defer connectedCtxCancel()
-
-	// hook to the event so we wait until the peer is connected
-	unhook := deps.NetworkManager.OnNeighborAdded(func(neighbor network.Neighbor) {
-		if neighbor.Peer().ID == addrInfo.ID {
-			// cancel the context to stop waiting
-			connectedCtxCancel()
-		}
-	}).Unhook
-	defer unhook()
-
-	// if the peer was already connected, we don't need to wait for it, but we still want to add
-	// it to the manual peers.
-	if deps.NetworkManager.NeighborExists(addrInfo.ID) {
-		connectedCtxCancel()
-	}
-
-	if err := deps.NetworkManager.AddManualPeers(multiAddr); err != nil {
-		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to add peer: %w", err)
-	}
-
-	// wait for the peer to be added or the context to be done
-	<-connectedCtx.Done()
-	if ierrors.Is(connectedCtx.Err(), context.DeadlineExceeded) {
-		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to add peer: timeout")
-	}
-
-	peerID := addrInfo.ID
-	neighbor, err := deps.NetworkManager.Neighbor(peerID)
+	peer, err := deps.NetworkManager.AddManualPeer(multiAddr)
 	if err != nil {
-		if ierrors.Is(err, network.ErrUnknownPeer) {
-			return nil, ierrors.WithMessagef(echo.ErrNotFound, "peer not found, peerID: %s", peerID.String())
-		}
-
-		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to get peer: %w", err)
+		return nil, ierrors.WithMessagef(echo.ErrInternalServerError, "failed to add peer: %w", err)
 	}
 
 	var alias string
@@ -179,8 +177,8 @@ func addPeer(c echo.Context) (*api.PeerInfo, error) {
 
 	// error is ignored because we don't care about the config here
 	if err := deps.PeeringConfigManager.AddPeer(multiAddr, alias); err != nil {
-		Component.LogWarnf("failed to add peer to config, peerID: %s, err: %s", peerID.String(), err.Error())
+		Component.LogWarnf("failed to add peer to config, peerID: %s, err: %s", peer.ID.String(), err.Error())
 	}
 
-	return getPeerInfo(neighbor), nil
+	return getPeerInfoFromPeer(peer), nil
 }
