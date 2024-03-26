@@ -104,7 +104,7 @@ func (c *Commitments) initLogger() (shutdown func()) {
 	return lo.BatchReverse(
 		c.Root.LogUpdates(c, log.LevelTrace, "Root", (*Commitment).LogName),
 
-		c.Logger.UnsubscribeFromParentLogger,
+		c.Logger.Shutdown,
 	)
 }
 

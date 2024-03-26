@@ -264,7 +264,7 @@ func (t *TipMetadata) initLogging() {
 	t.weaklyOrphanedWeakParents.LogUpdates(t, logLevel, "WeaklyOrphanedWeakParents")
 	t.parentsReferencingLatestValidationBlock.LogUpdates(t, logLevel, "ParentsReferencingLatestValidationBlock")
 
-	t.evicted.OnTrigger(t.UnsubscribeFromParentLogger)
+	t.evicted.OnTrigger(t.Logger.Shutdown)
 }
 
 // initBehavior initializes the behavior of the TipMetadata.

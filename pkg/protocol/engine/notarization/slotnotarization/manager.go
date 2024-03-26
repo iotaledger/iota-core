@@ -52,7 +52,7 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 		logger := e.NewChildLogger("NotarizationManager")
 
 		m := NewManager(e.NewSubModule("NotarizationManager"), e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
-		m.ShutdownEvent().OnTrigger(logger.UnsubscribeFromParentLogger)
+		m.ShutdownEvent().OnTrigger(logger.Shutdown)
 
 		m.apiProvider = e
 
