@@ -111,10 +111,16 @@ func (g *Gadget) isCommitteeValidationBlock(block *blocks.Block) (seat account.S
 }
 
 func anyChildInSet(block *blocks.Block, set ds.Set[iotago.BlockID]) bool {
-	for _, child := range block.Children() {
+	if err := block.Children().ForEach(func(child *blocks.Block) error {
 		if set.Has(child.ID()) {
-			return true
+			return ierrors.New("stop iteration: child in set")
 		}
+
+		// We continue the iteration if the child is not in the set.
+		return nil
+	}); err != nil {
+		// There can only be the stop iteration error -> there's a child in the set.
+		return true
 	}
 
 	return false

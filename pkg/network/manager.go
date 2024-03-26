@@ -18,6 +18,7 @@ type Manager interface {
 	OnNeighborAdded(handler func(Neighbor)) *event.Hook[func(Neighbor)]
 	OnNeighborRemoved(handler func(Neighbor)) *event.Hook[func(Neighbor)]
 
+	Neighbor(peerID peer.ID) (Neighbor, error)
 	AllNeighbors() []Neighbor
 	AutopeeringNeighbors() []Neighbor
 

@@ -7,14 +7,24 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
-func (r *RequestHandler) BlockFromBlockID(blockID iotago.BlockID) (*iotago.Block, error) {
+func (r *RequestHandler) ModelBlockFromBlockID(blockID iotago.BlockID) (*model.Block, error) {
 	block, exists := r.protocol.Engines.Main.Get().Block(blockID)
 	if !exists {
 		return nil, ierrors.WithMessagef(echo.ErrNotFound, "block %s not found", blockID)
+	}
+
+	return block, nil
+}
+
+func (r *RequestHandler) BlockFromBlockID(blockID iotago.BlockID) (*iotago.Block, error) {
+	block, err := r.ModelBlockFromBlockID(blockID)
+	if err != nil {
+		return nil, err
 	}
 
 	return block.ProtocolBlock(), nil

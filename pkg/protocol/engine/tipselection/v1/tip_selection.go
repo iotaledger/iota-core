@@ -127,8 +127,8 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 		},
 			// We select one validation tip as a strong parent. This is a security step to ensure that the tangle maintains
 			// acceptance by stitching together validation blocks.
-			types.NewTuple[func(optAmount ...int) []tipmanager.TipMetadata, int](t.tipManager.ValidationTips, 1),
-			types.NewTuple[func(optAmount ...int) []tipmanager.TipMetadata, int](t.tipManager.StrongTips, amount-1),
+			types.NewTuple[func(optAmount ...int) []tipmanager.TipMetadata, int](t.tipManager.ValidationTips, 2),
+			types.NewTuple[func(optAmount ...int) []tipmanager.TipMetadata, int](t.tipManager.StrongTips, amount-2),
 		); len(references[iotago.StrongParentType]) == 0 {
 			references[iotago.StrongParentType] = iotago.BlockIDs{t.rootBlock()}
 		}
@@ -239,7 +239,7 @@ func (t *TipSelection) collectReferences(callback func(tipmanager.TipMetadata), 
 	for _, tipSelectorAmount := range tipSelectorsAmount {
 		// Make sure we select the total number of unique tips and not just the number of tips from the given tip pool,
 		// because of how selectUniqueTips works.
-		accumulatedTipAmount += tipSelectorAmount.B
+		accumulatedTipAmount += max(0, tipSelectorAmount.B)
 
 		tipCandidates := selectUniqueTips(tipSelectorAmount.A, referencesCountCallback(), accumulatedTipAmount)
 

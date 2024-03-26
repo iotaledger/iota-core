@@ -25,26 +25,58 @@ func (r *RequestHandler) SubmitBlockWithoutAwaitingBooking(block *model.Block) e
 	return r.submitBlock(block)
 }
 
-// submitBlockAndAwaitEvent submits a block to be processed and waits for the event to be triggered.
-func (r *RequestHandler) submitBlockAndAwaitEvent(ctx context.Context, block *model.Block, evt *event.Event1[*blocks.Block]) error {
-	filtered := make(chan error, 1)
+// submitBlockAndAwaitRetainer submits a block to be processed and waits for the block gets retained.
+func (r *RequestHandler) submitBlockAndAwaitRetainer(ctx context.Context, block *model.Block) error {
 	exit := make(chan struct{})
 	defer close(exit)
 
+	blockFiltered := make(chan error, 1)
+	defer close(blockFiltered)
+
 	// Make sure we don't wait forever here. If the block is not dispatched to the main engine,
 	// it will never trigger one of the below events.
-	processingCtx, processingCtxCancel := context.WithTimeout(ctx, 5*time.Second)
+	processingCtx, processingCtxCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer processingCtxCancel()
 
 	// Calculate the blockID so that we don't capture the block pointer in the event handlers.
 	blockID := block.ID()
-	evtUnhook := evt.Hook(func(eventBlock *blocks.Block) {
+
+	// Hook to TransactionRetained event if the block contains a transaction.
+	var txRetained chan struct{}
+	var txRetainedUnhook func()
+
+	if signedTx, isTx := block.SignedTransaction(); isTx {
+		txID := signedTx.Transaction.MustID()
+
+		txRetained = make(chan struct{}, 2) // buffered to 2 to avoid blocking in case of a race condition
+		defer close(txRetained)
+
+		// we hook to the TransactionRetained event first, because there could be a race condition when the transaction gets retained
+		// the moment we check if the transaction is already retained.
+		txRetainedUnhook = r.protocol.Events.Engine.TransactionRetainer.TransactionRetained.Hook(func(transactionID iotago.TransactionID) {
+			if transactionID != txID {
+				return
+			}
+
+			// signal that the transaction is retained
+			txRetained <- struct{}{}
+		}, event.WithWorkerPool(r.workerPool)).Unhook
+
+		// if the transaction is already retained, we don't need to wait for the event because
+		// the onTransactionAttached event is only triggered if it's a new transaction.
+		if _, err := r.protocol.Engines.Main.Get().TxRetainer.TransactionMetadata(txID); err == nil {
+			// signal that the transaction is retained
+			txRetained <- struct{}{}
+		}
+	}
+
+	blockRetainedUnhook := r.protocol.Events.Engine.BlockRetainer.BlockRetained.Hook(func(eventBlock *blocks.Block) {
 		if blockID != eventBlock.ID() {
 			return
 		}
 
 		select {
-		case filtered <- nil:
+		case blockFiltered <- nil:
 		case <-exit:
 		}
 	}, event.WithWorkerPool(r.workerPool)).Unhook
@@ -55,33 +87,33 @@ func (r *RequestHandler) submitBlockAndAwaitEvent(ctx context.Context, block *mo
 		}
 
 		select {
-		case filtered <- event.Reason:
+		case blockFiltered <- event.Reason:
 		case <-exit:
 		}
 	}, event.WithWorkerPool(r.workerPool)).Unhook
 
-	prefilteredUnhook := r.protocol.Events.Engine.PreSolidFilter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
+	blockPreFilteredUnhook := r.protocol.Events.Engine.PreSolidFilter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
 		if blockID != event.Block.ID() {
 			return
 		}
 
 		select {
-		case filtered <- event.Reason:
+		case blockFiltered <- event.Reason:
 		case <-exit:
 		}
 	}, event.WithWorkerPool(r.workerPool)).Unhook
 
-	postfilteredUnhook := r.protocol.Events.Engine.PostSolidFilter.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
+	blockPostFilteredUnhook := r.protocol.Events.Engine.PostSolidFilter.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
 		if blockID != event.Block.ID() {
 			return
 		}
 		select {
-		case filtered <- event.Reason:
+		case blockFiltered <- event.Reason:
 		case <-exit:
 		}
 	}, event.WithWorkerPool(r.workerPool)).Unhook
 
-	defer lo.BatchReverse(evtUnhook, protocolFilteredUnhook, prefilteredUnhook, postfilteredUnhook)()
+	defer lo.BatchReverse(txRetainedUnhook, blockRetainedUnhook, protocolFilteredUnhook, blockPreFilteredUnhook, blockPostFilteredUnhook)()
 
 	if err := r.submitBlock(block); err != nil {
 		return ierrors.Wrapf(err, "failed to issue block %s", blockID)
@@ -89,23 +121,42 @@ func (r *RequestHandler) submitBlockAndAwaitEvent(ctx context.Context, block *mo
 
 	select {
 	case <-processingCtx.Done():
+		if ierrors.Is(processingCtx.Err(), context.DeadlineExceeded) {
+			return ierrors.Errorf("context deadline exceeded whilst waiting for event on block %s", blockID)
+		}
+
 		return ierrors.Errorf("context canceled whilst waiting for event on block %s", blockID)
-	case err := <-filtered:
+
+	case err := <-blockFiltered:
 		if err != nil {
 			return ierrors.Wrapf(err, "block filtered %s", blockID)
+		}
+
+		if txRetained != nil {
+			select {
+			case <-processingCtx.Done():
+				if ierrors.Is(processingCtx.Err(), context.DeadlineExceeded) {
+					return ierrors.Errorf("context deadline exceeded whilst waiting for transaction retained event on block %s", blockID)
+				}
+
+				return ierrors.Errorf("context canceled whilst waiting for transaction retained event on block %s", blockID)
+
+			case <-txRetained:
+				// we need to wait for the transaction to be retained before we can return
+			}
 		}
 
 		return nil
 	}
 }
 
-func (r *RequestHandler) SubmitBlockAndAwaitBooking(ctx context.Context, iotaBlock *iotago.Block) (iotago.BlockID, error) {
+func (r *RequestHandler) SubmitBlockAndAwaitRetainer(ctx context.Context, iotaBlock *iotago.Block) (iotago.BlockID, error) {
 	modelBlock, err := model.BlockFromBlock(iotaBlock)
 	if err != nil {
 		return iotago.EmptyBlockID, ierrors.Wrap(err, "error serializing block to model block")
 	}
 
-	if err = r.submitBlockAndAwaitEvent(ctx, modelBlock, r.protocol.Events.Engine.Retainer.BlockRetained); err != nil {
+	if err = r.submitBlockAndAwaitRetainer(ctx, modelBlock); err != nil {
 		return iotago.EmptyBlockID, ierrors.Wrap(err, "error issuing model block")
 	}
 
