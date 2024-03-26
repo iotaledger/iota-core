@@ -418,17 +418,17 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 func (m *MemPool[VoteRank]) executeTransaction(executionContext context.Context, transaction *TransactionMetadata) {
 	start3 := time.Now()
 
-	m.executionWorkers.Submit(func() {
-		if outputStates, err := m.vm.Execute(executionContext, transaction.Transaction()); err != nil {
-			transaction.setInvalid(err)
-		} else {
-			fmt.Println(">> execution took", time.Since(start3), " - ", transaction.ID())
+	//m.executionWorkers.Submit(func() {
+	if outputStates, err := m.vm.Execute(executionContext, transaction.Transaction()); err != nil {
+		transaction.setInvalid(err)
+	} else {
+		fmt.Println(">> execution took", time.Since(start3), " - ", transaction.ID())
 
-			transaction.setExecuted(outputStates)
+		transaction.setExecuted(outputStates)
 
-			m.bookTransaction(transaction)
-		}
-	})
+		m.bookTransaction(transaction)
+	}
+	//})
 }
 
 func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
