@@ -166,7 +166,7 @@ func (m *Manager) ReadLedgerSlot() (iotago.SlotIndex, error) {
 	return m.ReadLedgerIndexWithoutLocking()
 }
 
-func (m *Manager) ApplyDiffWithoutLocking(slot iotago.SlotIndex, newOutputs Outputs, newSpents Spents) (newStateTreeRoot iotago.Identifier, error error) {
+func (m *Manager) ApplyDiffWithoutLocking(slot iotago.SlotIndex, newOutputs Outputs, newSpents Spents) (newStateTreeRoot iotago.Identifier, err error) {
 	mutations, err := m.store.Batched()
 	if err != nil {
 		return iotago.EmptyIdentifier, err
@@ -239,7 +239,7 @@ func (m *Manager) ApplyDiffWithoutLocking(slot iotago.SlotIndex, newOutputs Outp
 	return root, nil
 }
 
-func (m *Manager) ApplyDiff(slot iotago.SlotIndex, newOutputs Outputs, newSpents Spents) (newStateTreeRoot iotago.Identifier, error error) {
+func (m *Manager) ApplyDiff(slot iotago.SlotIndex, newOutputs Outputs, newSpents Spents) (newStateTreeRoot iotago.Identifier, err error) {
 	m.WriteLockLedger()
 	defer m.WriteUnlockLedger()
 
