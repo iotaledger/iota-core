@@ -12,7 +12,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
-	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -78,7 +77,6 @@ func New[VoteRank spenddag.VoteRankType[VoteRank]](
 	vm mempool.VM,
 	stateResolver mempool.StateResolver,
 	mutationsFunc func(iotago.SlotIndex) (kvstore.KVStore, error),
-	workers *workerpool.Group,
 	spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, VoteRank],
 	apiProvider iotago.APIProvider,
 	errorHandler func(error),

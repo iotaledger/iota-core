@@ -69,7 +69,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			})
 			e.Events.SpendDAG.LinkTo(l.spendDAG.Events())
 
-			l.memPool = mempoolv1.New(NewVM(l), l.resolveState, e.Storage.Mutations, e.Workers.CreateGroup("MemPool"), l.spendDAG, l.apiProvider, l.errorHandler)
+			l.memPool = mempoolv1.New(NewVM(l), l.resolveState, e.Storage.Mutations, l.spendDAG, l.apiProvider, l.errorHandler)
 
 			l.manaManager = mana.NewManager(l.apiProvider, l.resolveAccountOutput, l.accountsLedger.Account)
 			latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
