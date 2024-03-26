@@ -178,7 +178,8 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 
 	// Commit the changes
 	// Update the UTXO ledger
-	if err = l.utxoLedger.ApplyDiff(slot, outputs, spenders); err != nil {
+	stateTreeRoot, err := l.utxoLedger.ApplyDiff(slot, outputs, spenders)
+	if err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, nil, ierrors.Wrapf(err, "failed to apply diff to UTXO ledger for slot %d", slot)
 	}
 
@@ -217,7 +218,7 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 	// (due to removing the attachments) and then committed, which would result in a broken state of the transaction.
 	l.memPool.Evict(slot)
 
-	return l.utxoLedger.StateTreeRoot(), stateDiff.Mutations().Root(), l.accountsLedger.AccountsTreeRoot(), outputs, spenders, mutations, nil
+	return stateTreeRoot, stateDiff.Mutations().Root(), l.accountsLedger.AccountsTreeRoot(), outputs, spenders, mutations, nil
 }
 
 func (l *Ledger) AddAccount(output *utxoledger.Output, blockIssuanceCredits iotago.BlockIssuanceCredits) error {

@@ -19,24 +19,22 @@ type Manager struct {
 	store     kvstore.KVStore
 	storeLock syncutils.RWMutex
 
-	stateTree ads.Map[iotago.Identifier, iotago.OutputID, *stateTreeMetadata]
+	stateTreeKVStore kvstore.KVStore
+	stateTree        ads.Map[iotago.Identifier, iotago.OutputID, *stateTreeMetadata]
 
 	apiProvider iotago.APIProvider
 }
 
 func New(store kvstore.KVStore, apiProvider iotago.APIProvider) *Manager {
-	return &Manager{
-		store: store,
-		stateTree: ads.NewMap[iotago.Identifier](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{StoreKeyPrefixStateTree})),
-			iotago.Identifier.Bytes,
-			iotago.IdentifierFromBytes,
-			iotago.OutputID.Bytes,
-			iotago.OutputIDFromBytes,
-			(*stateTreeMetadata).Bytes,
-			stateMetadataFromBytes,
-		),
-		apiProvider: apiProvider,
+	m := &Manager{
+		store:            store,
+		stateTreeKVStore: lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{StoreKeyPrefixStateTree})),
+		apiProvider:      apiProvider,
 	}
+
+	m.reInitStateTreeWithoutLocking()
+
+	return m
 }
 
 // KVStore returns the underlying KVStore.
@@ -56,6 +54,25 @@ func (m *Manager) ClearLedgerState() (err error) {
 	}()
 
 	return m.store.Clear()
+}
+
+func (m *Manager) ReInitStateTreeWithLocking() {
+	m.WriteLockLedger()
+	defer m.WriteUnlockLedger()
+
+	m.reInitStateTreeWithoutLocking()
+}
+
+func (m *Manager) reInitStateTreeWithoutLocking() {
+	m.stateTree = ads.NewMap[iotago.Identifier](
+		m.stateTreeKVStore,
+		iotago.Identifier.Bytes,
+		iotago.IdentifierFromBytes,
+		iotago.OutputID.Bytes,
+		iotago.OutputIDFromBytes,
+		(*stateTreeMetadata).Bytes,
+		stateMetadataFromBytes,
+	)
 }
 
 func (m *Manager) ReadLockLedger() {
@@ -149,22 +166,22 @@ func (m *Manager) ReadLedgerSlot() (iotago.SlotIndex, error) {
 	return m.ReadLedgerIndexWithoutLocking()
 }
 
-func (m *Manager) ApplyDiffWithoutLocking(slot iotago.SlotIndex, newOutputs Outputs, newSpents Spents) error {
+func (m *Manager) ApplyDiffWithoutLocking(slot iotago.SlotIndex, newOutputs Outputs, newSpents Spents) (newStateTreeRoot iotago.Identifier, err error) {
 	mutations, err := m.store.Batched()
 	if err != nil {
-		return err
+		return iotago.EmptyIdentifier, err
 	}
 
 	for _, output := range newOutputs {
 		if err = storeOutput(output, mutations); err != nil {
 			mutations.Cancel()
 
-			return err
+			return iotago.EmptyIdentifier, err
 		}
 		if err := markAsUnspent(output, mutations); err != nil {
 			mutations.Cancel()
 
-			return err
+			return iotago.EmptyIdentifier, err
 		}
 	}
 
@@ -172,7 +189,7 @@ func (m *Manager) ApplyDiffWithoutLocking(slot iotago.SlotIndex, newOutputs Outp
 		if err := storeSpentAndMarkOutputAsSpent(spent, mutations); err != nil {
 			mutations.Cancel()
 
-			return err
+			return iotago.EmptyIdentifier, err
 		}
 	}
 
@@ -185,38 +202,44 @@ func (m *Manager) ApplyDiffWithoutLocking(slot iotago.SlotIndex, newOutputs Outp
 	if err := storeDiff(slotDiff, mutations); err != nil {
 		mutations.Cancel()
 
-		return err
+		return iotago.EmptyIdentifier, err
 	}
 
 	if err := storeLedgerIndex(slot, mutations); err != nil {
 		mutations.Cancel()
 
-		return err
+		return iotago.EmptyIdentifier, err
 	}
 
 	if err := mutations.Commit(); err != nil {
-		return err
+		return iotago.EmptyIdentifier, err
 	}
 
 	for _, output := range newOutputs {
 		if err := m.stateTree.Set(output.OutputID(), newStateMetadata(output)); err != nil {
-			return ierrors.Wrapf(err, "failed to set new oputput in state tree, outputID: %s", output.OutputID().ToHex())
+			return iotago.EmptyIdentifier, ierrors.Wrapf(err, "failed to set new oputput in state tree, outputID: %s", output.OutputID().ToHex())
 		}
 	}
 	for _, spent := range newSpents {
 		if _, err := m.stateTree.Delete(spent.OutputID()); err != nil {
-			return ierrors.Wrapf(err, "failed to delete spent output from state tree, outputID: %s", spent.OutputID().ToHex())
+			return iotago.EmptyIdentifier, ierrors.Wrapf(err, "failed to delete spent output from state tree, outputID: %s", spent.OutputID().ToHex())
 		}
 	}
 
 	if err := m.stateTree.Commit(); err != nil {
-		return ierrors.Wrap(err, "failed to commit state tree")
+		return iotago.EmptyIdentifier, ierrors.Wrap(err, "failed to commit state tree")
 	}
 
-	return nil
+	root := m.StateTreeRoot()
+
+	// Re-Init the state tree to release memory from the underlying SMT of all the elements that were just added.
+	// This might increase runtime (as we need to access the disk) but it will reduce memory usage significantly for a big tree.
+	m.reInitStateTreeWithoutLocking()
+
+	return root, nil
 }
 
-func (m *Manager) ApplyDiff(slot iotago.SlotIndex, newOutputs Outputs, newSpents Spents) error {
+func (m *Manager) ApplyDiff(slot iotago.SlotIndex, newOutputs Outputs, newSpents Spents) (newStateTreeRoot iotago.Identifier, err error) {
 	m.WriteLockLedger()
 	defer m.WriteUnlockLedger()
 
@@ -289,6 +312,8 @@ func (m *Manager) RollbackDiffWithoutLocking(slot iotago.SlotIndex, newOutputs O
 		return ierrors.Wrap(err, "failed to commit state tree")
 	}
 
+	m.reInitStateTreeWithoutLocking()
+
 	return nil
 }
 
@@ -320,6 +345,8 @@ func (m *Manager) AddGenesisUnspentOutputWithoutLocking(unspentOutput *Output) e
 	if err := m.stateTree.Commit(); err != nil {
 		return ierrors.Wrap(err, "failed to commit state tree")
 	}
+
+	m.reInitStateTreeWithoutLocking()
 
 	return nil
 }
