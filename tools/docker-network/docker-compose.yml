@@ -21,7 +21,6 @@ services:
       - iota-core
     ports:
       - "8050:14265/tcp" # REST-API
-      - "8051:8081/tcp" # Dashboard
       - "6051:6061/tcp" # pprof
       - "9059:9029/tcp" # INX
     volumes:
@@ -51,7 +50,6 @@ services:
       - iota-core
     ports:
       - "8060:14265/tcp" # REST-API
-      - "8061:8081/tcp" # Dashboard
       - "6061:6061/tcp" # pprof
       - "9069:9029/tcp" # INX
     volumes:
@@ -81,7 +79,6 @@ services:
       - iota-core
     ports:
       - "8070:14265/tcp" # REST-API
-      - "8071:8081/tcp" # Dashboard
       - "6071:6061/tcp" # pprof
       - "9079:9029/tcp" # INX
     volumes:
@@ -111,7 +108,6 @@ services:
       - iota-core
     ports:
       - "8040:14265/tcp" # REST-API
-      - "8041:8081/tcp" # Dashboard
       - "6041:6061/tcp" # pprof
       - "9049:9029/tcp" # INX
     volumes:
@@ -139,7 +135,6 @@ services:
       - iota-core
     ports:
       - "8080:14265/tcp" # REST-API
-      - "8081:8081/tcp" # Dashboard
       - "6081:6061/tcp" # pprof
       - "9089:9029/tcp" # INX
     volumes:
@@ -169,7 +164,6 @@ services:
       - iota-core
     ports:
       - "8090:14265/tcp" # REST-API
-      - "8091:8081/tcp" # Dashboard
       - "6091:6061/tcp" # pprof
       - "9099:9029/tcp" # INX
     volumes:

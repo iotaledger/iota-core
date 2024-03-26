@@ -62,7 +62,11 @@ func main() {
 
 	replaceTopicNames := make(map[string]string)
 	replaceTopicNames["app"] = "Application"
+	replaceTopicNames["p2p"] = "Peer to Peer"
+	replaceTopicNames["db"] = "Database"
+	replaceTopicNames["jwtAuth"] = "JWT Auth"
 	replaceTopicNames["api"] = "API"
+	replaceTopicNames["inx"] = "INX"
 
 	application := coreApp.App()
 

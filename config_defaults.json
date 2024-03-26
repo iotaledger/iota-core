@@ -122,18 +122,6 @@
   "retainer": {
     "debugStoreErrorMessages": false
   },
-  "dashboard": {
-    "enabled": true,
-    "bindAddress": "0.0.0.0:8081",
-    "basicAuth": {
-      "enabled": false,
-      "username": "core",
-      "password": "core"
-    },
-    "conflicts": {
-      "maxCount": 100
-    }
-  },
   "prometheus": {
     "enabled": true,
     "bindAddress": "0.0.0.0:9311",

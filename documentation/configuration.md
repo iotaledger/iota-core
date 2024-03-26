@@ -91,7 +91,7 @@ Example:
   }
 ```
 
-## <a id="p2p"></a> 3. P2p
+## <a id="p2p"></a> 3. Peer to Peer
 
 | Name                                        | Description                                                   | Type   | Default value                                |
 | ------------------------------------------- | ------------------------------------------------------------- | ------ | -------------------------------------------- |
@@ -100,7 +100,7 @@ Example:
 | externalMultiAddresses                      | External reacheable multi addresses advertised to the network | array  |                                              |
 | identityPrivateKey                          | Private key used to derive the node identity (optional)       | string | ""                                           |
 | [autopeering](#p2p_autopeering)             | Configuration for autopeering                                 | object |                                              |
-| [db](#p2p_db)                               | Configuration for db                                          | object |                                              |
+| [db](#p2p_db)                               | Configuration for Database                                    | object |                                              |
 
 ### <a id="p2p_connectionmanager"></a> ConnectionManager
 
@@ -115,7 +115,7 @@ Example:
 | -------- | ------------------------------------------------------------------------ | ---- | ------------- |
 | maxPeers | The max number of autopeer connections. Set to 0 to disable autopeering. | int  | 5             |
 
-### <a id="p2p_db"></a> Db
+### <a id="p2p_db"></a> Database
 
 | Name | Description                  | Type   | Default value      |
 | ---- | ---------------------------- | ------ | ------------------ |
@@ -174,10 +174,10 @@ Example:
 | debugRequestLoggerEnabled   | Whether the debug logging for requests should be enabled                                       | boolean | false                                                                                                                                                                                                                                                                                                                                                                                      |
 | maxPageSize                 | The maximum number of results per page                                                         | uint    | 100                                                                                                                                                                                                                                                                                                                                                                                        |
 | maxCacheSize                | The maximum size of cache for results                                                          | string  | "50MB"                                                                                                                                                                                                                                                                                                                                                                                     |
-| [jwtAuth](#restapi_jwtauth) | Configuration for jwtAuth                                                                      | object  |                                                                                                                                                                                                                                                                                                                                                                                            |
+| [jwtAuth](#restapi_jwtauth) | Configuration for JWT Auth                                                                     | object  |                                                                                                                                                                                                                                                                                                                                                                                            |
 | [limits](#restapi_limits)   | Configuration for limits                                                                       | object  |                                                                                                                                                                                                                                                                                                                                                                                            |
 
-### <a id="restapi_jwtauth"></a> JwtAuth
+### <a id="restapi_jwtauth"></a> JWT Auth
 
 | Name | Description                                                                                                                             | Type   | Default value |
 | ---- | --------------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------- |
@@ -236,9 +236,9 @@ Example:
 | Name               | Description                               | Type    | Default value |
 | ------------------ | ----------------------------------------- | ------- | ------------- |
 | enabled            | Whether the DebugAPI component is enabled | boolean | false         |
-| [db](#debugapi_db) | Configuration for db                      | object  |               |
+| [db](#debugapi_db) | Configuration for Database                | object  |               |
 
-### <a id="debugapi_db"></a> Db
+### <a id="debugapi_db"></a> Database
 
 | Name                            | Description                                                | Type   | Default value   |
 | ------------------------------- | ---------------------------------------------------------- | ------ | --------------- |
@@ -287,7 +287,7 @@ Example:
   }
 ```
 
-## <a id="db"></a> 8. Db
+## <a id="db"></a> 8. Database
 
 | Name                   | Description                               | Type   | Default value      |
 | ---------------------- | ----------------------------------------- | ------ | ------------------ |
@@ -407,49 +407,7 @@ Example:
   }
 ```
 
-## <a id="dashboard"></a> 11. Dashboard
-
-| Name                              | Description                             | Type    | Default value  |
-| --------------------------------- | --------------------------------------- | ------- | -------------- |
-| enabled                           | Whether the dashboard plugin is enabled | boolean | true           |
-| bindAddress                       | The bind address of the dashboard       | string  | "0.0.0.0:8081" |
-| [basicAuth](#dashboard_basicauth) | Configuration for basicAuth             | object  |                |
-| [conflicts](#dashboard_conflicts) | Configuration for conflicts             | object  |                |
-
-### <a id="dashboard_basicauth"></a> BasicAuth
-
-| Name     | Description                       | Type    | Default value |
-| -------- | --------------------------------- | ------- | ------------- |
-| enabled  | Whether to enable HTTP basic auth | boolean | false         |
-| username | HTTP basic auth username          | string  | "core"        |
-| password | HTTP basic auth password          | string  | "core"        |
-
-### <a id="dashboard_conflicts"></a> Conflicts
-
-| Name     | Description                                     | Type | Default value |
-| -------- | ----------------------------------------------- | ---- | ------------- |
-| maxCount | Max number of conflicts stored on the dashboard | int  | 100           |
-
-Example:
-
-```json
-  {
-    "dashboard": {
-      "enabled": true,
-      "bindAddress": "0.0.0.0:8081",
-      "basicAuth": {
-        "enabled": false,
-        "username": "core",
-        "password": "core"
-      },
-      "conflicts": {
-        "maxCount": 100
-      }
-    }
-  }
-```
-
-## <a id="prometheus"></a> 12. Prometheus
+## <a id="prometheus"></a> 11. Prometheus
 
 | Name            | Description                                          | Type    | Default value  |
 | --------------- | ---------------------------------------------------- | ------- | -------------- |
@@ -473,7 +431,7 @@ Example:
   }
 ```
 
-## <a id="inx"></a> 13. Inx
+## <a id="inx"></a> 12. INX
 
 | Name        | Description                                            | Type    | Default value    |
 | ----------- | ------------------------------------------------------ | ------- | ---------------- |

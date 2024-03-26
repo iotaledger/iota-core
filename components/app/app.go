@@ -7,7 +7,6 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/app/components/profiling"
 	"github.com/iotaledger/hive.go/app/components/shutdown"
-	"github.com/iotaledger/iota-core/components/dashboard"
 	dashboardmetrics "github.com/iotaledger/iota-core/components/dashboard_metrics"
 	"github.com/iotaledger/iota-core/components/debugapi"
 	"github.com/iotaledger/iota-core/components/inx"
@@ -50,7 +49,6 @@ Command line flags:
 			metricstracker.Component,
 			protocol.Component,
 			dashboardmetrics.Component,
-			dashboard.Component,
 			prometheus.Component,
 			inx.Component,
 		),
