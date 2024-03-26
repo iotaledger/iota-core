@@ -198,7 +198,11 @@ func (m *Manager) AddManualPeer(multiAddr multiaddr.Multiaddr) (*network.Peer, e
 	return m.manualPeering.AddPeer(multiAddr)
 }
 
-func (m *Manager) GetManualPeers(onlyConnected ...bool) []*network.Peer {
+func (m *Manager) ManualPeer(id peer.ID) (*network.Peer, error) {
+	return m.manualPeering.Peer(id)
+}
+
+func (m *Manager) ManualPeers(onlyConnected ...bool) []*network.Peer {
 	return m.manualPeering.GetPeers(onlyConnected...)
 }
 
@@ -256,8 +260,8 @@ func (m *Manager) Send(packet proto.Message, to ...peer.ID) {
 	}
 }
 
-// AllNeighbors returns all the neighbors that are currently connected.
-func (m *Manager) AllNeighbors() []network.Neighbor {
+// Neighbors returns all the neighbors that are currently connected.
+func (m *Manager) Neighbors() []network.Neighbor {
 	neighbors := m.allNeighbors()
 	result := make([]network.Neighbor, len(neighbors))
 	for i, n := range neighbors {
@@ -274,7 +278,7 @@ func (m *Manager) allNeighbors() []*neighbor {
 
 // AutopeeringNeighbors returns all the neighbors that are currently connected via autopeering.
 func (m *Manager) AutopeeringNeighbors() []network.Neighbor {
-	return lo.Filter(m.AllNeighbors(), func(n network.Neighbor) bool {
+	return lo.Filter(m.Neighbors(), func(n network.Neighbor) bool {
 		return !m.manualPeering.IsPeerKnown(n.Peer().ID)
 	})
 }

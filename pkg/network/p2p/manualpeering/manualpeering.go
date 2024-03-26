@@ -82,6 +82,18 @@ func (m *Manager) RemovePeer(peerID peer.ID) error {
 	return nil
 }
 
+func (m *Manager) Peer(peerID peer.ID) (*network.Peer, error) {
+	m.knownPeersMutex.RLock()
+	defer m.knownPeersMutex.RUnlock()
+
+	peer, exists := m.knownPeers[peerID]
+	if !exists {
+		return nil, network.ErrUnknownPeer
+	}
+
+	return peer, nil
+}
+
 // GetPeers returns the list of known peers.
 func (m *Manager) GetPeers(onlyConnected ...bool) []*network.Peer {
 	m.knownPeersMutex.RLock()

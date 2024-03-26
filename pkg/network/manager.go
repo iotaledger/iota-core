@@ -23,8 +23,10 @@ type Manager interface {
 	RemovePeer(peerID peer.ID) error
 	// AddManualPeer adds a manual peer to the list of known peers.
 	AddManualPeer(multiAddress multiaddr.Multiaddr) (*Peer, error)
-	// GetManualPeers returns all the manual peers.
-	GetManualPeers(onlyConnected ...bool) []*Peer
+	// ManualPeer returns the manual peer with the given ID.
+	ManualPeer(peerID peer.ID) (*Peer, error)
+	// ManualPeers returns all the manual peers.
+	ManualPeers(onlyConnected ...bool) []*Peer
 
 	// OnNeighborAdded registers a callback that gets triggered when a neighbor is added.
 	OnNeighborAdded(handler func(Neighbor)) *event.Hook[func(Neighbor)]
@@ -38,8 +40,8 @@ type Manager interface {
 	// DisconnectNeighbor disconnects the neighbor with the given ID.
 	DisconnectNeighbor(peerID peer.ID) error
 
-	// AllNeighbors returns all the neighbors that are currently connected.
-	AllNeighbors() []Neighbor
+	// Neighbors returns all the neighbors that are currently connected.
+	Neighbors() []Neighbor
 	// AutopeeringNeighbors returns all the neighbors that are currently connected via autopeering.
 	AutopeeringNeighbors() []Neighbor
 
