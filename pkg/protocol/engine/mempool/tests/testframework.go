@@ -9,7 +9,6 @@ import (
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/debug"
-	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	ledgertests "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -28,12 +27,11 @@ type TestFramework struct {
 	blockIDsByAlias          map[string]iotago.BlockID
 
 	ledgerState *ledgertests.MockStateResolver
-	workers     *workerpool.Group
 
 	test *testing.T
 }
 
-func NewTestFramework(t *testing.T, instance mempool.MemPool[vote.MockedRank], spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, vote.MockedRank], ledgerState *ledgertests.MockStateResolver, workers *workerpool.Group) *TestFramework {
+func NewTestFramework(t *testing.T, instance mempool.MemPool[vote.MockedRank], spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, vote.MockedRank], ledgerState *ledgertests.MockStateResolver) *TestFramework {
 	t.Helper()
 
 	tf := &TestFramework{
@@ -46,7 +44,6 @@ func NewTestFramework(t *testing.T, instance mempool.MemPool[vote.MockedRank], s
 		blockIDsByAlias:          make(map[string]iotago.BlockID),
 
 		ledgerState: ledgerState,
-		workers:     workers,
 		test:        t,
 	}
 
@@ -379,12 +376,7 @@ func (t *TestFramework) AssertStateDiff(slot iotago.SlotIndex, spentOutputAliase
 	}
 }
 
-func (t *TestFramework) WaitChildren() {
-	t.workers.WaitChildren()
-}
-
 func (t *TestFramework) Cleanup() {
-	t.workers.WaitChildren()
 	t.ledgerState.Cleanup()
 
 	iotago.UnregisterIdentifierAliases()

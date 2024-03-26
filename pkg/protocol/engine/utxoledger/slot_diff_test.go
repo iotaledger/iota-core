@@ -80,7 +80,7 @@ func TestSlotDiffSerialization(t *testing.T) {
 		tpkg.RandLedgerStateSpentWithOutput(outputs[2], slot),
 	}
 
-	require.NoError(t, manager.ApplyDiffWithoutLocking(slot, outputs, spents))
+	require.NoError(t, lo.Return2(manager.ApplyDiffWithoutLocking(slot, outputs, spents)))
 
 	readDiff, err := manager.SlotDiffWithoutLocking(slot)
 	require.NoError(t, err)

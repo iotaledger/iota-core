@@ -235,13 +235,13 @@ func TestManager_Import(t *testing.T) {
 	require.NoError(t, kvstore.Copy(mapDB, mapDBAtSlot0))
 
 	output2 := tpkg.RandLedgerStateOutput()
-	require.NoError(t, manager.ApplyDiff(1,
+	require.NoError(t, lo.Return2(manager.ApplyDiff(1,
 		utxoledger.Outputs{
 			output2,
 			tpkg.RandLedgerStateOutput(),
 		}, utxoledger.Spents{
 			tpkg.RandLedgerStateSpentWithOutput(output1, 1),
-		}))
+		})))
 
 	ledgerSlot, err = manager.ReadLedgerSlot()
 	require.NoError(t, err)
@@ -250,14 +250,14 @@ func TestManager_Import(t *testing.T) {
 	mapDBAtSlot1 := mapdb.NewMapDB()
 	require.NoError(t, kvstore.Copy(mapDB, mapDBAtSlot1))
 
-	require.NoError(t, manager.ApplyDiff(2,
+	require.NoError(t, lo.Return2(manager.ApplyDiff(2,
 		utxoledger.Outputs{
 			tpkg.RandLedgerStateOutput(),
 			tpkg.RandLedgerStateOutput(),
 			tpkg.RandLedgerStateOutput(),
 		}, utxoledger.Spents{
 			tpkg.RandLedgerStateSpentWithOutput(output2, 2),
-		}))
+		})))
 
 	ledgerSlot, err = manager.ReadLedgerSlot()
 	require.NoError(t, err)
@@ -325,26 +325,26 @@ func TestManager_Export(t *testing.T) {
 	require.NoError(t, manager.AddGenesisUnspentOutput(tpkg.RandLedgerStateOutput()))
 
 	output2 := tpkg.RandLedgerStateOutput()
-	require.NoError(t, manager.ApplyDiff(1,
+	require.NoError(t, lo.Return2(manager.ApplyDiff(1,
 		utxoledger.Outputs{
 			output2,
 			tpkg.RandLedgerStateOutput(),
 		}, utxoledger.Spents{
 			tpkg.RandLedgerStateSpentWithOutput(output1, 1),
-		}))
+		})))
 
 	ledgerSlot, err := manager.ReadLedgerSlot()
 	require.NoError(t, err)
 	require.Equal(t, iotago.SlotIndex(1), ledgerSlot)
 
-	require.NoError(t, manager.ApplyDiff(2,
+	require.NoError(t, lo.Return2(manager.ApplyDiff(2,
 		utxoledger.Outputs{
 			tpkg.RandLedgerStateOutput(),
 			tpkg.RandLedgerStateOutput(),
 			tpkg.RandLedgerStateOutput(),
 		}, utxoledger.Spents{
 			tpkg.RandLedgerStateSpentWithOutput(output2, 2),
-		}))
+		})))
 
 	ledgerSlot, err = manager.ReadLedgerSlot()
 	require.NoError(t, err)
