@@ -45,7 +45,6 @@ func (c *SpendSet[SpenderID, ResourceID, VoteRank]) Add(addedSpender *Spender[Sp
 	}
 
 	return otherMembers, nil
-
 }
 
 // Remove removes a Spender from the SpendSet and returns all remaining members of the set.

@@ -18,12 +18,14 @@ type AccountsTestFramework struct {
 	identitiesByAlias map[string]iotago.AccountID
 }
 
-func NewAccountsTestFramework(test *testing.T, instance *account.Accounts) *AccountsTestFramework {
+func NewAccountsTestFramework(t *testing.T, instance *account.Accounts) *AccountsTestFramework {
+	t.Helper()
+
 	return &AccountsTestFramework{
 		Instance:  instance,
 		Committee: instance.SeatedAccounts(),
 
-		test:              test,
+		test:              t,
 		identitiesByAlias: make(map[string]iotago.AccountID),
 	}
 }

@@ -40,6 +40,8 @@ func NewFramework(
 	spenderID func(string) iotago.TransactionID,
 	resourceID func(string) iotago.OutputID,
 ) *Framework {
+	t.Helper()
+
 	f := &Framework{
 		Instance:   spendDAG,
 		Accounts:   validators,
@@ -56,7 +58,6 @@ func NewFramework(
 func (f *Framework) CreateOrUpdateSpender(alias string, resourceAliases []string) error {
 	f.Instance.CreateSpender(f.SpenderID(alias))
 	return f.Instance.UpdateSpentResources(f.SpenderID(alias), f.SpendSetIDs(resourceAliases...))
-
 }
 
 // UpdateSpenderParents updates the parents of the spender with the given alias.

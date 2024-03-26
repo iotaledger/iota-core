@@ -129,6 +129,8 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, blockMet
 			if isBasic && basicBlock.Payload != nil && basicBlock.Payload.PayloadType() == iotago.PayloadSignedTransaction {
 				tx, _ := basicBlock.Payload.(*iotago.SignedTransaction)
 				txResponse := NewTransaction(tx)
+
+				//nolint:errchkjson
 				bytes, _ := json.Marshal(txResponse)
 
 				return bytes

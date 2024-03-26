@@ -55,6 +55,8 @@ type BlockIssuer struct {
 }
 
 func NewBlockIssuer(t *testing.T, name string, keyManager *wallet.KeyManager, client Client, addressIndex uint32, accountID iotago.AccountID, validator bool, opts ...options.Option[BlockIssuer]) *BlockIssuer {
+	t.Helper()
+
 	_, pub := keyManager.KeyPair(addressIndex)
 
 	if accountID == iotago.EmptyAccountID {
@@ -124,7 +126,6 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, n
 		if blockSlot < commitment.Slot+protoParams.MinCommittableAge() &&
 			blockSlot > protoParams.MinCommittableAge() &&
 			commitment.Slot > protoParams.MinCommittableAge() {
-
 			commitmentSlot := commitment.Slot - protoParams.MinCommittableAge()
 			var err error
 			commitment, err = i.Client.CommitmentBySlot(ctx, commitmentSlot)

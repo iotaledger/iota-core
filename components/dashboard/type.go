@@ -1,3 +1,4 @@
+//nolint:tagliatelle // we won't change the dashboard now
 package dashboard
 
 import (
@@ -125,7 +126,7 @@ type ExplorerBlock struct {
 	ID string `json:"id"`
 	// NetworkID is the network ID of the block that attaches to.
 	NetworkID iotago.NetworkID `json:"networkID"`
-	// ProtocolVersion is the protocol that proccess the block.
+	// ProtocolVersion is the protocol that process the block.
 	ProtocolVersion iotago.Version `json:"protocolVersion"`
 	// SolidificationTimestamp is the timestamp of the block.
 	SolidificationTimestamp int64 `json:"solidificationTimestamp"`

@@ -32,9 +32,9 @@ type SybilProtection interface {
 	PoolRewardsForAccount(accountID iotago.AccountID) (
 		poolRewardsForAccount iotago.Mana, exists bool, err error)
 	SeatManager() seatmanager.SeatManager
-	CommitSlot(iotago.SlotIndex) (iotago.Identifier, iotago.Identifier, error)
-	Import(io.ReadSeeker) error
-	Export(io.WriteSeeker, iotago.SlotIndex) error
+	CommitSlot(slot iotago.SlotIndex) (iotago.Identifier, iotago.Identifier, error)
+	Import(reader io.ReadSeeker) error
+	Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) error
 
 	// Reset resets the component to a clean state as if it was created at the last commitment.
 	Reset()

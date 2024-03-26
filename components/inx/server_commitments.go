@@ -36,7 +36,7 @@ func (s *Server) ListenToCommitments(req *inx.SlotRangeRequest, srv inx.INX_List
 				return status.Errorf(codes.NotFound, "commitment slot %d not found", slot)
 			}
 
-			return err
+			return status.Errorf(codes.Internal, "failed to load commitment for slot %d: %s", slot, err.Error())
 		}
 
 		if err := srv.Send(inxCommitment(commitment)); err != nil {
@@ -160,7 +160,7 @@ func (s *Server) ListenToCommitments(req *inx.SlotRangeRequest, srv inx.INX_List
 func (s *Server) ForceCommitUntil(_ context.Context, slot *inx.SlotRequest) (*inx.NoParams, error) {
 	err := deps.Protocol.Engines.Main.Get().Notarization.ForceCommitUntil(slot.Unwrap())
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "error while performing force commit until %d", slot.Slot)
+		return nil, ierrors.Wrapf(err, "error while performing force commit until %d", slot.GetSlot())
 	}
 
 	return &inx.NoParams{}, nil
@@ -178,7 +178,7 @@ func (s *Server) ReadCommitment(_ context.Context, req *inx.CommitmentRequest) (
 			return nil, status.Errorf(codes.NotFound, "commitment slot %d not found", req.GetCommitmentSlot())
 		}
 
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "failed to load commitment for slot %d: %s", commitmentSlot, err.Error())
 	}
 
 	if req.GetCommitmentId() != nil {

@@ -7,6 +7,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	inx "github.com/iotaledger/inx/go"
@@ -39,7 +40,6 @@ func NewLedgerOutput(o *utxoledger.Output, slotIncluded ...iotago.SlotIndex) (*i
 	if includedSlot > 0 &&
 		includedSlot <= latestCommitment.Slot() &&
 		includedSlot >= deps.Protocol.CommittedAPI().ProtocolParameters().GenesisSlot() {
-
 		includedCommitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(includedSlot)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to load commitment with slot: %d", includedSlot)
@@ -67,7 +67,6 @@ func NewLedgerSpent(s *utxoledger.Spent) (*inx.LedgerSpent, error) {
 	if spentSlot > 0 &&
 		spentSlot <= latestCommitment.Slot() &&
 		spentSlot >= deps.Protocol.CommittedAPI().ProtocolParameters().GenesisSlot() {
-
 		spentCommitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(spentSlot)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to load commitment with slot: %d", spentSlot)
@@ -206,7 +205,11 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 	createLedgerUpdatePayloadAndSend := func(slot iotago.SlotIndex, outputs utxoledger.Outputs, spents utxoledger.Spents) error {
 		commitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(slot)
 		if err != nil {
-			return status.Errorf(codes.NotFound, "commitment for slot %d not found", slot)
+			if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+				return status.Errorf(codes.NotFound, "commitment for slot %d not found", slot)
+			}
+
+			return status.Errorf(codes.Internal, "failed to get commitment for slot %d: %s", slot, err.Error())
 		}
 
 		// Send Begin
@@ -250,7 +253,11 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 		for currentSlot := startSlot; currentSlot <= endSlot; currentSlot++ {
 			stateDiff, err := deps.Protocol.Engines.Main.Get().Ledger.SlotDiffs(currentSlot)
 			if err != nil {
-				return status.Errorf(codes.NotFound, "ledger update for slot %d not found", currentSlot)
+				if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+					return status.Errorf(codes.NotFound, "ledger update for slot %d not found", currentSlot)
+				}
+
+				return status.Errorf(codes.Internal, "failed to get ledger update for slot %d: %s", currentSlot, err.Error())
 			}
 
 			if err := createLedgerUpdatePayloadAndSend(stateDiff.Slot, stateDiff.Outputs, stateDiff.Spents); err != nil {

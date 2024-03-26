@@ -8,6 +8,8 @@ import (
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
+	"github.com/iotaledger/iota-core/pkg/network"
+	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	"github.com/iotaledger/iota.go/v4/api"
@@ -29,8 +31,10 @@ var (
 type dependencies struct {
 	dig.In
 
-	RestRouteManager *restapipkg.RestRouteManager
-	Protocol         *protocol.Protocol
+	RestRouteManager     *restapipkg.RestRouteManager
+	Protocol             *protocol.Protocol
+	PeeringConfigManager *p2p.ConfigManager
+	NetworkManager       network.Manager
 }
 
 func configure() error {
@@ -42,7 +46,7 @@ func configure() error {
 			return err
 		}
 
-		return httpserver.JSONResponse(c, http.StatusOK, resp)
+		return responseByHeader(c, resp, http.StatusOK)
 	})
 
 	routeGroup.DELETE(api.EndpointWithEchoParameters(api.ManagementEndpointPeer), func(c echo.Context) error {
@@ -54,21 +58,16 @@ func configure() error {
 	})
 
 	routeGroup.GET(api.ManagementEndpointPeers, func(c echo.Context) error {
-		resp, err := listPeers(c)
-		if err != nil {
-			return err
-		}
-
-		return httpserver.JSONResponse(c, http.StatusOK, resp)
+		return responseByHeader(c, listPeers(), http.StatusOK)
 	})
 
 	routeGroup.POST(api.ManagementEndpointPeers, func(c echo.Context) error {
-		resp, err := addPeer(c, Component.Logger)
+		resp, err := addPeer(c)
 		if err != nil {
 			return err
 		}
 
-		return httpserver.JSONResponse(c, http.StatusOK, resp)
+		return responseByHeader(c, resp, http.StatusOK)
 	})
 
 	routeGroup.POST(api.ManagementEndpointDatabasePrune, func(c echo.Context) error {
@@ -77,17 +76,21 @@ func configure() error {
 			return err
 		}
 
-		return httpserver.JSONResponse(c, http.StatusOK, resp)
+		return responseByHeader(c, resp, http.StatusOK)
 	})
 
-	routeGroup.POST(api.ManagementEndpointSnapshotsCreate, func(c echo.Context) error {
-		resp, err := createSnapshots(c)
-		if err != nil {
-			return err
-		}
-
-		return httpserver.JSONResponse(c, http.StatusOK, resp)
-	})
+	// routeGroup.POST(api.ManagementEndpointSnapshotsCreate, func(c echo.Context) error {
+	//	resp, err := createSnapshots(c)
+	//	if err != nil {
+	//		return err
+	//	}
+	//
+	//	return responseByHeader(c, resp, http.StatusOK)
+	// })
 
 	return nil
+}
+
+func responseByHeader(c echo.Context, obj any, httpStatusCode ...int) error {
+	return httpserver.SendResponseByHeader(c, deps.Protocol.CommittedAPI(), obj, httpStatusCode...)
 }

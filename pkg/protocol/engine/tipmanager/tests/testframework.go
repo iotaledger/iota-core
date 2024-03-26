@@ -1,3 +1,4 @@
+//nolint:dupl
 package tests
 
 import (
@@ -36,12 +37,14 @@ type TestFramework struct {
 	API iotago.API
 }
 
-func NewTestFramework(test *testing.T) *TestFramework {
-	t := &TestFramework{
+func NewTestFramework(t *testing.T) *TestFramework {
+	t.Helper()
+
+	tf := &TestFramework{
 		blockIDsByAlias:    make(map[string]iotago.BlockID),
 		tipMetadataByAlias: make(map[string]tipmanager.TipMetadata),
 		blocksByID:         make(map[iotago.BlockID]*blocks.Block),
-		test:               test,
+		test:               t,
 		API:                tpkg.ZeroCostTestAPI,
 		time:               time.Now(),
 		manualPOA: *mock.NewManualPOA(iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI),
@@ -54,14 +57,14 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		),
 	}
 
-	t.blockIDsByAlias["Genesis"] = iotago.EmptyBlockID
+	tf.blockIDsByAlias["Genesis"] = iotago.EmptyBlockID
 
-	t.Instance = tipmanagerv1.New(module.NewTestModule(test), func(blockID iotago.BlockID) (block *blocks.Block, exists bool) {
-		block, exists = t.blocksByID[blockID]
+	tf.Instance = tipmanagerv1.New(module.NewTestModule(t), func(blockID iotago.BlockID) (block *blocks.Block, exists bool) {
+		block, exists = tf.blocksByID[blockID]
 		return block, exists
-	}, t.manualPOA.CommitteeInSlot)
+	}, tf.manualPOA.CommitteeInSlot)
 
-	return t
+	return tf
 }
 
 func (t *TestFramework) Validator(alias string) iotago.AccountID {

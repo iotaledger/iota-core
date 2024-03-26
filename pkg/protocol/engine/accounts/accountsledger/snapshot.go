@@ -207,7 +207,6 @@ func (m *Manager) writeSlotDiffs(writer io.WriteSeeker, targetSlot iotago.SlotIn
 			var innerErr error
 
 			if err = slotDiffs.Stream(func(accountID iotago.AccountID, accountDiff *model.AccountDiff, destroyed bool) bool {
-
 				if err = stream.Write(writer, accountID); err != nil {
 					innerErr = ierrors.Wrapf(err, "unable to write accountID for account %s", accountID)
 					return false

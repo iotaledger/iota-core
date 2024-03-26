@@ -17,7 +17,6 @@ import (
 )
 
 func generateJWTApiToken(args []string) error {
-
 	fs := configuration.NewUnsortedFlagSet("", flag.ContinueOnError)
 	databasePathFlag := fs.String(FlagToolDatabasePath, DefaultValueP2PDatabasePath, "the path to the p2p database folder")
 	apiJWTSaltFlag := fs.String(FlagToolSalt, DefaultValueAPIJWTTokenSalt, "salt used inside the JWT tokens for the REST API")
@@ -94,7 +93,6 @@ func generateJWTApiToken(args []string) error {
 	}
 
 	if *outputJSONFlag {
-
 		result := struct {
 			JWT string `json:"jwt"`
 		}{

@@ -12,7 +12,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
@@ -283,10 +282,22 @@ func Test_CoreAPI(t *testing.T) {
 			},
 		},
 		{
+			name: "Test_TransactionByID",
+			testFunc: func(t *testing.T, nodeAlias string) {
+				assetsPerSlot.forEachTransaction(t, func(t *testing.T, transaction *iotago.SignedTransaction, firstAttachmentID iotago.BlockID) {
+					txID := transaction.Transaction.MustID()
+					resp, err := d.wallet.Clients[nodeAlias].TransactionByID(context.Background(), txID)
+					require.NoError(t, err)
+					require.NotNil(t, resp)
+					require.EqualValues(t, txID, resp.MustID())
+				})
+			},
+		},
+		{
 			name: "Test_TransactionsIncludedBlock",
 			testFunc: func(t *testing.T, nodeAlias string) {
 				assetsPerSlot.forEachTransaction(t, func(t *testing.T, transaction *iotago.SignedTransaction, firstAttachmentID iotago.BlockID) {
-					resp, err := d.Client(nodeAlias).TransactionIncludedBlock(context.Background(), lo.PanicOnErr(transaction.Transaction.ID()))
+					resp, err := d.Client(nodeAlias).TransactionIncludedBlock(context.Background(), transaction.Transaction.MustID())
 					require.NoError(t, err)
 					require.NotNil(t, resp)
 					require.EqualValues(t, firstAttachmentID, resp.MustID())
@@ -297,7 +308,7 @@ func Test_CoreAPI(t *testing.T) {
 			name: "Test_TransactionsIncludedBlockMetadata",
 			testFunc: func(t *testing.T, nodeAlias string) {
 				assetsPerSlot.forEachTransaction(t, func(t *testing.T, transaction *iotago.SignedTransaction, firstAttachmentID iotago.BlockID) {
-					resp, err := d.Client(nodeAlias).TransactionIncludedBlockMetadata(context.Background(), lo.PanicOnErr(transaction.Transaction.ID()))
+					resp, err := d.Client(nodeAlias).TransactionIncludedBlockMetadata(context.Background(), transaction.Transaction.MustID())
 					require.NoError(t, err)
 					require.NotNil(t, resp)
 					require.EqualValues(t, api.BlockStateFinalized, resp.BlockState)
@@ -309,7 +320,7 @@ func Test_CoreAPI(t *testing.T) {
 			name: "Test_TransactionsMetadata",
 			testFunc: func(t *testing.T, nodeAlias string) {
 				assetsPerSlot.forEachTransaction(t, func(t *testing.T, transaction *iotago.SignedTransaction, firstAttachmentID iotago.BlockID) {
-					resp, err := d.Client(nodeAlias).TransactionMetadata(context.Background(), lo.PanicOnErr(transaction.Transaction.ID()))
+					resp, err := d.Client(nodeAlias).TransactionMetadata(context.Background(), transaction.Transaction.MustID())
 					require.NoError(t, err)
 					require.NotNil(t, resp)
 					require.Equal(t, api.TransactionStateFinalized, resp.TransactionState)
@@ -478,7 +489,7 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 				slot := iotago.SlotIndex(1000_000_000)
 				resp, err := d.Client(nodeAlias).CommitmentBySlot(context.Background(), slot)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.True(t, isStatusCode(err, http.StatusNotFound))
 				require.Nil(t, resp)
 			},
 		},
@@ -488,7 +499,7 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 				committmentID := tpkg.RandCommitmentID()
 				resp, err := d.Client(nodeAlias).CommitmentByID(context.Background(), committmentID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.True(t, isStatusCode(err, http.StatusNotFound))
 				require.Nil(t, resp)
 			},
 		},
@@ -521,7 +532,7 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 				slot := iotago.SlotIndex(1000_000_000)
 				resp, err := d.Client(nodeAlias).CommitmentUTXOChangesBySlot(context.Background(), slot)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.True(t, isStatusCode(err, http.StatusNotFound))
 				require.Nil(t, resp)
 			},
 		},
@@ -532,7 +543,7 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 
 				resp, err := d.Client(nodeAlias).CommitmentUTXOChangesFullBySlot(context.Background(), slot)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.True(t, isStatusCode(err, http.StatusNotFound))
 				require.Nil(t, resp)
 			},
 		},
@@ -575,7 +586,7 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 				txID := tpkg.RandTransactionID()
 				resp, err := d.Client(nodeAlias).TransactionIncludedBlock(context.Background(), txID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.True(t, isStatusCode(err, http.StatusNotFound))
 				require.Nil(t, resp)
 			},
 		},
@@ -586,7 +597,7 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 
 				resp, err := d.Client(nodeAlias).TransactionIncludedBlockMetadata(context.Background(), txID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.True(t, isStatusCode(err, http.StatusNotFound))
 				require.Nil(t, resp)
 			},
 		},
@@ -608,7 +619,7 @@ func Test_CoreAPI_BadRequests(t *testing.T) {
 				commitmentID := tpkg.RandCommitmentID()
 				resp, err := d.Client(nodeAlias).Congestion(context.Background(), accountAddress, 0, commitmentID)
 				require.Error(t, err)
-				require.True(t, isStatusCode(err, http.StatusBadRequest))
+				require.True(t, isStatusCode(err, http.StatusNotFound))
 				require.Nil(t, resp)
 			},
 		},

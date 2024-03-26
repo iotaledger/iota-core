@@ -162,7 +162,6 @@ func (t *TestSuite) AssertCommitmentsAndChainsEvicted(expectedEvictedSlot iotago
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-
 			seenChains := make(map[*protocol.Chain]struct{})
 			if err := node.Protocol.Commitments.ForEach(func(commitment *protocol.Commitment) error {
 				if commitment.Chain.Get() != nil { // the chain of orphaned commitments is nil.

@@ -263,6 +263,7 @@ func WithAccountImmutableFeatures(features iotago.AccountOutputImmFeatures) opti
 func WithAccountConditions(conditions iotago.AccountOutputUnlockConditions) options.Option[builder.AccountOutputBuilder] {
 	return func(accountBuilder *builder.AccountOutputBuilder) {
 		for _, condition := range conditions.MustSet() {
+			//nolint:gocritic
 			switch condition.Type() {
 			case iotago.UnlockConditionAddress:
 				//nolint:forcetypeassert

@@ -28,7 +28,7 @@ func (t *TestSuite) AssertTransaction(transaction *iotago.Transaction, node *moc
 			return ierrors.Errorf("AssertTransaction: %s: expected ID %s, got %s", node.Name, transactionID, loadedTransactionMetadata.ID())
 		}
 
-		// nolint: forcetypeassert // we are in a test and want to assert it anyway
+		//nolint:forcetypeassert // we are in a test and want to assert it anyway
 		if !assert.Equal(t.fakeTesting, transaction.TransactionEssence, loadedTransactionMetadata.Transaction().(*iotago.Transaction).TransactionEssence) {
 			return ierrors.Errorf("AssertTransaction: %s: expected TransactionEssence %v, got %v", node.Name, transaction.TransactionEssence, loadedTransactionMetadata.Transaction().(*iotago.Transaction).TransactionEssence)
 		}
@@ -39,7 +39,7 @@ func (t *TestSuite) AssertTransaction(transaction *iotago.Transaction, node *moc
 		}
 
 		// TODO: fix this in another PR
-		//if !assert.Equal(t.fakeTesting, transaction.Outputs, typedTransaction.Outputs) {
+		// if !assert.Equal(t.fakeTesting, transaction.Outputs, typedTransaction.Outputs) {
 		api := t.DefaultWallet().Client.APIForSlot(transactionID.Slot())
 		expected, _ := api.Encode(transaction.Outputs)
 		actual, _ := api.Encode(typedTransaction.Outputs)
@@ -164,7 +164,6 @@ func (t *TestSuite) AssertTransactionInCacheConflicts(transactionConflicts map[*
 func (t *TestSuite) AssertTransactionFailure(signedTxID iotago.SignedTransactionID, txFailureReason error, nodes ...*mock.Node) {
 	for _, node := range nodes {
 		t.Eventually(func() error {
-
 			txFailure, exists := node.TransactionFailure(signedTxID)
 			if !exists {
 				return ierrors.Errorf("%s: failure for signed transaction %s does not exist", node.Name, signedTxID)

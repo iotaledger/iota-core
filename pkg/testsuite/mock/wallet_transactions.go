@@ -68,7 +68,7 @@ func (w *Wallet) CreateAccountsFromInput(transactionName string, inputName strin
 	remainderMana := input.Output.StoredMana() - outputMana*iotago.Mana(outputCount)
 
 	outputStates := make(iotago.Outputs[iotago.Output], 0, outputCount)
-	for i := 0; i < outputCount; i++ {
+	for i := range outputCount {
 		if i+1 == outputCount {
 			outputBaseToken += remainderBaseToken
 			outputMana += remainderMana
@@ -670,7 +670,7 @@ func (w *Wallet) CreateBasicOutputsEquallyFromInput(transactionName string, outp
 	remainderFunds := inputAmount - tokenAmount*iotago.BaseToken(outputCount)
 
 	outputStates := make(iotago.Outputs[iotago.Output], 0, outputCount)
-	for i := 0; i < outputCount; i++ {
+	for i := range outputCount {
 		if i+1 == outputCount {
 			tokenAmount += remainderFunds
 			manaAmount += remainderMana
@@ -763,7 +763,7 @@ func (w *Wallet) CreateBasicOutputsEquallyFromInputs(transactionName string, inp
 	outputMana := totalInputMana / iotago.Mana(outputsCount)
 	remainderMana := totalInputMana - outputMana*iotago.Mana(outputsCount)
 
-	for i := 0; i < outputsCount; i++ {
+	for i := range outputsCount {
 		if i+1 == outputsCount {
 			outputAmount += remainderAmount
 			outputMana += remainderMana
@@ -1216,7 +1216,6 @@ func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Tra
 				break
 			}
 		}
-
 	}
 }
 

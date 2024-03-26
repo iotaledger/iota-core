@@ -10,7 +10,7 @@ import (
 
 func (s *Server) ReadIsValidatorAccount(_ context.Context, accountInfoRequest *inx.AccountInfoRequest) (*inx.BoolResponse, error) {
 	slot := iotago.SlotIndex(accountInfoRequest.GetAccountSlot())
-	accountID, _, err := iotago.AccountIDFromBytes(accountInfoRequest.AccountId)
+	accountID, _, err := iotago.AccountIDFromBytes(accountInfoRequest.GetAccountId())
 	if err != nil {
 		return nil, ierrors.Wrap(err, "error when parsing account id")
 	}
@@ -25,7 +25,7 @@ func (s *Server) ReadIsValidatorAccount(_ context.Context, accountInfoRequest *i
 
 func (s *Server) ReadIsCommitteeMember(_ context.Context, accountInfoRequest *inx.AccountInfoRequest) (*inx.BoolResponse, error) {
 	slot := iotago.SlotIndex(accountInfoRequest.GetAccountSlot())
-	accountID, _, err := iotago.AccountIDFromBytes(accountInfoRequest.AccountId)
+	accountID, _, err := iotago.AccountIDFromBytes(accountInfoRequest.GetAccountId())
 	if err != nil {
 		return nil, ierrors.Wrap(err, "error when parsing account id")
 	}
@@ -39,7 +39,7 @@ func (s *Server) ReadIsCommitteeMember(_ context.Context, accountInfoRequest *in
 
 func (s *Server) ReadIsCandidate(_ context.Context, accountInfoRequest *inx.AccountInfoRequest) (*inx.BoolResponse, error) {
 	slot := iotago.SlotIndex(accountInfoRequest.GetAccountSlot())
-	accountID, _, err := iotago.AccountIDFromBytes(accountInfoRequest.AccountId)
+	accountID, _, err := iotago.AccountIDFromBytes(accountInfoRequest.GetAccountId())
 	if err != nil {
 		return nil, ierrors.Wrap(err, "error when parsing account id")
 	}

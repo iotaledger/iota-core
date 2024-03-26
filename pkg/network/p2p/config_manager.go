@@ -18,9 +18,19 @@ type ConfigManager struct {
 func NewConfigManager(storeCallback func([]*PeerConfigItem) error) *ConfigManager {
 	return &ConfigManager{
 		onChangeMap: onchangemap.NewOnChangeMap(
-			onchangemap.WithChangedCallback[string, *ComparablePeerID](storeCallback),
+			onchangemap.WithChangedCallback(storeCallback),
 		),
 	}
+}
+
+// Peer returns a peer by its ID.
+func (pm *ConfigManager) Peer(peerID peer.ID) *PeerConfigItem {
+	peer, err := pm.onChangeMap.Get(NewComparablePeerID(peerID))
+	if err != nil {
+		return nil
+	}
+
+	return peer
 }
 
 // Peers returns all known peers.

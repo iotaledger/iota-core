@@ -18,18 +18,18 @@ import (
 )
 
 var (
-	// settings
+	// settings.
 	webSocketWriteTimeout = 3 * time.Second
 
-	// clients
+	// clients.
 	wsClientsMu    syncutils.RWMutex
 	wsClients      = make(map[uint64]*wsclient)
 	nextWsClientID uint64
 
-	// gorilla websocket layer
+	// gorilla websocket layer.
 	upgrader = websocket.Upgrader{
 		HandshakeTimeout:  webSocketWriteTimeout,
-		CheckOrigin:       func(r *http.Request) bool { return true },
+		CheckOrigin:       func(*http.Request) bool { return true },
 		EnableCompression: true,
 	}
 )
@@ -97,6 +97,7 @@ func registerWSClient() (uint64, *wsclient) {
 	}
 	wsClients[clientID] = wsClient
 	nextWsClientID++
+
 	return clientID, wsClient
 }
 
@@ -120,6 +121,7 @@ func broadcastWsBlock(blk interface{}, dontDrop ...bool) {
 			case <-wsClient.exit:
 			case wsClient.channel <- blk:
 			}
+
 			return
 		}
 
@@ -166,15 +168,7 @@ func websocketRoute(c echo.Context) error {
 			break
 		}
 	}
-	return nil
-}
 
-func sendJSON(ws *websocket.Conn, blk *wsblk) error {
-	if err := ws.WriteJSON(blk); err != nil {
-		return err
-	}
-	if err := ws.SetWriteDeadline(time.Now().Add(webSocketWriteTimeout)); err != nil {
-		return err
-	}
+	//nolint:nilerr // false positive
 	return nil
 }

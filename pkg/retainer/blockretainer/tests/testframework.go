@@ -46,7 +46,9 @@ type TestFramework struct {
 	lastFinalizedSlot iotago.SlotIndex
 }
 
-func NewTestFramework(test *testing.T) *TestFramework {
+func NewTestFramework(t *testing.T) *TestFramework {
+	t.Helper()
+
 	tf := &TestFramework{
 		stores:            make(map[iotago.SlotIndex]*slotstore.BlockMetadataStore),
 		lastCommittedSlot: iotago.SlotIndex(0),
@@ -57,10 +59,10 @@ func NewTestFramework(test *testing.T) *TestFramework {
 				iotago.WithLivenessOptions(5, 5, 1, 2, 3),
 			),
 		),
-		test: test,
+		test: t,
 	}
 
-	workers := workerpool.NewGroup(test.Name())
+	workers := workerpool.NewGroup(t.Name())
 
 	storeFunc := func(slotIndex iotago.SlotIndex) (*slotstore.BlockMetadataStore, error) {
 		if _, exists := tf.stores[slotIndex]; !exists {
@@ -75,10 +77,10 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	}
 
 	errorHandlerFunc := func(err error) {
-		require.NoError(test, err)
+		require.NoError(t, err)
 	}
 
-	tf.Instance = blockretainer.New(module.NewTestModule(test), workers, storeFunc, lastFinalizedSlotFunc, errorHandlerFunc)
+	tf.Instance = blockretainer.New(module.NewTestModule(t), workers, storeFunc, lastFinalizedSlotFunc, errorHandlerFunc)
 
 	return tf
 }

@@ -176,8 +176,12 @@ func attachEngineLogs(instance *engine.Engine) func() {
 			instance.LogTrace("BlockProcessed", "block", blockID)
 		}).Unhook,
 
-		events.Retainer.BlockRetained.Hook(func(block *blocks.Block) {
+		events.BlockRetainer.BlockRetained.Hook(func(block *blocks.Block) {
 			instance.LogTrace("Retainer.BlockRetained", "block", block.ID())
+		}).Unhook,
+
+		events.TransactionRetainer.TransactionRetained.Hook(func(txID iotago.TransactionID) {
+			instance.LogTrace("Retainer.TransactionRetained", "transaction", txID)
 		}).Unhook,
 
 		events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
@@ -438,7 +442,7 @@ func (c *ChainsCandidate) measureAt(slot iotago.SlotIndex) (teardown func()) {
 	// sanitize protocol parameters
 	chainSwitchingThreshold := c.chains.protocol.APIForSlot(slot).ProtocolParameters().ChainSwitchingThreshold()
 	if slot < iotago.SlotIndex(chainSwitchingThreshold) {
-		return
+		return nil
 	}
 
 	// get the sorted commitments for the given slot
@@ -451,9 +455,9 @@ func (c *ChainsCandidate) measureAt(slot iotago.SlotIndex) (teardown func()) {
 
 			// abort if the heaviest commitment is the main chain or main chain is heavier
 			if mainChain := c.chains.Main.Get(); heaviestChain == mainChain {
-				return
+				return nil
 			} else if mainChain.CumulativeVerifiedWeightAt(heaviestCommitment.Slot()) > candidateWeight {
-				return
+				return nil
 			}
 
 			// create counter for the number of slots with the same chain

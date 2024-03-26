@@ -48,6 +48,18 @@ func configure() error {
 		return responseByHeader(c, resp)
 	})
 
+	routeGroup.GET(api.CoreEndpointNetworkHealth, func(c echo.Context) error {
+		if deps.RequestHandler.IsNetworkHealthy() {
+			return httpserver.JSONResponse(c, http.StatusOK, &api.NetworkHealthResponse{
+				IsNetworkHealthy: true,
+			})
+		}
+
+		return httpserver.JSONResponse(c, http.StatusServiceUnavailable, &api.NetworkHealthResponse{
+			IsNetworkHealthy: false,
+		})
+	})
+
 	routeGroup.GET(api.CoreEndpointNetworkMetrics, func(c echo.Context) error {
 		resp := metrics()
 
@@ -211,13 +223,22 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointTransactionsIncludedBlock), func(c echo.Context) error {
-		block, err := blockFromTransactionID(c)
+	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointTransaction), func(c echo.Context) error {
+		resp, err := transactionFromTransactionID(c)
 		if err != nil {
 			return err
 		}
 
-		return responseByHeader(c, block)
+		return responseByHeader(c, resp)
+	})
+
+	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointTransactionsIncludedBlock), func(c echo.Context) error {
+		resp, err := blockFromTransactionID(c)
+		if err != nil {
+			return err
+		}
+
+		return responseByHeader(c, resp)
 	})
 
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointTransactionsIncludedBlockMetadata), func(c echo.Context) error {

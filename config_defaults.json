@@ -74,7 +74,7 @@
     }
   },
   "debugAPI": {
-    "enabled": true,
+    "enabled": false,
     "db": {
       "path": "testnet/debug",
       "maxOpenDBs": 2,

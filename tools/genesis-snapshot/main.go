@@ -58,7 +58,7 @@ func parseFlags() (opt []options.Option[snapshotcreator.Options], conf string) {
 	if err != nil {
 		log.Fatal(ierrors.Wrap(err, "failed to decode base58 seed"))
 	}
-	keyManager, err := wallet.NewKeyManager(genesisSeed[:], wallet.DefaultIOTAPath)
+	keyManager, err := wallet.NewKeyManager(genesisSeed, wallet.DefaultIOTAPath)
 	if err != nil {
 		log.Fatal(ierrors.Wrap(err, "failed to create KeyManager from seed"))
 	}

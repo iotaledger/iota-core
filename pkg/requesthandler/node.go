@@ -13,6 +13,10 @@ func (r *RequestHandler) IsNodeSynced() bool {
 	return r.protocol.Engines.Main.Get().SyncManager.IsNodeSynced()
 }
 
+func (r *RequestHandler) IsNetworkHealthy() bool {
+	return r.protocol.Engines.Main.Get().SyncManager.IsNodeSynced() && !r.protocol.Engines.Main.Get().SyncManager.IsFinalizationDelayed()
+}
+
 func (r *RequestHandler) GetProtocolParameters() []*api.InfoResProtocolParameters {
 	protoParams := make([]*api.InfoResProtocolParameters, 0)
 	provider := r.protocol.Engines.Main.Get().Storage.Settings().APIProvider()
@@ -37,6 +41,7 @@ func (r *RequestHandler) GetNodeStatus() *api.InfoResNodeStatus {
 
 	return &api.InfoResNodeStatus{
 		IsHealthy:                   syncStatus.NodeSynced,
+		IsNetworkHealthy:            syncStatus.NodeSynced && !syncStatus.FinalizationDelayed,
 		AcceptedTangleTime:          clSnapshot.AcceptedTime,
 		RelativeAcceptedTangleTime:  clSnapshot.RelativeAcceptedTime,
 		ConfirmedTangleTime:         clSnapshot.ConfirmedTime,

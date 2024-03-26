@@ -10,7 +10,7 @@ import (
 
 type VM struct{}
 
-func (V *VM) Inputs(transaction mempool.Transaction) ([]mempool.StateReference, error) {
+func (v *VM) Inputs(transaction mempool.Transaction) ([]mempool.StateReference, error) {
 	testTransaction, ok := transaction.(*Transaction)
 	if !ok {
 		return nil, ierrors.New("invalid transaction type in MockedVM")
@@ -19,11 +19,11 @@ func (V *VM) Inputs(transaction mempool.Transaction) ([]mempool.StateReference, 
 	return testTransaction.Inputs()
 }
 
-func (V *VM) ValidateSignatures(_ mempool.SignedTransaction, _ []mempool.State) (executionContext context.Context, err error) {
+func (v *VM) ValidateSignatures(_ mempool.SignedTransaction, _ []mempool.State) (executionContext context.Context, err error) {
 	return context.Background(), nil
 }
 
-func (V *VM) Execute(_ context.Context, transaction mempool.Transaction) (outputs []mempool.State, err error) {
+func (v *VM) Execute(_ context.Context, transaction mempool.Transaction) (outputs []mempool.State, err error) {
 	typedTransaction, ok := transaction.(*Transaction)
 	if !ok {
 		return nil, ierrors.New("invalid transaction type in MockedVM")
@@ -33,7 +33,7 @@ func (V *VM) Execute(_ context.Context, transaction mempool.Transaction) (output
 		return nil, ierrors.New("invalid transaction")
 	}
 
-	for i := uint16(0); i < typedTransaction.outputCount; i++ {
+	for i := range typedTransaction.outputCount {
 		id, err := typedTransaction.ID()
 		if err != nil {
 			return nil, err
