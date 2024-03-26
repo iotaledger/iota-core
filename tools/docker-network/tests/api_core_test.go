@@ -286,7 +286,7 @@ func Test_CoreAPI(t *testing.T) {
 			testFunc: func(t *testing.T, nodeAlias string) {
 				assetsPerSlot.forEachTransaction(t, func(t *testing.T, transaction *iotago.SignedTransaction, firstAttachmentID iotago.BlockID) {
 					txID := transaction.Transaction.MustID()
-					resp, err := d.wallet.Clients[nodeAlias].TransactionByID(context.Background(), txID)
+					resp, err := d.Client(nodeAlias).TransactionByID(context.Background(), txID)
 					require.NoError(t, err)
 					require.NotNil(t, resp)
 					require.EqualValues(t, txID, resp.MustID())

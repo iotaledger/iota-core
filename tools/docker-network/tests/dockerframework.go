@@ -363,11 +363,6 @@ func (d *DockerTestFramework) NodeStatus(name string) *api.InfoResNodeStatus {
 	return info.Status
 }
 
-// Client returns the node client by the given node name.
-func (d *DockerTestFramework) Client(name string) *nodeclient.Client {
-	return d.wallet.Clients[name]
-}
-
 func (d *DockerTestFramework) AccountsFromNodes(nodes ...*Node) []string {
 	var accounts []string
 	for _, node := range nodes {
