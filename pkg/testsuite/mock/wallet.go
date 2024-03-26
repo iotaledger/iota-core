@@ -2,6 +2,7 @@ package mock
 
 import (
 	"crypto/ed25519"
+	"sync"
 	"testing"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -79,8 +80,13 @@ type Wallet struct {
 	BlockIssuer *BlockIssuer
 
 	outputs      map[string]*OutputData
+	outputsByID  map[iotago.OutputID]*OutputData
 	transactions map[string]*iotago.Transaction
-	clock        WalletClock
+
+	accounts     map[iotago.AccountID]*AccountData
+	accountsLock sync.RWMutex
+
+	clock WalletClock
 }
 
 func NewWallet(t *testing.T, name string, client Client, keyManager ...*wallet.KeyManager) *Wallet {
@@ -98,6 +104,8 @@ func NewWallet(t *testing.T, name string, client Client, keyManager ...*wallet.K
 		Name:         name,
 		Client:       client,
 		outputs:      make(map[string]*OutputData),
+		outputsByID:  make(map[iotago.OutputID]*OutputData),
+		accounts:     make(map[iotago.AccountID]*AccountData),
 		transactions: make(map[string]*iotago.Transaction),
 		keyManager:   km,
 		BlockIssuer:  NewBlockIssuer(t, name, km, client, blockIssuerAddressIndex, blockIssuerID, false),
@@ -124,6 +132,7 @@ func (w *Wallet) CurrentSlot() iotago.SlotIndex {
 
 func (w *Wallet) AddOutput(outputName string, output *OutputData) {
 	w.outputs[outputName] = output
+	w.outputsByID[output.ID] = output
 }
 
 func (w *Wallet) Balance() iotago.BaseToken {
@@ -139,6 +148,15 @@ func (w *Wallet) OutputData(outputName string) *OutputData {
 	output, exists := w.outputs[outputName]
 	if !exists {
 		panic(ierrors.Errorf("output %s not registered in wallet %s", outputName, w.Name))
+	}
+
+	return output
+}
+
+func (w *Wallet) Output(outputID iotago.OutputID) *OutputData {
+	output, exists := w.outputsByID[outputID]
+	if !exists {
+		panic(ierrors.Errorf("output %s not registered in wallet %s", outputID.ToHex(), w.Name))
 	}
 
 	return output
@@ -168,6 +186,40 @@ func (w *Wallet) Transactions(transactionNames ...string) []*iotago.Transaction 
 
 func (w *Wallet) TransactionID(alias string) iotago.TransactionID {
 	return w.Transaction(alias).MustID()
+}
+
+func (w *Wallet) Account(accountID iotago.AccountID) *AccountData {
+	w.accountsLock.RLock()
+	defer w.accountsLock.RUnlock()
+
+	acc, exists := w.accounts[accountID]
+	if !exists {
+		panic(ierrors.Errorf("account %s not registered in wallet", accountID.ToHex()))
+	}
+
+	return acc
+}
+
+func (w *Wallet) Accounts(accountIDs ...iotago.AccountID) []*AccountData {
+	w.accountsLock.RLock()
+	defer w.accountsLock.RUnlock()
+
+	accounts := make([]*AccountData, 0)
+	if len(accountIDs) == 0 {
+		for _, acc := range w.accounts {
+			accounts = append(accounts, acc)
+		}
+	}
+
+	for _, id := range accountIDs {
+		acc, exists := w.accounts[id]
+		if !exists {
+			panic(ierrors.Errorf("account %s not registered in wallet", id.ToHex()))
+		}
+		accounts = append(accounts, acc)
+	}
+
+	return accounts
 }
 
 func (w *Wallet) Address(index ...uint32) iotago.DirectUnlockableAddress {

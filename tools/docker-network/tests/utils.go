@@ -27,7 +27,7 @@ import (
 func (d *DockerTestFramework) CheckAccountStatus(ctx context.Context, blkID iotago.BlockID, txID iotago.TransactionID, creationOutputID iotago.OutputID, accountAddress *iotago.AccountAddress, checkIndexer ...bool) {
 	// request by blockID if provided, otherwise use txID
 	// we take the slot from the blockID in case the tx is created earlier than the block.
-	clt := d.wallet.Client
+	clt := d.defaultWallet.Client
 	slot := blkID.Slot()
 
 	if blkID == iotago.EmptyBlockID {
@@ -45,7 +45,7 @@ func (d *DockerTestFramework) CheckAccountStatus(ctx context.Context, blkID iota
 
 	// Check the indexer
 	if len(checkIndexer) > 0 && checkIndexer[0] {
-		indexerClt, err := d.wallet.Client.Indexer(ctx)
+		indexerClt, err := d.defaultWallet.Client.Indexer(ctx)
 		require.NoError(d.Testing, err)
 
 		_, _, _, err = indexerClt.Account(ctx, accountAddress)
@@ -60,7 +60,7 @@ func (d *DockerTestFramework) CheckAccountStatus(ctx context.Context, blkID iota
 func (d *DockerTestFramework) AssertIndexerAccount(account *mock.AccountData) {
 	d.Eventually(func() error {
 		ctx := context.TODO()
-		indexerClt, err := d.wallet.Client.Indexer(ctx)
+		indexerClt, err := d.defaultWallet.Client.Indexer(ctx)
 		if err != nil {
 			return err
 		}
@@ -80,7 +80,7 @@ func (d *DockerTestFramework) AssertIndexerAccount(account *mock.AccountData) {
 func (d *DockerTestFramework) AssertIndexerFoundry(foundryID iotago.FoundryID) {
 	d.Eventually(func() error {
 		ctx := context.TODO()
-		indexerClt, err := d.wallet.Client.Indexer(ctx)
+		indexerClt, err := d.defaultWallet.Client.Indexer(ctx)
 		if err != nil {
 			return err
 		}
@@ -114,7 +114,7 @@ func (d *DockerTestFramework) AssertCommittee(expectedEpoch iotago.EpochIndex, e
 	sort.Strings(expectedCommitteeMember)
 
 	status := d.NodeStatus("V1")
-	testAPI := d.wallet.Client.CommittedAPI()
+	testAPI := d.defaultWallet.Client.CommittedAPI()
 	expectedSlotStart := testAPI.TimeProvider().EpochStart(expectedEpoch)
 	require.Greater(d.Testing, expectedSlotStart, status.LatestAcceptedBlockSlot)
 
@@ -195,7 +195,7 @@ func (d *DockerTestFramework) Eventually(condition func() error, waitForSync ...
 }
 
 func (d *DockerTestFramework) AwaitTransactionPayloadAccepted(ctx context.Context, txID iotago.TransactionID) {
-	clt := d.wallet.Client
+	clt := d.defaultWallet.Client
 
 	d.Eventually(func() error {
 		resp, err := clt.TransactionMetadata(ctx, txID)
@@ -217,7 +217,7 @@ func (d *DockerTestFramework) AwaitTransactionPayloadAccepted(ctx context.Contex
 
 func (d *DockerTestFramework) AwaitTransactionState(ctx context.Context, txID iotago.TransactionID, expectedState api.TransactionState) {
 	d.Eventually(func() error {
-		resp, err := d.wallet.Client.TransactionMetadata(ctx, txID)
+		resp, err := d.defaultWallet.Client.TransactionMetadata(ctx, txID)
 		if err != nil {
 			return err
 		}
@@ -232,7 +232,7 @@ func (d *DockerTestFramework) AwaitTransactionState(ctx context.Context, txID io
 
 func (d *DockerTestFramework) AwaitTransactionFailure(ctx context.Context, txID iotago.TransactionID, expectedReason api.TransactionFailureReason) {
 	d.Eventually(func() error {
-		resp, err := d.wallet.Client.TransactionMetadata(ctx, txID)
+		resp, err := d.defaultWallet.Client.TransactionMetadata(ctx, txID)
 		if err != nil {
 			return err
 		}
@@ -270,10 +270,10 @@ func (d *DockerTestFramework) AwaitFinalization(targetSlot iotago.SlotIndex) {
 	})
 }
 
-func (d *DockerTestFramework) AwaitAddressUnspentOutputAccepted(ctx context.Context, addr iotago.Address) (outputID iotago.OutputID, output iotago.Output, err error) {
-	indexerClt, err := d.wallet.Client.Indexer(ctx)
+func (d *DockerTestFramework) AwaitAddressUnspentOutputAccepted(ctx context.Context, wallet *mock.Wallet, addr iotago.Address) (outputID iotago.OutputID, output iotago.Output, err error) {
+	indexerClt, err := wallet.Client.Indexer(ctx)
 	require.NoError(d.Testing, err)
-	addrBech := addr.Bech32(d.wallet.Client.CommittedAPI().ProtocolParameters().Bech32HRP())
+	addrBech := addr.Bech32(d.defaultWallet.Client.CommittedAPI().ProtocolParameters().Bech32HRP())
 
 	for t := time.Now(); time.Since(t) < d.optsWaitFor; time.Sleep(d.optsTick) {
 		res, err := indexerClt.Outputs(ctx, &api.BasicOutputsQuery{
@@ -300,8 +300,8 @@ func (d *DockerTestFramework) AwaitAddressUnspentOutputAccepted(ctx context.Cont
 	return iotago.EmptyOutputID, nil, ierrors.Errorf("no unspent outputs found for address %s due to timeout", addrBech)
 }
 
-func (d *DockerTestFramework) SendFaucetRequest(ctx context.Context, receiveAddr iotago.Address) {
-	cltAPI := d.wallet.Client.CommittedAPI()
+func (d *DockerTestFramework) SendFaucetRequest(ctx context.Context, wallet *mock.Wallet, receiveAddr iotago.Address) {
+	cltAPI := wallet.Client.CommittedAPI()
 	addrBech := receiveAddr.Bech32(cltAPI.ProtocolParameters().Bech32HRP())
 
 	type EnqueueRequest struct {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
@@ -35,12 +36,11 @@ func Test_MempoolInvalidSignatures(t *testing.T) {
 
 	d.WaitUntilNetworkReady()
 
-	account := d.CreateAccount()
+	wallet, account := d.CreateAccount()
 
 	ctx := context.Background()
-	fundsOutputID := d.RequestFaucetFunds(ctx, iotago.AddressEd25519)
-	input := d.wallet.Output(fundsOutputID)
-	validTX := d.wallet.CreateBasicOutputFromInput(input, account.ID)
+	fundsOutputData := d.RequestFaucetFunds(ctx, wallet, iotago.AddressEd25519)
+	validTX := wallet.CreateBasicOutputFromInput(fundsOutputData, account.ID)
 	invalidTX := validTX.Clone().(*iotago.SignedTransaction)
 
 	// Make validTX invalid by replacing the first unlock with an empty signature unlock.
@@ -51,19 +51,16 @@ func Test_MempoolInvalidSignatures(t *testing.T) {
 	}
 
 	fmt.Println("Submitting block with invalid TX")
-	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, d.wallet.Client, account.ID.ToAddress().(*iotago.AccountAddress))
-	d.SubmitPayload(context.Background(), invalidTX, account.ID, congestionResp, issuerResp)
+	wallet.IssueBasicBlock(ctx, "", mock.WithPayload(invalidTX))
 
 	d.AwaitTransactionState(ctx, invalidTX.Transaction.MustID(), api.TransactionStateFailed)
 	d.AwaitTransactionFailure(ctx, invalidTX.Transaction.MustID(), api.TxFailureUnlockSignatureInvalid)
 
 	fmt.Println("Submitting block with valid TX")
-	issuerResp, congestionResp = d.PrepareBlockIssuance(ctx, d.wallet.Client, account.ID.ToAddress().(*iotago.AccountAddress))
-	d.SubmitPayload(context.Background(), validTX, account.ID, congestionResp, issuerResp)
+	wallet.IssueBasicBlock(ctx, "", mock.WithPayload(validTX))
 
 	fmt.Println("Submitting block with invalid TX (again)")
-	issuerResp, congestionResp = d.PrepareBlockIssuance(ctx, d.wallet.Client, account.ID.ToAddress().(*iotago.AccountAddress))
-	d.SubmitPayload(context.Background(), invalidTX, account.ID, congestionResp, issuerResp)
+	wallet.IssueBasicBlock(ctx, "", mock.WithPayload(invalidTX))
 
 	d.AwaitTransactionPayloadAccepted(ctx, validTX.Transaction.MustID())
 }

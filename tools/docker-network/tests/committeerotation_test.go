@@ -43,7 +43,7 @@ func Test_SmallerCommittee(t *testing.T) {
 
 	status := d.NodeStatus("V1")
 
-	clt := d.wallet.Client
+	clt := d.defaultWallet.Client
 	currentEpoch := clt.CommittedAPI().TimeProvider().EpochFromSlot(status.LatestAcceptedBlockSlot)
 
 	// stop inx-validator plugin of validator 2
@@ -90,7 +90,7 @@ func Test_ReuseDueToNoFinalization(t *testing.T) {
 	err = d.StopContainer(d.Node("V2").ContainerName, d.Node("V3").ContainerName)
 	require.NoError(t, err)
 
-	clt := d.wallet.Client
+	clt := d.defaultWallet.Client
 	status := d.NodeStatus("V1")
 
 	prevFinalizedSlot := status.LatestFinalizedSlot
@@ -155,7 +155,7 @@ func Test_NoCandidacyPayload(t *testing.T) {
 
 	d.WaitUntilNetworkReady()
 
-	clt := d.wallet.Client
+	clt := d.defaultWallet.Client
 	status := d.NodeStatus("V1")
 	prevFinalizedSlot := status.LatestFinalizedSlot
 	fmt.Println("First finalized slot: ", prevFinalizedSlot)
@@ -205,7 +205,7 @@ func Test_Staking(t *testing.T) {
 
 	d.WaitUntilNetworkReady()
 
-	account := d.CreateAccount(WithStakingFeature(100, 1, 0))
+	_, account := d.CreateAccount(WithStakingFeature(100, 1, 0))
 
 	d.AssertValidatorExists(account.Address)
 }
@@ -242,13 +242,13 @@ func Test_Delegation(t *testing.T) {
 	d.WaitUntilNetworkReady()
 
 	// create an account to perform delegation
-	account := d.CreateAccount()
+	wallet, _ := d.CreateAccount()
 
 	// delegate all faucet funds to V2, V2 should replace V3
-	_, delegationOutput := d.DelegateToValidator(account.ID, d.Node("V2").AccountAddress(t))
+	_, delegationOutput := d.DelegateToValidator(wallet, d.Node("V2").AccountAddress(t))
 	d.AssertCommittee(delegationOutput.StartEpoch+1, d.AccountsFromNodes(d.Nodes("V1", "V2", "V4")...))
 
 	// delegate all faucet funds to V3, V3 should replace V1
-	_, delegationOutput = d.DelegateToValidator(account.ID, d.Node("V3").AccountAddress(t))
+	_, delegationOutput = d.DelegateToValidator(wallet, d.Node("V3").AccountAddress(t))
 	d.AssertCommittee(delegationOutput.StartEpoch+1, d.AccountsFromNodes(d.Nodes("V2", "V3", "V4")...))
 }

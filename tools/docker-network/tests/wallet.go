@@ -8,7 +8,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -308,72 +307,6 @@ func (w *DockerWallet) CreateDelegationFromInput(issuerID iotago.AccountID, vali
 	return signedTx
 }
 
-func (w *DockerWallet) CreateFoundryAndNativeTokensFromInput(issuerID iotago.AccountID, inputID iotago.OutputID, mintedAmount iotago.BaseToken, maxSupply iotago.BaseToken, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
-	input := w.Output(inputID)
-
-	issuer := w.Account(issuerID)
-	currentSlot := w.Client.LatestAPI().TimeProvider().CurrentSlot()
-	apiForSlot := w.Client.APIForSlot(currentSlot)
-
-	// increase foundry counter
-	accTransitionOutput := builder.NewAccountOutputBuilderFromPrevious(issuer.Output).
-		FoundriesToGenerate(1).MustBuild()
-
-	// build foundry output
-	foundryID, err := iotago.FoundryIDFromAddressAndSerialNumberAndTokenScheme(issuer.Address, accTransitionOutput.FoundryCounter, iotago.TokenSchemeSimple)
-	require.NoError(w.Testing, err)
-	tokenScheme := &iotago.SimpleTokenScheme{
-		MintedTokens:  big.NewInt(int64(mintedAmount)),
-		MaximumSupply: big.NewInt(int64(maxSupply)),
-		MeltedTokens:  big.NewInt(0),
-	}
-
-	foundryOutput := builder.NewFoundryOutputBuilder(issuer.Address, input.Output.BaseTokenAmount(), accTransitionOutput.FoundryCounter, tokenScheme).
-		NativeToken(&iotago.NativeTokenFeature{
-			ID:     foundryID,
-			Amount: big.NewInt(int64(mintedAmount)),
-		}).MustBuild()
-
-	signedTx, err := builder.NewTransactionBuilder(apiForSlot, w.AddressSigner(input.AddressIndex, issuer.AddressIndex)).
-		AddInput(&builder.TxInput{
-			UnlockTarget: input.Address,
-			InputID:      input.ID,
-			Input:        input.Output,
-		}).
-		AddInput(&builder.TxInput{
-			UnlockTarget: issuer.Output.UnlockConditionSet().Address().Address,
-			InputID:      issuer.OutputID,
-			Input:        issuer.Output,
-		}).
-		AddOutput(accTransitionOutput).
-		AddOutput(foundryOutput).
-		SetCreationSlot(currentSlot).
-		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: issuerID}).
-		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
-		AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("foundry")}).
-		AllotAllMana(currentSlot, issuerID, 0).
-		Build()
-	require.NoError(w.Testing, err)
-
-	foundryOutputID := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 1)
-	w.AddOutput(foundryOutputID, &mock.OutputData{
-		ID:      foundryOutputID,
-		Output:  foundryOutput,
-		Address: issuer.Address,
-	})
-
-	//nolint:forcetypeassert
-	w.AddAccount(issuerID, &mock.AccountData{
-		ID:           issuerID,
-		Address:      issuer.Address,
-		AddressIndex: issuer.AddressIndex,
-		Output:       signedTx.Transaction.Outputs[0].(*iotago.AccountOutput),
-		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0),
-	})
-
-	return signedTx
-}
-
 // TransitionFoundry transitions a FoundryOutput by increasing the native token amount on the output by one.
 func (w *DockerWallet) TransitionFoundry(issuerID iotago.AccountID, inputID iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
 	issuer := w.Account(issuerID)
@@ -480,27 +413,6 @@ func (w *DockerWallet) CreateNFTFromInput(issuerID iotago.AccountID, inputID iot
 		Address:      nftAddress,
 		AddressIndex: nftAddressIndex,
 	})
-
-	return signedTx
-}
-
-func (w *DockerWallet) CreateBasicOutputFromInput(input *mock.OutputData, issuerAccountID iotago.AccountID) *iotago.SignedTransaction {
-	currentSlot := w.Client.LatestAPI().TimeProvider().SlotFromTime(time.Now())
-	apiForSlot := w.Client.APIForSlot(currentSlot)
-	_, ed25519Addr := w.Address()
-	basicOutput := builder.NewBasicOutputBuilder(ed25519Addr, input.Output.BaseTokenAmount()).MustBuild()
-	signedTx, err := builder.NewTransactionBuilder(apiForSlot, w.AddressSigner(input.AddressIndex)).
-		AddInput(&builder.TxInput{
-			UnlockTarget: input.Address,
-			InputID:      input.ID,
-			Input:        input.Output,
-		}).
-		AddOutput(basicOutput).
-		SetCreationSlot(currentSlot).
-		AllotAllMana(currentSlot, issuerAccountID, 0).
-		AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("basic")}).
-		Build()
-	require.NoError(w.Testing, err)
 
 	return signedTx
 }

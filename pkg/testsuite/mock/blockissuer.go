@@ -51,7 +51,7 @@ type BlockIssuer struct {
 	blockIssuanceResponseUsed bool
 	mutex                     syncutils.RWMutex
 
-	AccountData AccountData
+	AccountData *AccountData
 }
 
 func NewBlockIssuer(t *testing.T, name string, keyManager *wallet.KeyManager, client Client, addressIndex uint32, accountID iotago.AccountID, validator bool, opts ...options.Option[BlockIssuer]) *BlockIssuer {
@@ -72,7 +72,7 @@ func NewBlockIssuer(t *testing.T, name string, keyManager *wallet.KeyManager, cl
 		keyManager:                keyManager,
 		Client:                    client,
 		blockIssuanceResponseUsed: true,
-		AccountData: AccountData{
+		AccountData: &AccountData{
 			ID:           accountID,
 			AddressIndex: addressIndex,
 			Address:      accountAddress,
