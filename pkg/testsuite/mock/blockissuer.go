@@ -259,7 +259,7 @@ func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, opts .
 	return blocks.NewBlock(modelBlock), err
 }
 
-func (i *BlockIssuer) IssueBasicBlock(ctx context.Context, alias string, opts ...options.Option[BasicBlockParams]) (*blocks.Block, error) {
+func (i *BlockIssuer) CreateAndSubmitBasicBlock(ctx context.Context, alias string, opts ...options.Option[BasicBlockParams]) (*blocks.Block, error) {
 	block, err := i.CreateBasicBlock(ctx, alias, opts...)
 	if err != nil {
 		return nil, err

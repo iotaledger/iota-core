@@ -51,14 +51,15 @@ func Test_ValidatorsAPI(t *testing.T) {
 	clt := d.defaultWallet.Client
 	status := d.NodeStatus("V1")
 	currentEpoch := clt.CommittedAPI().TimeProvider().EpochFromSlot(status.LatestAcceptedBlockSlot)
+	expectedValidators := d.AccountsFromNodes(d.Nodes()...)
 
 	for i := 0; i < 50; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 
-			wallet, _ := d.CreateAccount(WithStakingFeature(100, 1, 0))
-
+			wallet, accountData := d.CreateAccount(WithStakingFeature(100, 1, 0))
+			expectedValidators = append(expectedValidators, accountData.Address.Bech32(hrp))
 			// issue candidacy payload in the next epoch (currentEpoch + 1), in order to issue it before epochNearingThreshold
 			d.AwaitCommitment(clt.CommittedAPI().TimeProvider().EpochEnd(currentEpoch))
 			blkID := d.IssueCandidacyPayloadFromAccount(wallet)
@@ -68,10 +69,6 @@ func Test_ValidatorsAPI(t *testing.T) {
 	}
 	wg.Wait()
 
-	expectedValidators := d.AccountsFromNodes(d.Nodes()...)
-	for _, v := range d.defaultWallet.Accounts() {
-		expectedValidators = append(expectedValidators, v.Address.Bech32(hrp))
-	}
 	// get all validators of currentEpoch+1 with pageSize 10
 	actualValidators := getAllValidatorsOnEpoch(t, clt, 0, 10)
 	require.ElementsMatch(t, expectedValidators, actualValidators)

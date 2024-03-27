@@ -36,11 +36,11 @@ func Test_MempoolInvalidSignatures(t *testing.T) {
 
 	d.WaitUntilNetworkReady()
 
-	wallet, account := d.CreateAccount()
+	wallet, _ := d.CreateAccount()
 
 	ctx := context.Background()
 	fundsOutputData := d.RequestFaucetFunds(ctx, wallet, iotago.AddressEd25519)
-	validTX := wallet.CreateBasicOutputFromInput(fundsOutputData, account.ID)
+	validTX := wallet.CreateBasicOutputFromInput(fundsOutputData)
 	invalidTX := validTX.Clone().(*iotago.SignedTransaction)
 
 	// Make validTX invalid by replacing the first unlock with an empty signature unlock.
@@ -51,16 +51,16 @@ func Test_MempoolInvalidSignatures(t *testing.T) {
 	}
 
 	fmt.Println("Submitting block with invalid TX")
-	wallet.IssueBasicBlock(ctx, "", mock.WithPayload(invalidTX))
+	wallet.CreateAndSubmitBasicBlock(ctx, "", mock.WithPayload(invalidTX))
 
 	d.AwaitTransactionState(ctx, invalidTX.Transaction.MustID(), api.TransactionStateFailed)
 	d.AwaitTransactionFailure(ctx, invalidTX.Transaction.MustID(), api.TxFailureUnlockSignatureInvalid)
 
 	fmt.Println("Submitting block with valid TX")
-	wallet.IssueBasicBlock(ctx, "", mock.WithPayload(validTX))
+	wallet.CreateAndSubmitBasicBlock(ctx, "", mock.WithPayload(validTX))
 
 	fmt.Println("Submitting block with invalid TX (again)")
-	wallet.IssueBasicBlock(ctx, "", mock.WithPayload(invalidTX))
+	wallet.CreateAndSubmitBasicBlock(ctx, "", mock.WithPayload(invalidTX))
 
 	d.AwaitTransactionPayloadAccepted(ctx, validTX.Transaction.MustID())
 }

@@ -214,7 +214,7 @@ func (d *DockerTestFramework) prepareAssets(totalAssetsNum int) (coreAPIAssets, 
 		d.SubmitBlock(ctx, block)
 
 		// transaction
-		valueBlock, signedTx, faucetOutput := d.CreateBasicOutputBlock(account.ID)
+		valueBlock, signedTx, faucetOutput := d.CreateBasicOutputBlock(wallet)
 		valueBlockSlot := valueBlock.MustID().Slot()
 		assets.setupAssetsForSlot(valueBlockSlot)
 		// transaction and outputs are stored with the earliest included block
@@ -227,7 +227,7 @@ func (d *DockerTestFramework) prepareAssets(totalAssetsNum int) (coreAPIAssets, 
 		d.AwaitTransactionPayloadAccepted(ctx, signedTx.Transaction.MustID())
 
 		// issue reattachment after the fisrt one is already included
-		secondAttachment, err := wallet.IssueBasicBlock(ctx, "", mock.WithPayload(signedTx))
+		secondAttachment, err := wallet.CreateAndSubmitBasicBlock(ctx, "", mock.WithPayload(signedTx))
 		require.NoError(d.Testing, err)
 		assets[valueBlockSlot].reattachments = append(assets[valueBlockSlot].reattachments, secondAttachment.ID())
 

@@ -1222,7 +1222,7 @@ func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Tra
 	}
 }
 
-func (w *Wallet) CreateBasicOutputFromInput(input *OutputData, issuerAccountID iotago.AccountID) *iotago.SignedTransaction {
+func (w *Wallet) CreateBasicOutputFromInput(input *OutputData) *iotago.SignedTransaction {
 	currentSlot := w.CurrentSlot()
 	apiForSlot := w.Client.APIForSlot(currentSlot)
 	ed25519Addr := w.Address()
@@ -1235,7 +1235,7 @@ func (w *Wallet) CreateBasicOutputFromInput(input *OutputData, issuerAccountID i
 		}).
 		AddOutput(basicOutput).
 		SetCreationSlot(currentSlot).
-		AllotAllMana(currentSlot, issuerAccountID, 0).
+		AllotAllMana(currentSlot, w.BlockIssuer.AccountData.ID, 0).
 		AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("basic")}).
 		Build()
 	require.NoError(w.Testing, err)

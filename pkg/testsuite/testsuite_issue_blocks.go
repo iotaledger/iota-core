@@ -117,7 +117,7 @@ func (t *TestSuite) IssueBasicBlockWithOptions(blockName string, wallet *mock.Wa
 	//nolint:gocritic
 	blockHeaderOptions := append(blockOpts, mock.WithIssuingTime(issuingTime))
 
-	block, err := wallet.IssueBasicBlock(context.Background(), blockName, mock.WithBasicBlockHeader(blockHeaderOptions...), mock.WithPayload(payload))
+	block, err := wallet.CreateAndSubmitBasicBlock(context.Background(), blockName, mock.WithBasicBlockHeader(blockHeaderOptions...), mock.WithPayload(payload))
 
 	t.registerBlock(blockName, block)
 
