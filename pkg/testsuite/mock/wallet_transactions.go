@@ -560,7 +560,6 @@ func (w *Wallet) CreateFoundryAndNativeTokensOnOutputsFromInput(transactionName 
 
 // TransitionFoundry transitions a FoundryOutput by increasing the native token amount on the output by one.
 func (w *Wallet) TransitionFoundry(transactionName string, foundryInput *OutputData, accountInput *OutputData) *iotago.SignedTransaction {
-
 	inputFoundry, isFoundry := foundryInput.Output.(*iotago.FoundryOutput)
 	if !isFoundry {
 		panic("foundry input is not *iotago.FoundryOutput")

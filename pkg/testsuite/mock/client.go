@@ -244,7 +244,7 @@ func (c *TestSuiteClient) SubmitBlock(ctx context.Context, block *iotago.Block) 
 	return c.Node.RequestHandler.SubmitBlockAndAwaitRetainer(ctx, block)
 }
 
-func (c *TestSuiteClient) TransactionByID(_ context.Context, txID iotago.TransactionID) (*iotago.Transaction, error) {
+func (c *TestSuiteClient) TransactionByID(_ context.Context, _ iotago.TransactionID) (*iotago.Transaction, error) {
 	panic("not implemented")
 }
 

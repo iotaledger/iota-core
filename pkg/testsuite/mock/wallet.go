@@ -53,6 +53,7 @@ func NewAccountDataFromAccountID(accountID iotago.AccountID, addressIndex ...uin
 	if len(addressIndex) == 0 {
 		addressIndex = []uint32{0}
 	}
+
 	return &AccountData{
 		ID:           accountID,
 		Address:      accountAddress,
