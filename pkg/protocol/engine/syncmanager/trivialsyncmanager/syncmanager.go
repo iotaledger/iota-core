@@ -1,12 +1,14 @@
 package trivialsyncmanager
 
 import (
+	"context"
 	"time"
 
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/hive.go/runtime/timeutil"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
@@ -50,8 +52,9 @@ type SyncManager struct {
 	isBootstrappedLock syncutils.RWMutex
 	isBootstrapped     bool
 
-	isSyncedLock syncutils.RWMutex
-	isSynced     bool
+	isSyncedLock   syncutils.RWMutex
+	isSynced       bool
+	isSyncedTicker *timeutil.Ticker
 
 	isFinalizationDelayedLock syncutils.RWMutex
 	isFinalizationDelayed     bool
@@ -137,6 +140,7 @@ func New(subModule module.Module, e *engine.Engine, latestCommitment *model.Comm
 
 		isBootstrapped:         false,
 		isSynced:               false,
+		isSyncedTicker:         nil,
 		isFinalizationDelayed:  true,
 		lastAcceptedBlockSlot:  latestCommitment.Slot(),
 		lastConfirmedBlockSlot: latestCommitment.Slot(),
@@ -145,6 +149,17 @@ func New(subModule module.Module, e *engine.Engine, latestCommitment *model.Comm
 		lastPrunedEpoch:        0,
 		hasPruned:              false,
 	}, opts, func(s *SyncManager) {
+		ctx, cancel := context.WithCancel(context.Background())
+		e.ShutdownEvent().OnTrigger(func() {
+			// stop the ticker when the engine is shutting down
+			cancel()
+		})
+
+		// start the sync status update ticker
+		s.isSyncedTicker = timeutil.NewTicker(func() {
+			s.updateSyncStatus()
+		}, 1*time.Second, ctx)
+
 		s.updatePrunedEpoch(s.engine.Storage.LastPrunedEpoch())
 
 		// set the default bootstrapped function
