@@ -1,12 +1,14 @@
 package trivialsyncmanager
 
 import (
+	"context"
 	"time"
 
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/hive.go/runtime/timeutil"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
@@ -50,8 +52,9 @@ type SyncManager struct {
 	isBootstrappedLock syncutils.RWMutex
 	isBootstrapped     bool
 
-	isSyncedLock syncutils.RWMutex
-	isSynced     bool
+	isSyncedLock   syncutils.RWMutex
+	isSynced       bool
+	isSyncedTicker *timeutil.Ticker
 
 	isFinalizationDelayedLock syncutils.RWMutex
 	isFinalizationDelayed     bool
@@ -126,6 +129,8 @@ func NewProvider(opts ...options.Option[SyncManager]) module.Provider[*engine.En
 }
 
 func New(subModule module.Module, e *engine.Engine, latestCommitment *model.Commitment, finalizedSlot iotago.SlotIndex, opts ...options.Option[SyncManager]) *SyncManager {
+	ctxUpdateSyncStatusTicker, ctxCancelUpdateSyncStatusTicker := context.WithCancel(context.Background())
+
 	return module.InitSimpleLifecycle(options.Apply(&SyncManager{
 		Module: subModule,
 		events: syncmanager.NewEvents(),
@@ -137,6 +142,7 @@ func New(subModule module.Module, e *engine.Engine, latestCommitment *model.Comm
 
 		isBootstrapped:         false,
 		isSynced:               false,
+		isSyncedTicker:         nil,
 		isFinalizationDelayed:  true,
 		lastAcceptedBlockSlot:  latestCommitment.Slot(),
 		lastConfirmedBlockSlot: latestCommitment.Slot(),
@@ -145,6 +151,11 @@ func New(subModule module.Module, e *engine.Engine, latestCommitment *model.Comm
 		lastPrunedEpoch:        0,
 		hasPruned:              false,
 	}, opts, func(s *SyncManager) {
+		// start the sync status update ticker, tick every half slot duration
+		s.isSyncedTicker = timeutil.NewTicker(func() {
+			s.updateSyncStatus()
+		}, time.Duration(e.CommittedAPI().ProtocolParameters().SlotDurationInSeconds())*time.Second/2, ctxUpdateSyncStatusTicker)
+
 		s.updatePrunedEpoch(s.engine.Storage.LastPrunedEpoch())
 
 		// set the default bootstrapped function
@@ -153,7 +164,15 @@ func New(subModule module.Module, e *engine.Engine, latestCommitment *model.Comm
 				return time.Since(e.Clock.Accepted().RelativeTime()) < s.optsBootstrappedThreshold && e.Notarization.IsBootstrapped()
 			}
 		}
-	}))
+	}), func(syncManager *SyncManager) {
+		// stop the ticker when the engine is shutting down
+		ctxCancelUpdateSyncStatusTicker()
+
+		// wait for the ticker to gracefully shut down
+		syncManager.isSyncedTicker.WaitForGracefulShutdown()
+
+		syncManager.Module.StoppedEvent().Trigger()
+	})
 }
 
 func (s *SyncManager) SyncStatus() *syncmanager.SyncStatus {

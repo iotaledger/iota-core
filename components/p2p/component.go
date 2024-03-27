@@ -352,7 +352,7 @@ func connectConfigKnownPeers() {
 			Component.LogPanicf("invalid peer address info: %s", err)
 		}
 
-		if err := deps.NetworkManager.AddManualPeers(multiAddr); err != nil {
+		if _, err := deps.NetworkManager.AddManualPeer(multiAddr); err != nil {
 			Component.LogInfof("failed to add peer: %s, error: %s", multiAddr.String(), err)
 		}
 	}

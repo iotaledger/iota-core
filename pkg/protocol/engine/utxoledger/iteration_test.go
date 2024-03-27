@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -34,7 +35,7 @@ func TestUTXOComputeBalance(t *testing.T) {
 		tpkg.RandLedgerStateSpentWithOutput(initialOutput, index),
 	}
 
-	require.NoError(t, manager.ApplyDiffWithoutLocking(index, outputs, spents))
+	require.NoError(t, lo.Return2(manager.ApplyDiffWithoutLocking(index, outputs, spents)))
 
 	spent, err := manager.SpentOutputs()
 	require.NoError(t, err)
@@ -80,7 +81,7 @@ func TestUTXOIteration(t *testing.T) {
 		tpkg.RandLedgerStateSpentWithOutput(outputs[9], index),
 	}
 
-	require.NoError(t, manager.ApplyDiffWithoutLocking(index, outputs, spents))
+	require.NoError(t, lo.Return2(manager.ApplyDiffWithoutLocking(index, outputs, spents)))
 
 	// Prepare values to check
 	outputByID := make(map[string]struct{})

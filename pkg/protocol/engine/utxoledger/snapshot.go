@@ -215,6 +215,8 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 		return ierrors.Wrap(err, "unable to commit state tree")
 	}
 
+	m.reInitStateTreeWithoutLocking()
+
 	return nil
 }
 
@@ -305,6 +307,8 @@ func (m *Manager) Rollback(targetSlot iotago.SlotIndex) error {
 	if err := m.stateTree.Commit(); err != nil {
 		return ierrors.Wrap(err, "unable to commit state tree")
 	}
+
+	m.reInitStateTreeWithoutLocking()
 
 	return nil
 }

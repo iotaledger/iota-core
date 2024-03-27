@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -49,11 +50,14 @@ func Test_MaxAllowedWallClockDrift(t *testing.T) {
 
 	tooFarAheadFutureBlock := lo.PanicOnErr(node0.Validator.CreateBasicBlock(context.Background(), "tooFarAheadFuture", mock.WithBasicBlockHeader(mock.WithIssuingTime(time.Now().Add(allowedDrift).Add(1*time.Second)))))
 	ts.RegisterBlock("tooFarAheadFuture", tooFarAheadFutureBlock)
-	require.NoError(t, node0.Validator.SubmitBlockWithoutAwaitingBooking(tooFarAheadFutureBlock.ModelBlock(), node0))
+	err := node0.Validator.SubmitBlock(context.Background(), tooFarAheadFutureBlock.ModelBlock())
+	require.Error(t, err)
+	require.True(t, ierrors.Is(err, protocol.ErrBlockTimeTooFarAheadInFuture))
 
 	ts.AssertBlocksExist(ts.Blocks("past", "present", "acceptedFuture"), true, node0.Client)
 	ts.AssertBlocksExist(ts.Blocks("tooFarAheadFuture"), false, node0.Client)
 }
+
 func Test_BlockTimeMonotonicity(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(

@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
@@ -81,6 +82,15 @@ func (r *RequestHandler) submitBlockAndAwaitRetainer(ctx context.Context, block 
 		blockCtxCancel(errBlockRetained)
 	}, event.WithWorkerPool(r.workerPool)).Unhook
 
+	protocolFilteredUnhook := r.protocol.Events.ProtocolFilter.Hook(func(event *protocol.BlockFilteredEvent) {
+		if blockID != event.Block.ID() {
+			return
+		}
+
+		// signal that block was dropped by the protocol
+		blockCtxCancel(event.Reason)
+	}, event.WithWorkerPool(r.workerPool)).Unhook
+
 	blockPreFilteredUnhook := r.protocol.Events.Engine.PreSolidFilter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
 		if blockID != event.Block.ID() {
 			return
@@ -99,7 +109,7 @@ func (r *RequestHandler) submitBlockAndAwaitRetainer(ctx context.Context, block 
 		blockCtxCancel(event.Reason)
 	}, event.WithWorkerPool(r.workerPool)).Unhook
 
-	defer lo.BatchReverse(txRetainedUnhook, blockRetainedUnhook, blockPreFilteredUnhook, blockPostFilteredUnhook)()
+	defer lo.BatchReverse(txRetainedUnhook, blockRetainedUnhook, protocolFilteredUnhook, blockPreFilteredUnhook, blockPostFilteredUnhook)()
 
 	if err := r.submitBlock(block); err != nil {
 		return ierrors.Wrapf(err, "failed to issue block %s", blockID)

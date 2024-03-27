@@ -172,7 +172,7 @@ func (n *neighbor) Close() {
 		n.logger.LogErrorf("Failed to disconnect the neighbor, error: %s", err.Error())
 	}
 	n.wg.Wait()
-	n.logger.UnsubscribeFromParentLogger()
+	n.logger.Shutdown()
 }
 
 func (n *neighbor) disconnect() (err error) {

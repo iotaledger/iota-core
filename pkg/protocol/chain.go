@@ -210,7 +210,7 @@ func (c *Chain) initLogger() (shutdown func()) {
 		c.IsEvicted.LogUpdates(c, log.LevelTrace, "IsEvicted"),
 		c.shouldEvict.LogUpdates(c, log.LevelTrace, "shouldEvict"),
 
-		c.Logger.UnsubscribeFromParentLogger,
+		c.Logger.Shutdown,
 	)
 }
 

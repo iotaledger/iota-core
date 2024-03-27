@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"time"
+
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/ds/types"
@@ -13,6 +15,12 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
+)
+
+var (
+	ErrBlockTimeTooFarAheadInFuture = ierrors.New("a block cannot be too far ahead in the future")
+	ErrUnsolidifiableCommitment     = ierrors.New("block referencing unsolidifiable commitment is not allowed")
+	ErrFailToUpdateDropBuffer       = ierrors.New("failed to update dropped blocks buffer")
 )
 
 // Blocks is a subcomponent of the protocol that is responsible for handling block requests and responses.
@@ -87,10 +95,30 @@ func (b *Blocks) SendResponse(block *model.Block) {
 // ProcessResponse processes the given block response.
 func (b *Blocks) ProcessResponse(block *model.Block, from peer.ID) {
 	b.workerPool.Submit(func() {
+		// this check must happen before the block reaches the Engine. The Protocol needs a perception of the current time,
+		// otherwise a malicous actor might trigger a chain switch by sending a block with a commitment in the future.
+		if timeDelta := time.Since(block.ProtocolBlock().Header.IssuingTime); timeDelta < -b.protocol.Options.MaxAllowedWallClockDrift {
+			b.LogWarn("filtered block, issuing time ahead", "block", block.ID(), "issuingTime", block.ProtocolBlock().Header.IssuingTime, "timeDelta", timeDelta, "deltaAllowed", b.protocol.Options.MaxAllowedWallClockDrift, "from", from, "err", ErrBlockTimeTooFarAheadInFuture)
+
+			b.protocol.Events.ProtocolFilter.Trigger(&BlockFilteredEvent{
+				Block:  block,
+				Reason: ierrors.WithMessagef(ErrBlockTimeTooFarAheadInFuture, "block issuing time ahead by %v, time delta allowed: %d", -timeDelta, b.protocol.Options.MaxAllowedWallClockDrift),
+				Source: from,
+			})
+
+			return
+		}
+
 		// abort if the commitment belongs to an evicted slot
 		commitment, err := b.protocol.Commitments.Get(block.ProtocolBlock().Header.SlotCommitmentID, true)
 		if err != nil && ierrors.Is(err, ErrorSlotEvicted) {
 			b.LogError("dropped block referencing unsolidifiable commitment", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID(), "err", err)
+
+			b.protocol.Events.ProtocolFilter.Trigger(&BlockFilteredEvent{
+				Block:  block,
+				Reason: ierrors.WithMessagef(ErrUnsolidifiableCommitment, "commitment %s slot has been evicted", block.ProtocolBlock().Header.SlotCommitmentID.String()),
+				Source: from,
+			})
 
 			return
 		}
@@ -99,6 +127,12 @@ func (b *Blocks) ProcessResponse(block *model.Block, from peer.ID) {
 		if commitment == nil || !commitment.Chain.Get().DispatchBlock(block, from) {
 			if !b.droppedBlocksBuffer.Add(block.ProtocolBlock().Header.SlotCommitmentID, types.NewTuple(block, from)) {
 				b.LogError("failed to add dropped block referencing unsolid commitment to dropped blocks buffer", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID())
+
+				b.protocol.Events.ProtocolFilter.Trigger(&BlockFilteredEvent{
+					Block:  block,
+					Reason: ierrors.WithMessagef(ErrFailToUpdateDropBuffer, "failed to add block %s to dropped blocks buffer", block.ID().String()),
+					Source: from,
+				})
 			} else {
 				b.LogTrace("dropped block referencing unsolid commitment added to dropped blocks buffer", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID())
 			}

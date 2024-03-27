@@ -1,18 +1,13 @@
 package protocol
 
 import (
-	"time"
-
 	"github.com/libp2p/go-libp2p/core/peer"
 
-	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
 )
-
-var ErrBlockTimeTooFarAheadInFuture = ierrors.New("a block cannot be too far ahead in the future")
 
 // Network is a subcomponent of the protocol that is responsible for handling the network communication.
 type Network struct {
@@ -34,7 +29,7 @@ func newNetwork(protocol *Protocol, networkEndpoint network.Endpoint) *Network {
 		protocol: protocol,
 	}
 
-	protocol.ShutdownEvent().OnTrigger(n.Logger.UnsubscribeFromParentLogger)
+	protocol.ShutdownEvent().OnTrigger(n.Logger.Shutdown)
 
 	return n
 }
@@ -42,13 +37,6 @@ func newNetwork(protocol *Protocol, networkEndpoint network.Endpoint) *Network {
 // OnBlockReceived overwrites the OnBlockReceived method of the core protocol to filter out invalid blocks.
 func (n *Network) OnBlockReceived(callback func(block *model.Block, src peer.ID)) (unsubscribe func()) {
 	return n.Protocol.OnBlockReceived(func(block *model.Block, src peer.ID) {
-		// filter blocks from the future
-		if timeDelta := time.Since(block.ProtocolBlock().Header.IssuingTime); timeDelta < -n.protocol.Options.MaxAllowedWallClockDrift {
-			n.LogWarn("filtered block, issuing time ahead", "block", block.ID(), "issuingTime", block.ProtocolBlock().Header.IssuingTime, "timeDelta", timeDelta, "deltaAllowed", n.protocol.Options.MaxAllowedWallClockDrift, "from", src, "err", ErrBlockTimeTooFarAheadInFuture)
-
-			return
-		}
-
 		callback(block, src)
 	})
 }

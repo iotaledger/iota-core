@@ -12,24 +12,24 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.1
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/iotaledger/hive.go/ads v0.0.0-20240315104458-b689cbcfddbd
-	github.com/iotaledger/hive.go/app v0.0.0-20240315104458-b689cbcfddbd
-	github.com/iotaledger/hive.go/constraints v0.0.0-20240320122938-13a946cf3c7a
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20240320122938-13a946cf3c7a
-	github.com/iotaledger/hive.go/crypto v0.0.0-20240320122938-13a946cf3c7a
-	github.com/iotaledger/hive.go/db v0.0.0-20240315104458-b689cbcfddbd
-	github.com/iotaledger/hive.go/ds v0.0.0-20240320122938-13a946cf3c7a
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20240320122938-13a946cf3c7a
-	github.com/iotaledger/hive.go/kvstore v0.0.0-20240315104458-b689cbcfddbd
-	github.com/iotaledger/hive.go/lo v0.0.0-20240320122938-13a946cf3c7a
-	github.com/iotaledger/hive.go/log v0.0.0-20240315104458-b689cbcfddbd
-	github.com/iotaledger/hive.go/runtime v0.0.0-20240320122938-13a946cf3c7a
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20240320122938-13a946cf3c7a
-	github.com/iotaledger/hive.go/sql v0.0.0-20240315104458-b689cbcfddbd
-	github.com/iotaledger/hive.go/stringify v0.0.0-20240320122938-13a946cf3c7a
+	github.com/iotaledger/hive.go/ads v0.0.0-20240326102522-2e37ab3611a3
+	github.com/iotaledger/hive.go/app v0.0.0-20240326102522-2e37ab3611a3
+	github.com/iotaledger/hive.go/constraints v0.0.0-20240326102522-2e37ab3611a3
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20240326102522-2e37ab3611a3
+	github.com/iotaledger/hive.go/crypto v0.0.0-20240326102522-2e37ab3611a3
+	github.com/iotaledger/hive.go/db v0.0.0-20240326102522-2e37ab3611a3
+	github.com/iotaledger/hive.go/ds v0.0.0-20240326102522-2e37ab3611a3
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20240326102522-2e37ab3611a3
+	github.com/iotaledger/hive.go/kvstore v0.0.0-20240326102522-2e37ab3611a3
+	github.com/iotaledger/hive.go/lo v0.0.0-20240326102522-2e37ab3611a3
+	github.com/iotaledger/hive.go/log v0.0.0-20240326102522-2e37ab3611a3
+	github.com/iotaledger/hive.go/runtime v0.0.0-20240326102522-2e37ab3611a3
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20240326102522-2e37ab3611a3
+	github.com/iotaledger/hive.go/sql v0.0.0-20240326102522-2e37ab3611a3
+	github.com/iotaledger/hive.go/stringify v0.0.0-20240326102522-2e37ab3611a3
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20240307101848-db58eb9353ec
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20240307100839-48553e1d2022
-	github.com/iotaledger/iota.go/v4 v4.0.0-20240322114706-82a1f8a8b70c
+	github.com/iotaledger/iota.go/v4 v4.0.0-20240325092426-32979eef3205
 	github.com/labstack/echo/v4 v4.11.4
 	github.com/labstack/gommon v0.4.2
 	github.com/libp2p/go-libp2p v0.33.1
@@ -48,7 +48,7 @@ require (
 	golang.org/x/crypto v0.21.0
 	google.golang.org/grpc v1.62.1
 	google.golang.org/protobuf v1.33.0
-	gorm.io/gorm v1.25.7
+	gorm.io/gorm v1.25.8
 )
 
 require (
@@ -84,7 +84,7 @@ require (
 	github.com/google/go-github v17.0.0+incompatible // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
-	github.com/google/pprof v0.0.0-20240227163752-401108e1b7e7 // indirect
+	github.com/google/pprof v0.0.0-20240319011627-a57c5dfe54fd // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-version v1.6.0 // indirect
@@ -102,7 +102,7 @@ require (
 	github.com/ipld/go-ipld-prime v0.21.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20231201235250-de7065d80cb9 // indirect
-	github.com/jackc/pgx/v5 v5.5.4 // indirect
+	github.com/jackc/pgx/v5 v5.5.5 // indirect
 	github.com/jackc/puddle/v2 v2.2.1 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
@@ -191,7 +191,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240304212257-790db918fca8 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	gorm.io/driver/postgres v1.5.6 // indirect
+	gorm.io/driver/postgres v1.5.7 // indirect
 	gorm.io/driver/sqlite v1.5.5 // indirect
 	lukechampine.com/blake3 v1.2.1 // indirect
 )

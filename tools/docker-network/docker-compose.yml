@@ -34,6 +34,7 @@ services:
       --inx.bindAddress=0.0.0.0:9029
       --prometheus.goMetrics=true
       --prometheus.processMetrics=true
+      --debugAPI.enabled=true
 
   node-2-validator:
     image: docker-network-node-1-validator:latest
