@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -57,7 +58,7 @@ func New(
 	blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool),
 	retrieveCommitteeInSlot func(slot iotago.SlotIndex) (*account.SeatedAccounts, bool),
 ) *TipManager {
-	t := &TipManager{
+	return options.Apply(&TipManager{
 		Module:                  subModule,
 		retrieveBlock:           blockRetriever,
 		retrieveCommitteeInSlot: retrieveCommitteeInSlot,
@@ -67,11 +68,15 @@ func New(
 		strongTipSet:            randommap.New[iotago.BlockID, *TipMetadata](),
 		weakTipSet:              randommap.New[iotago.BlockID, *TipMetadata](),
 		blockAdded:              event.New1[tipmanager.TipMetadata](),
-	}
+	}, nil, func(t *TipManager) {
+		t.initLogging()
 
-	t.initLogging()
+		t.ShutdownEvent().OnTrigger(func() {
+			t.StoppedEvent().Trigger()
+		})
 
-	return module.InitSimpleLifecycle(t)
+		t.ConstructedEvent().Trigger()
+	})
 }
 
 // AddBlock adds a Block to the TipManager and returns the TipMetadata if the Block was added successfully.

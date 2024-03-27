@@ -39,6 +39,8 @@ func NewProvider(opts ...options.Option[PreSolidBlockFilter]) module.Provider[*e
 			})
 
 			e.Events.PreSolidFilter.LinkTo(f.events)
+
+			f.InitializedEvent().Trigger()
 		})
 
 		return f
@@ -46,9 +48,9 @@ func NewProvider(opts ...options.Option[PreSolidBlockFilter]) module.Provider[*e
 }
 
 // New creates a new PreSolidBlockFilter.
-func New(module module.Module, apiProvider iotago.APIProvider, opts ...options.Option[PreSolidBlockFilter]) *PreSolidBlockFilter {
+func New(subModule module.Module, apiProvider iotago.APIProvider, opts ...options.Option[PreSolidBlockFilter]) *PreSolidBlockFilter {
 	return options.Apply(&PreSolidBlockFilter{
-		Module:      module,
+		Module:      subModule,
 		events:      presolidfilter.NewEvents(),
 		apiProvider: apiProvider,
 	}, opts, func(p *PreSolidBlockFilter) {

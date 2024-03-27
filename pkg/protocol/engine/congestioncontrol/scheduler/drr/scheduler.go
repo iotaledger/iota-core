@@ -62,7 +62,6 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 				return e.SyncManager.LatestCommitment().Slot()
 			}
 			s.blockCache = e.BlockCache
-			e.Events.Scheduler.LinkTo(s.events)
 			e.SybilProtection.InitializedEvent().OnTrigger(func() {
 				s.seatManager = e.SybilProtection.SeatManager()
 			})
@@ -103,7 +102,6 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 					return 1 + Deficit(mana), nil
 				}
 			})
-			s.ConstructedEvent().Trigger()
 			e.Events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 				s.AddBlock(block)
 				s.selectBlockToScheduleWithLocking()
@@ -122,22 +120,28 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 			})
 
 			e.InitializedEvent().OnTrigger(s.Start)
+
+			e.Events.Scheduler.LinkTo(s.events)
+
+			s.InitializedEvent().Trigger()
 		})
 
 		return s
 	})
 }
 
-func New(module module.Module, apiProvider iotago.APIProvider, opts ...options.Option[Scheduler]) *Scheduler {
+func New(subModule module.Module, apiProvider iotago.APIProvider, opts ...options.Option[Scheduler]) *Scheduler {
 	return options.Apply(
 		&Scheduler{
-			Module:          module,
+			Module:          subModule,
 			events:          scheduler.NewEvents(),
 			deficits:        shrinkingmap.New[iotago.AccountID, Deficit](),
 			apiProvider:     apiProvider,
 			validatorBuffer: NewValidatorBuffer(),
 		}, opts, func(s *Scheduler) {
 			s.ShutdownEvent().OnTrigger(s.shutdown)
+
+			s.ConstructedEvent().Trigger()
 		},
 	)
 }

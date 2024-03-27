@@ -37,20 +37,12 @@ type Gadget struct {
 
 func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine, slotgadget.Gadget] {
 	return module.Provide(func(e *engine.Engine) slotgadget.Gadget {
-		return options.Apply(&Gadget{
-			Module:                        e.NewSubModule("TotalWeightSlotGadget"),
-			events:                        slotgadget.NewEvents(),
-			slotTrackers:                  shrinkingmap.New[iotago.SlotIndex, *slottracker.SlotTracker](),
-			optsSlotFinalizationThreshold: 0.67,
-			errorHandler:                  e.ErrorHandler("slotgadget"),
-		}, opts, func(g *Gadget) {
-			e.Events.SlotGadget.LinkTo(g.events)
+		g := New(e.NewSubModule("TotalWeightSlotGadget"), e, opts...)
 
-			e.ConstructedEvent().OnTrigger(func() {
-				g.seatManager = e.SybilProtection.SeatManager()
+		e.ConstructedEvent().OnTrigger(func() {
+			g.seatManager = e.SybilProtection.SeatManager()
 
-				e.Events.BlockGadget.BlockConfirmed.Hook(g.trackVotes)
-			})
+			e.Events.BlockGadget.BlockConfirmed.Hook(g.trackVotes)
 
 			g.storeLastFinalizedSlotFunc = func(slot iotago.SlotIndex) {
 				if err := e.Storage.Settings().SetLatestFinalizedSlot(slot); err != nil {
@@ -67,12 +59,28 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 				g.InitializedEvent().Trigger()
 			})
 
-			g.ShutdownEvent().OnTrigger(func() {
-				g.StoppedEvent().Trigger()
-			})
+			e.Events.SlotGadget.LinkTo(g.events)
 
-			g.ConstructedEvent().Trigger()
+			g.InitializedEvent().Trigger()
 		})
+
+		return g
+	})
+}
+
+func New(subModule module.Module, engine *engine.Engine, opts ...options.Option[Gadget]) *Gadget {
+	return options.Apply(&Gadget{
+		Module:                        subModule,
+		events:                        slotgadget.NewEvents(),
+		slotTrackers:                  shrinkingmap.New[iotago.SlotIndex, *slottracker.SlotTracker](),
+		optsSlotFinalizationThreshold: 0.67,
+		errorHandler:                  engine.ErrorHandler("slotgadget"),
+	}, opts, func(g *Gadget) {
+		g.ShutdownEvent().OnTrigger(func() {
+			g.StoppedEvent().Trigger()
+		})
+
+		g.ConstructedEvent().Trigger()
 	})
 }
 

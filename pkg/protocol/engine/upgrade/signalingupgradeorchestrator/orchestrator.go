@@ -87,30 +87,33 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 			opts...,
 		)
 
-		for _, protocolParams := range o.optsProtocolParameters {
-			storedProtocolParams := e.Storage.Settings().APIProvider().ProtocolParameters(protocolParams.Version())
-			if storedProtocolParams != nil {
-				if lo.PanicOnErr(storedProtocolParams.Hash()) != lo.PanicOnErr(protocolParams.Hash()) {
-					panic(ierrors.Errorf("protocol parameters for version %d already exist with different hash", protocolParams.Version()))
+		e.ConstructedEvent().OnTrigger(func() {
+			for _, protocolParams := range o.optsProtocolParameters {
+				storedProtocolParams := e.Storage.Settings().APIProvider().ProtocolParameters(protocolParams.Version())
+				if storedProtocolParams != nil {
+					if lo.PanicOnErr(storedProtocolParams.Hash()) != lo.PanicOnErr(protocolParams.Hash()) {
+						panic(ierrors.Errorf("protocol parameters for version %d already exist with different hash", protocolParams.Version()))
+					}
+
+					if !storedProtocolParams.Equals(protocolParams) {
+						panic(ierrors.Errorf("protocol parameters for version %d already exist but are not equal", protocolParams.Version()))
+					}
 				}
 
-				if !storedProtocolParams.Equals(protocolParams) {
-					panic(ierrors.Errorf("protocol parameters for version %d already exist but are not equal", protocolParams.Version()))
+				if err := e.Storage.Settings().StoreProtocolParameters(protocolParams); err != nil {
+					panic(ierrors.Wrapf(err, "failed to store protocol parameters for version %d", protocolParams.Version()))
 				}
 			}
 
-			if err := e.Storage.Settings().StoreProtocolParameters(protocolParams); err != nil {
-				panic(ierrors.Wrapf(err, "failed to store protocol parameters for version %d", protocolParams.Version()))
-			}
-		}
-
-		o.InitializedEvent().Trigger()
+			o.InitializedEvent().Trigger()
+		})
 
 		return o
 	})
 }
 
-func NewOrchestrator(module module.Module, errorHandler func(error),
+func NewOrchestrator(subModule module.Module,
+	errorHandler func(error),
 	decidedUpgradeSignals epochstore.Store[model.VersionAndHash],
 	upgradeSignalsFunc func(slot iotago.SlotIndex) (*slotstore.Store[account.SeatIndex, *model.SignaledBlock], error),
 	apiProvider iotago.APIProvider,
@@ -119,7 +122,7 @@ func NewOrchestrator(module module.Module, errorHandler func(error),
 	epochForVersionFunc func(iotago.Version) (iotago.EpochIndex, bool),
 	seatManager seatmanager.SeatManager, opts ...options.Option[Orchestrator]) *Orchestrator {
 	return options.Apply(&Orchestrator{
-		Module:                    module,
+		Module:                    subModule,
 		errorHandler:              errorHandler,
 		latestSignals:             memstorage.NewIndexedStorage[iotago.SlotIndex, account.SeatIndex, *model.SignaledBlock](),
 		decidedUpgradeSignals:     decidedUpgradeSignals,
