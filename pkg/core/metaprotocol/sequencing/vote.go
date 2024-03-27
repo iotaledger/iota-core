@@ -51,7 +51,7 @@ func (v *Vote) FromBlockContext(block *Block, parents ...*Block) {
 		v.Committee.AddAll(parentVote.Committee)
 
 		for validatorID, lastSeenVote := range parentVote.LastSeenVotes {
-			// if the last seen vote is from a newer round, we need update our round and reset the votes
+			// if the last seen vote is from a newer round, we need to advance our round and clear the votes
 			if lastSeenVote.Round > v.Round {
 				v.Round, v.VotesForPreviousRound = lastSeenVote.Round, make(map[IssuerID]*Vote)
 			}
@@ -60,7 +60,7 @@ func (v *Vote) FromBlockContext(block *Block, parents ...*Block) {
 			v.LastSeenVotes[validatorID] = maxVote(v.LastSeenVotes[validatorID], lastSeenVote)
 		}
 
-		// if the parent is in the same round as us, we need to inherit the votes
+		// if the parent is in the same round as us, we inherit the votes
 		if parentVote.Round == v.Round {
 			for validatorID, latestVote := range parentVote.VotesForPreviousRound {
 				v.VotesForPreviousRound[validatorID] = maxVote(v.VotesForPreviousRound[validatorID], latestVote)
@@ -68,7 +68,7 @@ func (v *Vote) FromBlockContext(block *Block, parents ...*Block) {
 		}
 	}
 
-	// cast our own vote if we are part of the committee
+	// cast our own vote or finalize a round if we are part of the committee
 	if v.Committee.Has(block.Issuer) {
 		if _, hasVoted := v.VotesForPreviousRound[block.Issuer]; !hasVoted {
 			v.castVote()
