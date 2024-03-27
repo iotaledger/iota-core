@@ -3,6 +3,7 @@
 package tests
 
 import (
+	"context"
 	"crypto/ed25519"
 	"math/big"
 	"sync"
@@ -508,4 +509,59 @@ func (w *DockerWallet) CreateBasicOutputFromInput(input *mock.OutputData, issuer
 	require.NoError(w.Testing, err)
 
 	return signedTx
+}
+
+func (w *DockerWallet) ClaimValidatorRewards(issuerAccountID iotago.AccountID, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
+	acc := w.Account(issuerAccountID)
+	clt := w.DefaultClient()
+
+	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	apiForSlot := clt.APIForSlot(currentSlot)
+
+	rewardResp, err := clt.Rewards(context.Background(), acc.OutputID)
+	require.NoError(w.Testing, err)
+	potentialMana := w.PotentialMana(apiForSlot, acc.Output, acc.OutputID, currentSlot)
+	storedMana := w.StoredMana(apiForSlot, acc.Output, acc.OutputID, currentSlot)
+
+	accountOutput := builder.NewAccountOutputBuilderFromPrevious(acc.Output).
+		RemoveFeature(iotago.FeatureStaking).
+		Mana(potentialMana + storedMana + rewardResp.Rewards).
+		MustBuild()
+
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot, w.AddressSigner(acc.AddressIndex)).
+		AddInput(&builder.TxInput{
+			UnlockTarget: acc.Output.UnlockConditionSet().Address().Address,
+			InputID:      acc.OutputID,
+			Input:        acc.Output,
+		}).
+		AddRewardInput(&iotago.RewardInput{Index: 0}, rewardResp.Rewards).
+		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{
+			AccountID: accountOutput.AccountID,
+		}).
+		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
+		AddOutput(accountOutput).
+		SetCreationSlot(currentSlot).
+		AllotAllMana(currentSlot, issuerAccountID, 0).
+		AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("basic")}).
+		Build()
+	require.NoError(w.Testing, err)
+
+	w.AddOutput(iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0), &mock.OutputData{
+		ID:           iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0),
+		Output:       accountOutput,
+		Address:      acc.Address,
+		AddressIndex: acc.AddressIndex,
+	})
+
+	return signedTx
+}
+
+// Computes the Potential Mana that the output generates until the current slot.
+func (w *DockerWallet) PotentialMana(api iotago.API, input iotago.Output, inputID iotago.OutputID, currentSlot iotago.SlotIndex) iotago.Mana {
+	return lo.PanicOnErr(iotago.PotentialMana(api.ManaDecayProvider(), api.StorageScoreStructure(), input, inputID.CreationSlot(), currentSlot))
+}
+
+// Computes the decay on stored mana that the output holds until the current slot.
+func (w *DockerWallet) StoredMana(api iotago.API, input iotago.Output, inputID iotago.OutputID, currentSlot iotago.SlotIndex) iotago.Mana {
+	return lo.PanicOnErr(api.ManaDecayProvider().DecayManaBySlots(input.StoredMana(), inputID.CreationSlot(), currentSlot))
 }
