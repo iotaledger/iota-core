@@ -556,6 +556,50 @@ func (w *DockerWallet) ClaimValidatorRewards(issuerAccountID iotago.AccountID, i
 	return signedTx
 }
 
+func (w *DockerWallet) ClaimDelegatorRewards(delegationOutputID iotago.OutputID, issuerAccountID iotago.AccountID, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
+	delegationOutput := w.Output(delegationOutputID)
+	acc := w.Account(issuerAccountID)
+	clt := w.DefaultClient()
+
+	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	apiForSlot := clt.APIForSlot(currentSlot)
+	potentialMana := w.PotentialMana(apiForSlot, delegationOutput.Output, delegationOutputID, currentSlot)
+
+	rewardsResp, err := clt.Rewards(context.Background(), delegationOutputID)
+	require.NoError(w.Testing, err)
+
+	// Create Basic Output where the reward will be put.
+	basicOutput := builder.NewBasicOutputBuilder(delegationOutput.Output.UnlockConditionSet().Address().Address, delegationOutput.Output.BaseTokenAmount()).
+		Mana(rewardsResp.Rewards + potentialMana).
+		MustBuild()
+
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot, w.AddressSigner(delegationOutput.AddressIndex)).
+		AddInput(&builder.TxInput{
+			UnlockTarget: delegationOutput.Output.UnlockConditionSet().Address().Address,
+			InputID:      delegationOutputID,
+			Input:        delegationOutput.Output,
+		}).
+		AddRewardInput(&iotago.RewardInput{Index: 0}, rewardsResp.Rewards).
+		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{
+			AccountID: acc.ID,
+		}).
+		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
+		AddOutput(basicOutput).
+		SetCreationSlot(currentSlot).
+		AllotAllMana(currentSlot, issuerAccountID, 0).
+		Build()
+	require.NoError(w.Testing, err)
+
+	w.AddOutput(iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0), &mock.OutputData{
+		ID:           iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0),
+		Output:       basicOutput,
+		Address:      delegationOutput.Output.UnlockConditionSet().Address().Address,
+		AddressIndex: delegationOutput.AddressIndex,
+	})
+
+	return signedTx
+}
+
 // Computes the Potential Mana that the output generates until the current slot.
 func (w *DockerWallet) PotentialMana(api iotago.API, input iotago.Output, inputID iotago.OutputID, currentSlot iotago.SlotIndex) iotago.Mana {
 	return lo.PanicOnErr(iotago.PotentialMana(api.ManaDecayProvider(), api.StorageScoreStructure(), input, inputID.CreationSlot(), currentSlot))
