@@ -129,6 +129,8 @@ func NewProvider(opts ...options.Option[SyncManager]) module.Provider[*engine.En
 }
 
 func New(subModule module.Module, e *engine.Engine, latestCommitment *model.Commitment, finalizedSlot iotago.SlotIndex, opts ...options.Option[SyncManager]) *SyncManager {
+	ctxUpdateSyncStatusTicker, ctxCancelUpdateSyncStatusTicker := context.WithCancel(context.Background())
+
 	return module.InitSimpleLifecycle(options.Apply(&SyncManager{
 		Module: subModule,
 		events: syncmanager.NewEvents(),
@@ -149,16 +151,10 @@ func New(subModule module.Module, e *engine.Engine, latestCommitment *model.Comm
 		lastPrunedEpoch:        0,
 		hasPruned:              false,
 	}, opts, func(s *SyncManager) {
-		ctx, cancel := context.WithCancel(context.Background())
-		e.ShutdownEvent().OnTrigger(func() {
-			// stop the ticker when the engine is shutting down
-			cancel()
-		})
-
-		// start the sync status update ticker
+		// start the sync status update ticker, tick every half slot duration
 		s.isSyncedTicker = timeutil.NewTicker(func() {
 			s.updateSyncStatus()
-		}, 1*time.Second, ctx)
+		}, time.Duration(e.CommittedAPI().ProtocolParameters().SlotDurationInSeconds())*time.Second/2, ctxUpdateSyncStatusTicker)
 
 		s.updatePrunedEpoch(s.engine.Storage.LastPrunedEpoch())
 
@@ -168,7 +164,15 @@ func New(subModule module.Module, e *engine.Engine, latestCommitment *model.Comm
 				return time.Since(e.Clock.Accepted().RelativeTime()) < s.optsBootstrappedThreshold && e.Notarization.IsBootstrapped()
 			}
 		}
-	}))
+	}), func(syncManager *SyncManager) {
+		// stop the ticker when the engine is shutting down
+		ctxCancelUpdateSyncStatusTicker()
+
+		// wait for the ticker to gracefully shut down
+		syncManager.isSyncedTicker.WaitForGracefulShutdown()
+
+		syncManager.Module.StoppedEvent().Trigger()
+	})
 }
 
 func (s *SyncManager) SyncStatus() *syncmanager.SyncStatus {
