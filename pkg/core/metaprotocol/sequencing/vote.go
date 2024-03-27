@@ -29,6 +29,7 @@ type Vote struct {
 	IsMilestone reactive.Event
 }
 
+// NewVote returns an empty Vote object.
 func NewVote() *Vote {
 	return &Vote{
 		IsMilestoneCandidate: reactive.NewEvent(),
