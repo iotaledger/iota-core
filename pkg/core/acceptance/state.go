@@ -8,6 +8,9 @@ const (
 	// Pending is the state of pending spenders.
 	Pending State = iota
 
+	// PreAccepted is the state of pre-accepted spenders.
+	PreAccepted
+
 	// Accepted is the state of accepted spenders.
 	Accepted
 
