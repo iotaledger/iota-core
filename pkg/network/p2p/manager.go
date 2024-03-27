@@ -112,6 +112,7 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer) error {
 		return ierrors.New("no protocol handler registered to dial peer")
 	}
 
+	// Do not try to dial already connected peers.
 	if m.NeighborExists(peer.ID) {
 		return ierrors.WithMessagef(network.ErrDuplicatePeer, "peer %s already exists", peer.ID.String())
 	}
@@ -193,8 +194,16 @@ func (m *Manager) Shutdown() {
 	}
 }
 
-func (m *Manager) AddManualPeers(peers ...multiaddr.Multiaddr) error {
-	return m.manualPeering.AddPeers(peers...)
+func (m *Manager) AddManualPeer(multiAddr multiaddr.Multiaddr) (*network.Peer, error) {
+	return m.manualPeering.AddPeer(multiAddr)
+}
+
+func (m *Manager) ManualPeer(id peer.ID) (*network.Peer, error) {
+	return m.manualPeering.Peer(id)
+}
+
+func (m *Manager) ManualPeers(onlyConnected ...bool) []*network.Peer {
+	return m.manualPeering.GetPeers(onlyConnected...)
 }
 
 // LocalPeerID returns the local peer ID.
@@ -207,8 +216,27 @@ func (m *Manager) P2PHost() host.Host {
 	return m.libp2pHost
 }
 
-// DropNeighbor disconnects the neighbor with the given ID and the group.
-func (m *Manager) DropNeighbor(id peer.ID) error {
+// RemovePeer disconnects the neighbor with the given ID
+// and removes it from manual peering in case it was added manually.
+func (m *Manager) RemovePeer(id peer.ID) error {
+	if m.manualPeering.IsPeerKnown(id) {
+		// RemovePeer calls DisconnectNeighbor internally
+		if err := m.manualPeering.RemovePeer(id); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if err := m.DisconnectNeighbor(id); err != nil && !ierrors.Is(err, network.ErrUnknownPeer) {
+		return ierrors.Wrapf(err, "failed to drop peer %s in the gossip layer", id.String())
+	}
+
+	return nil
+}
+
+// DisconnectNeighbor disconnects the neighbor with the given ID.
+func (m *Manager) DisconnectNeighbor(id peer.ID) error {
 	nbr, err := m.neighbor(id)
 	if err != nil {
 		return ierrors.WithStack(err)
@@ -232,7 +260,8 @@ func (m *Manager) Send(packet proto.Message, to ...peer.ID) {
 	}
 }
 
-func (m *Manager) AllNeighbors() []network.Neighbor {
+// Neighbors returns all the neighbors that are currently connected.
+func (m *Manager) Neighbors() []network.Neighbor {
 	neighbors := m.allNeighbors()
 	result := make([]network.Neighbor, len(neighbors))
 	for i, n := range neighbors {
@@ -247,8 +276,9 @@ func (m *Manager) allNeighbors() []*neighbor {
 	return m.neighbors.Values()
 }
 
+// AutopeeringNeighbors returns all the neighbors that are currently connected via autopeering.
 func (m *Manager) AutopeeringNeighbors() []network.Neighbor {
-	return lo.Filter(m.AllNeighbors(), func(n network.Neighbor) bool {
+	return lo.Filter(m.Neighbors(), func(n network.Neighbor) bool {
 		return !m.manualPeering.IsPeerKnown(n.Peer().ID)
 	})
 }
@@ -350,11 +380,14 @@ func (m *Manager) addNeighbor(ctx context.Context, peer *network.Peer, ps *Packe
 	if peer.ID == m.libp2pHost.ID() {
 		return ierrors.WithStack(network.ErrLoopbackPeer)
 	}
+
 	m.shutdownMutex.RLock()
 	defer m.shutdownMutex.RUnlock()
+
 	if m.isShutdown {
 		return network.ErrNotRunning
 	}
+
 	if m.NeighborExists(peer.ID) {
 		return ierrors.WithStack(network.ErrDuplicatePeer)
 	}
