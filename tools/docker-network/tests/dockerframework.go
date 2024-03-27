@@ -66,6 +66,17 @@ func (n *Node) AccountAddress(t *testing.T) *iotago.AccountAddress {
 	return accAddress
 }
 
+type DockerWalletClock struct {
+	client mock.Client
+}
+
+func (c *DockerWalletClock) SetCurrentSlot(slot iotago.SlotIndex) {
+}
+
+func (c *DockerWalletClock) CurrentSlot() iotago.SlotIndex {
+	return c.client.LatestAPI().TimeProvider().CurrentSlot()
+}
+
 type DockerTestFramework struct {
 	Testing *testing.T
 
@@ -209,6 +220,7 @@ func (d *DockerTestFramework) waitForNodesAndGetClients() error {
 		d.Testing,
 		"default",
 		d.clients["V1"],
+		&DockerWalletClock{client: d.clients["V1"]},
 		lo.PanicOnErr(wallet.NewKeyManagerFromRandom(wallet.DefaultIOTAPath)),
 	)
 
@@ -513,7 +525,7 @@ func (d *DockerTestFramework) CreateAccountBlockFromInput(wallet *mock.Wallet, i
 
 // CreateImplicitAccount requests faucet funds and creates an implicit account. It already wait until the transaction is committed and the created account is useable.
 func (d *DockerTestFramework) CreateImplicitAccount(ctx context.Context) (*mock.Wallet, *mock.OutputData) {
-	newWallet := mock.NewWallet(d.Testing, "", d.defaultWallet.Client)
+	newWallet := mock.NewWallet(d.Testing, "", d.defaultWallet.Client, &DockerWalletClock{client: d.defaultWallet.Client})
 	implicitAccountOutputData := d.RequestFaucetFunds(ctx, newWallet, iotago.AddressImplicitAccountCreation)
 
 	accountID := iotago.AccountIDFromOutputID(implicitAccountOutputData.ID)
@@ -523,6 +535,14 @@ func (d *DockerTestFramework) CreateImplicitAccount(ctx context.Context) (*mock.
 	// make sure an implicit account is committed
 	d.CheckAccountStatus(ctx, iotago.EmptyBlockID, implicitAccountOutputData.ID.TransactionID(), implicitAccountOutputData.ID, accountAddress)
 
+	// update the wallet with the new account data
+	newWallet.SetBlockIssuer(&mock.AccountData{
+		ID:           accountID,
+		Address:      accountAddress,
+		OutputID:     implicitAccountOutputData.ID,
+		AddressIndex: implicitAccountOutputData.AddressIndex,
+	})
+
 	return newWallet, implicitAccountOutputData
 }
 
@@ -531,8 +551,13 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 	// create an implicit account by requesting faucet funds
 	ctx := context.TODO()
 	newWallet, implicitAccountOutputData := d.CreateImplicitAccount(ctx)
-	clt := d.defaultWallet.Client
+	clt := newWallet.Client
 
+	var implicitBlockIssuerKey iotago.BlockIssuerKey = iotago.Ed25519PublicKeyHashBlockIssuerKeyFromImplicitAccountCreationAddress(newWallet.ImplicitAccountCreationAddress())
+	opts = append(opts, mock.WithBlockIssuerFeature(
+		iotago.NewBlockIssuerKeys(implicitBlockIssuerKey),
+		iotago.MaxSlotIndex,
+	))
 	signedTx := newWallet.TransitionImplicitAccountToAccountOutput("", []*mock.OutputData{implicitAccountOutputData}, opts...)
 
 	// The account transition block should be issued by the implicit account block issuer key.
@@ -544,6 +569,15 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 	accOutput := signedTx.Transaction.Outputs[0].(*iotago.AccountOutput)
 	accAddress := (accOutput.AccountID).ToAddress().(*iotago.AccountAddress)
 	d.CheckAccountStatus(ctx, block.ID(), signedTx.Transaction.MustID(), accOutputID, accAddress, true)
+
+	// update the wallet with the new account data
+	newWallet.SetBlockIssuer(&mock.AccountData{
+		ID:           accOutput.AccountID,
+		Address:      accAddress,
+		Output:       accOutput,
+		OutputID:     accOutputID,
+		AddressIndex: implicitAccountOutputData.AddressIndex,
+	})
 
 	fmt.Printf("Account created, Bech addr: %s, in txID: %s, slot: %d\n", accAddress.Bech32(clt.CommittedAPI().ProtocolParameters().Bech32HRP()), signedTx.Transaction.MustID().ToHex(), block.ID().Slot())
 
@@ -586,8 +620,7 @@ func (d *DockerTestFramework) PrepareBlockIssuance(ctx context.Context, clt mock
 }
 
 // AllotManaTo requests faucet funds then uses it to allots mana from one account to another.
-func (d *DockerTestFramework) AllotManaTo(fromWallet *mock.Wallet, toID iotago.AccountID, manaToAllot iotago.Mana) {
-	to := d.defaultWallet.Account(toID)
+func (d *DockerTestFramework) AllotManaTo(fromWallet *mock.Wallet, to *mock.AccountData, manaToAllot iotago.Mana) {
 	// requesting faucet funds for allotment
 	ctx := context.TODO()
 	fundsOutputID := d.RequestFaucetFunds(ctx, fromWallet, iotago.AddressEd25519)
@@ -596,20 +629,21 @@ func (d *DockerTestFramework) AllotManaTo(fromWallet *mock.Wallet, toID iotago.A
 	signedTx := fromWallet.AllotManaFromBasicOutput(
 		"",
 		fundsOutputID,
-		toID,
+		manaToAllot,
+		to.ID,
 	)
-
+	preAllotmentCommitmentID := fromWallet.GetNewBlockIssuanceResponse().LatestCommitment.MustID()
 	block, err := fromWallet.IssueBasicBlock(ctx, "", mock.WithPayload(signedTx))
 	require.NoError(d.Testing, err)
 	fmt.Println("Allot mana transaction sent, blkID:", block.ID().ToHex(), ", txID:", signedTx.Transaction.MustID().ToHex(), ", slot:", block.ID().Slot())
 
 	d.AwaitTransactionPayloadAccepted(ctx, signedTx.Transaction.MustID())
 
-	// allotment is updated until the transaction is committed
+	// allotment is updated when the transaction is committed
 	d.AwaitCommitment(block.ID().Slot())
 
 	// check if the mana is allotted
-	toCongestionResp, err := clt.Congestion(ctx, to.Address, 0, lo.PanicOnErr(fromWallet.GetNewBlockIssuanceResponse().LatestCommitment.ID()))
+	toCongestionResp, err := clt.Congestion(ctx, to.Address, 0, preAllotmentCommitmentID)
 	require.NoError(d.Testing, err)
 	oldBIC := toCongestionResp.BlockIssuanceCredits
 
@@ -626,9 +660,9 @@ func (d *DockerTestFramework) CreateNativeToken(fromWallet *mock.Wallet, mintedA
 	ctx := context.TODO()
 
 	// requesting faucet funds for native token creation
-	fundsOutputData := d.RequestFaucetFunds(ctx, d.defaultWallet, iotago.AddressEd25519)
+	fundsOutputData := d.RequestFaucetFunds(ctx, fromWallet, iotago.AddressEd25519)
 
-	signedTx := d.defaultWallet.CreateFoundryAndNativeTokensFromInput(fundsOutputData, mintedAmount, maxSupply)
+	signedTx := fromWallet.CreateFoundryAndNativeTokensFromInput(fundsOutputData, mintedAmount, maxSupply)
 
 	block, err := fromWallet.IssueBasicBlock(ctx, "", mock.WithPayload(signedTx))
 	require.NoError(d.Testing, err)

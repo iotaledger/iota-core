@@ -44,11 +44,11 @@ func Test_AccountTransitions(t *testing.T) {
 
 	// create account2
 	fmt.Println("Creating account2")
-	_, account2 := d.CreateAccount()
+	wallet2, _ := d.CreateAccount()
 
 	// allot 1000 mana from account1 to account2
 	fmt.Println("Allotting mana from account1 to account2")
-	d.AllotManaTo(wallet1, account2.ID, 1000)
+	d.AllotManaTo(wallet1, wallet2.BlockIssuer.AccountData, 1000)
 
 	// create native token
 	fmt.Println("Creating native token")

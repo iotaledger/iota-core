@@ -610,17 +610,9 @@ func (w *Wallet) TransitionFoundry(transactionName string, foundryInput *OutputD
 	return signedTransaction
 }
 
-func (w *Wallet) AllotManaFromBasicOutput(transactionName string, input *OutputData, accountIDs ...iotago.AccountID) *iotago.SignedTransaction {
+func (w *Wallet) AllotManaFromBasicOutput(transactionName string, input *OutputData, manaToAllot iotago.Mana, accountIDs ...iotago.AccountID) *iotago.SignedTransaction {
 	if _, isBasic := input.Output.(*iotago.BasicOutput); !isBasic {
 		panic("input is not *iotago.BasicOutput")
-	}
-	output := &iotago.BasicOutput{
-		Amount: input.Output.BaseTokenAmount(),
-		Mana:   0,
-		UnlockConditions: iotago.BasicOutputUnlockConditions{
-			&iotago.AddressUnlockCondition{Address: w.Address()},
-		},
-		Features: iotago.BasicOutputFeatures{},
 	}
 
 	apiForSlot := w.Client.APIForSlot(w.CurrentSlot())
@@ -628,17 +620,28 @@ func (w *Wallet) AllotManaFromBasicOutput(transactionName string, input *OutputD
 	storageScoreStructure := apiForSlot.StorageScoreStructure()
 
 	totalInputMana := lo.PanicOnErr(vm.TotalManaIn(manaDecayProvider, storageScoreStructure, w.CurrentSlot(), vm.InputSet{input.ID: input.Output}, vm.RewardsInputSet{}))
-	outputMana := totalInputMana / iotago.Mana(len(accountIDs))
-	remainderMana := totalInputMana - outputMana*iotago.Mana(len(accountIDs))
+	if manaToAllot > totalInputMana {
+		panic("not enough mana to allot")
+	}
+	manaPerOutput := manaToAllot / iotago.Mana(len(accountIDs))
+	remainderMana := manaToAllot - manaPerOutput*iotago.Mana(len(accountIDs))
+	output := &iotago.BasicOutput{
+		Amount: input.Output.BaseTokenAmount(),
+		Mana:   totalInputMana - manaToAllot,
+		UnlockConditions: iotago.BasicOutputUnlockConditions{
+			&iotago.AddressUnlockCondition{Address: w.Address()},
+		},
+		Features: iotago.BasicOutputFeatures{},
+	}
 
 	var allotments iotago.Allotments
 	for i, accountID := range accountIDs {
 		if i+1 == len(accountIDs) {
-			outputMana += remainderMana
+			manaPerOutput += remainderMana
 		}
 		allotments = append(allotments, &iotago.Allotment{
 			AccountID: accountID,
-			Mana:      outputMana,
+			Mana:      manaPerOutput,
 		})
 	}
 

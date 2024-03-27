@@ -54,18 +54,15 @@ type BlockIssuer struct {
 	AccountData *AccountData
 }
 
-func NewBlockIssuer(t *testing.T, name string, keyManager *wallet.KeyManager, client Client, addressIndex uint32, accountID iotago.AccountID, validator bool, opts ...options.Option[BlockIssuer]) *BlockIssuer {
+func NewBlockIssuer(t *testing.T, name string, keyManager *wallet.KeyManager, client Client, accountData *AccountData, validator bool, opts ...options.Option[BlockIssuer]) *BlockIssuer {
 	t.Helper()
 
-	_, pub := keyManager.KeyPair(addressIndex)
+	_, pub := keyManager.KeyPair(accountData.AddressIndex)
 
-	if accountID == iotago.EmptyAccountID {
-		accountID = blake2b.Sum256(pub)
+	if accountData.ID == iotago.EmptyAccountID {
+		accountData.ID = blake2b.Sum256(pub)
 	}
-	accountID.RegisterAlias(name)
-
-	accountAddress, ok := accountID.ToAddress().(*iotago.AccountAddress)
-	require.True(t, ok)
+	accountData.ID.RegisterAlias(name)
 
 	return options.Apply(&BlockIssuer{
 		Testing:                   t,
@@ -74,11 +71,7 @@ func NewBlockIssuer(t *testing.T, name string, keyManager *wallet.KeyManager, cl
 		keyManager:                keyManager,
 		Client:                    client,
 		blockIssuanceResponseUsed: true,
-		AccountData: &AccountData{
-			ID:           accountID,
-			AddressIndex: addressIndex,
-			Address:      accountAddress,
-		},
+		AccountData:               accountData,
 	}, opts)
 }
 

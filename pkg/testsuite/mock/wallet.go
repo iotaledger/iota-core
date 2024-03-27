@@ -45,6 +45,21 @@ type AccountData struct {
 	OutputID iotago.OutputID
 }
 
+func NewAccountDataFromAccountID(accountID iotago.AccountID, addressIndex ...uint32) *AccountData {
+	accountAddress, ok := accountID.ToAddress().(*iotago.AccountAddress)
+	if !ok {
+		panic(ierrors.Errorf("accountID %s is not an account address", accountID.ToHex()))
+	}
+	if len(addressIndex) == 0 {
+		addressIndex = []uint32{0}
+	}
+	return &AccountData{
+		ID:           accountID,
+		Address:      accountAddress,
+		AddressIndex: addressIndex[0],
+	}
+}
+
 // WalletClock is an interface that provides the current slot.
 type WalletClock interface {
 	SetCurrentSlot(slot iotago.SlotIndex)
@@ -89,7 +104,7 @@ type Wallet struct {
 	clock WalletClock
 }
 
-func NewWallet(t *testing.T, name string, client Client, keyManager ...*wallet.KeyManager) *Wallet {
+func NewWallet(t *testing.T, name string, client Client, clock WalletClock, keyManager ...*wallet.KeyManager) *Wallet {
 	t.Helper()
 
 	var km *wallet.KeyManager
@@ -110,13 +125,13 @@ func NewWallet(t *testing.T, name string, client Client, keyManager ...*wallet.K
 		accounts:     make(map[iotago.AccountID]*AccountData),
 		transactions: make(map[string]*iotago.Transaction),
 		keyManager:   km,
-		BlockIssuer:  NewBlockIssuer(t, name, km, client, blockIssuerAddressIndex, blockIssuerID, false),
-		clock:        &TestSuiteWalletClock{},
+		BlockIssuer:  NewBlockIssuer(t, name, km, client, NewAccountDataFromAccountID(blockIssuerID, blockIssuerAddressIndex), false),
+		clock:        clock,
 	}
 }
 
 func (w *Wallet) SetBlockIssuer(accountData *AccountData) {
-	w.BlockIssuer = NewBlockIssuer(w.Testing, w.Name, w.keyManager, w.Client, accountData.AddressIndex, accountData.ID, false)
+	w.BlockIssuer = NewBlockIssuer(w.Testing, w.Name, w.keyManager, w.Client, accountData, false)
 }
 
 func (w *Wallet) SetDefaultClient(client Client) {

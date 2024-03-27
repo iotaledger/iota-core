@@ -414,9 +414,11 @@ func allotments(t *testing.T, numAllotments int) (float64, []float64) {
 				accountOutput := ts.AccountOutput(fmt.Sprintf("Genesis:%d", i+3)).Output.(*iotago.AccountOutput)
 				accountIDs = append(accountIDs, accountOutput.AccountID)
 			}
+			basicOutputData := ts.DefaultWallet().OutputData("Genesis:0")
 			tx1 := ts.DefaultWallet().AllotManaFromBasicOutput(
 				"tx1",
-				ts.DefaultWallet().OutputData("Genesis:0"),
+				basicOutputData,
+				basicOutputData.Output.StoredMana(),
 				accountIDs...,
 			)
 			commitment := node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
