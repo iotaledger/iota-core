@@ -38,15 +38,17 @@ func NewProvider(opts ...options.Option[PostSolidBlockFilter]) module.Provider[*
 			e.Ledger.InitializedEvent().OnTrigger(func() {
 				c.Init(e.Ledger.Account, e.BlockCache.Block, e.Ledger.RMCManager().RMC)
 			})
+
+			c.InitializedEvent().Trigger()
 		})
 
 		return c
 	})
 }
 
-func New(module module.Module, opts ...options.Option[PostSolidBlockFilter]) *PostSolidBlockFilter {
+func New(subModule module.Module, opts ...options.Option[PostSolidBlockFilter]) *PostSolidBlockFilter {
 	return options.Apply(&PostSolidBlockFilter{
-		Module: module,
+		Module: subModule,
 		events: postsolidfilter.NewEvents(),
 	}, opts, func(p *PostSolidBlockFilter) {
 		p.ShutdownEvent().OnTrigger(func() {

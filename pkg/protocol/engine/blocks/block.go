@@ -367,11 +367,11 @@ func (b *Block) WitnessCount() int {
 	return b.witnesses.Size()
 }
 
-func (b *Block) Witnesses() []account.SeatIndex {
+func (b *Block) Witnesses() ds.ReadableSet[account.SeatIndex] {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
-	return b.witnesses.ToSlice()
+	return b.witnesses
 }
 
 func (b *Block) SpenderIDs() ds.Set[iotago.TransactionID] {
@@ -424,11 +424,11 @@ func (b *Block) AddAcceptanceRatifier(seat account.SeatIndex) (added bool) {
 	return b.acceptanceRatifiers.Add(seat)
 }
 
-func (b *Block) AcceptanceRatifiers() []account.SeatIndex {
+func (b *Block) AcceptanceRatifiers() ds.ReadableSet[account.SeatIndex] {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
-	return b.acceptanceRatifiers.ToSlice()
+	return b.acceptanceRatifiers
 }
 
 // Accepted returns a reactive variable that is true if the Block was accepted.
@@ -536,11 +536,11 @@ func (b *Block) AddConfirmationRatifier(seat account.SeatIndex) (added bool) {
 	return b.confirmationRatifiers.Add(seat)
 }
 
-func (b *Block) ConfirmationRatifiers() []account.SeatIndex {
+func (b *Block) ConfirmationRatifiers() ds.ReadableSet[account.SeatIndex] {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
-	return b.confirmationRatifiers.ToSlice()
+	return b.confirmationRatifiers
 }
 
 func (b *Block) IsConfirmed() bool {

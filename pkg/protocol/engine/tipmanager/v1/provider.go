@@ -29,10 +29,8 @@ func NewProvider() module.Provider[*engine.Engine, tipmanager.TipManager] {
 			e.Events.SeatManager.OnlineCommitteeSeatRemoved.Hook(t.RemoveSeat)
 
 			e.Events.TipManager.BlockAdded.LinkTo(t.blockAdded)
-		})
 
-		e.ShutdownEvent().OnTrigger(func() {
-			t.ShutdownEvent().Trigger()
+			t.InitializedEvent().Trigger()
 		})
 
 		return t

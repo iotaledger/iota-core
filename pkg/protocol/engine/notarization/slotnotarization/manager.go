@@ -6,6 +6,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
@@ -49,17 +50,11 @@ type Manager struct {
 
 func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 	return module.Provide(func(e *engine.Engine) notarization.Notarization {
-		logger := e.NewChildLogger("NotarizationManager")
-
-		m := NewManager(e.NewSubModule("NotarizationManager"), e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
-		m.ShutdownEvent().OnTrigger(logger.Shutdown)
-
-		m.apiProvider = e
+		m := NewManager(e.NewSubModule("NotarizationManager"), e)
 
 		e.ConstructedEvent().OnTrigger(func() {
 			m.storage = e.Storage
 			m.acceptedTimeFunc = e.Clock.Accepted().Time
-
 			m.ledger = e.Ledger
 			m.sybilProtection = e.SybilProtection
 			m.tipSelection = e.TipSelection
@@ -80,6 +75,7 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 			e.Events.Notarization.LinkTo(m.events)
 
 			m.slotMutations = NewSlotMutations(e.Storage.Settings().LatestCommitment().Slot())
+
 			m.InitializedEvent().Trigger()
 		})
 
@@ -87,19 +83,18 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 	})
 }
 
-func NewManager(subModule module.Module, workers *workerpool.Group, errorHandler func(error)) *Manager {
-	m := &Manager{
+func NewManager(subModule module.Module, engine *engine.Engine) *Manager {
+	return options.Apply(&Manager{
 		Module:       subModule,
 		events:       notarization.NewEvents(),
-		workers:      workers,
-		errorHandler: errorHandler,
-	}
+		workers:      engine.Workers.CreateGroup("NotarizationManager"),
+		errorHandler: engine.ErrorHandler("notarization"),
+		apiProvider:  engine,
+	}, nil, func(m *Manager) {
+		m.ShutdownEvent().OnTrigger(m.Shutdown)
 
-	m.ShutdownEvent().OnTrigger(m.Shutdown)
-
-	m.ConstructedEvent().Trigger()
-
-	return m
+		m.ConstructedEvent().Trigger()
+	})
 }
 
 func (m *Manager) Shutdown() {
@@ -199,7 +194,7 @@ func (m *Manager) isCommittable(slot iotago.SlotIndex, acceptedBlockSlot iotago.
 }
 
 func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, error) {
-	m.LogTrace("Trying to create commitment for slot", "slot", slot)
+	m.LogDebug("Trying to create commitment for slot", "slot", slot)
 	m.commitmentMutex.Lock()
 	defer m.commitmentMutex.Unlock()
 
@@ -260,7 +255,7 @@ func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, er
 		rmc,
 	)
 
-	m.LogTrace("Committing", "commitment", newCommitment, "roots ", roots)
+	m.LogDebug("Committing", "commitment", newCommitment, "roots ", roots)
 
 	newModelCommitment, err := model.CommitmentFromCommitment(newCommitment, apiForSlot, serix.WithValidation())
 	if err != nil {

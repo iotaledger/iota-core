@@ -35,52 +35,64 @@ type Clock struct {
 // NewProvider creates a new Clock provider with the given options.
 func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, clock.Clock] {
 	return module.Provide(func(e *engine.Engine) clock.Clock {
-		return options.Apply(&Clock{
-			Module:        e.NewSubModule("Clock"),
-			acceptedTime:  NewRelativeTime(),
-			confirmedTime: NewRelativeTime(),
-			workerPool:    e.Workers.CreatePool("Clock", workerpool.WithWorkerCount(1), workerpool.WithCancelPendingTasksOnShutdown(true), workerpool.WithPanicOnSubmitAfterShutdown(true)),
-		}, opts, func(c *Clock) {
-			e.ConstructedEvent().OnTrigger(func() {
-				latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Slot()
-				c.acceptedTime.Set(e.APIForSlot(latestCommitmentIndex).TimeProvider().SlotEndTime(latestCommitmentIndex))
+		c := New(e.NewSubModule("Clock"), e, opts...)
 
-				latestFinalizedSlotIndex := e.Storage.Settings().LatestFinalizedSlot()
-				c.confirmedTime.Set(e.APIForSlot(latestFinalizedSlotIndex).TimeProvider().SlotEndTime(latestFinalizedSlotIndex))
+		e.ConstructedEvent().OnTrigger(func() {
+			latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Slot()
+			c.acceptedTime.Set(e.APIForSlot(latestCommitmentIndex).TimeProvider().SlotEndTime(latestCommitmentIndex))
 
-				e.Events.Clock.AcceptedTimeUpdated.LinkTo(c.acceptedTime.OnUpdated)
-				e.Events.Clock.ConfirmedTimeUpdated.LinkTo(c.confirmedTime.OnUpdated)
+			latestFinalizedSlotIndex := e.Storage.Settings().LatestFinalizedSlot()
+			c.confirmedTime.Set(e.APIForSlot(latestFinalizedSlotIndex).TimeProvider().SlotEndTime(latestFinalizedSlotIndex))
 
-				asyncOpt := event.WithWorkerPool(c.workerPool)
-				c.ShutdownEvent().OnTrigger(lo.Batch(
-					e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-						c.acceptedTime.Advance(block.IssuingTime())
-					}, asyncOpt).Unhook,
+			e.Events.Clock.AcceptedTimeUpdated.LinkTo(c.acceptedTime.OnUpdated)
+			e.Events.Clock.ConfirmedTimeUpdated.LinkTo(c.confirmedTime.OnUpdated)
 
-					e.Events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
-						c.confirmedTime.Advance(block.IssuingTime())
-					}, asyncOpt).Unhook,
+			asyncOpt := event.WithWorkerPool(c.workerPool)
 
-					e.Events.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
-						timeProvider := e.APIForSlot(slot).TimeProvider()
-						slotEndTime := timeProvider.SlotEndTime(slot)
+			unhook := lo.Batch(
+				e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+					c.acceptedTime.Advance(block.IssuingTime())
+				}, asyncOpt).Unhook,
 
-						c.acceptedTime.Advance(slotEndTime)
-						c.confirmedTime.Advance(slotEndTime)
-					}, asyncOpt).Unhook,
+				e.Events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
+					c.confirmedTime.Advance(block.IssuingTime())
+				}, asyncOpt).Unhook,
 
-					func() {
-						c.workerPool.Shutdown()
+				e.Events.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
+					timeProvider := e.APIForSlot(slot).TimeProvider()
+					slotEndTime := timeProvider.SlotEndTime(slot)
 
-						c.StoppedEvent().Trigger()
-					},
-				))
+					c.acceptedTime.Advance(slotEndTime)
+					c.confirmedTime.Advance(slotEndTime)
+				}, asyncOpt).Unhook,
+			)
 
-				c.InitializedEvent().Trigger()
+			c.ShutdownEvent().OnTrigger(func() {
+				unhook()
+				c.workerPool.Shutdown()
+
+				c.StoppedEvent().Trigger()
 			})
 
-			c.ConstructedEvent().Trigger()
+			c.InitializedEvent().Trigger()
 		})
+
+		return c
+	})
+}
+
+func New(subModule module.Module, engine *engine.Engine, opts ...options.Option[Clock]) *Clock {
+	return options.Apply(&Clock{
+		Module:        subModule,
+		acceptedTime:  NewRelativeTime(),
+		confirmedTime: NewRelativeTime(),
+		workerPool:    engine.Workers.CreatePool("Clock", workerpool.WithWorkerCount(1), workerpool.WithCancelPendingTasksOnShutdown(true), workerpool.WithPanicOnSubmitAfterShutdown(true)),
+	}, opts, func(c *Clock) {
+		c.ShutdownEvent().OnTrigger(func() {
+			c.workerPool.Shutdown()
+		})
+
+		c.ConstructedEvent().Trigger()
 	})
 }
 

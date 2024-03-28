@@ -46,53 +46,60 @@ type SybilProtection struct {
 
 func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engine.Engine, sybilprotection.SybilProtection] {
 	return module.Provide(func(e *engine.Engine) sybilprotection.SybilProtection {
-		return options.Apply(&SybilProtection{
-			Module: e.NewSubModule("SybilProtection"),
-			events: sybilprotection.NewEvents(),
+		s := New(e.NewSubModule("SybilProtection"), e, opts...)
 
-			apiProvider:             e,
-			optsSeatManagerProvider: topstakers.NewProvider(),
-		}, opts, func(o *SybilProtection) {
-			o.seatManager = o.optsSeatManagerProvider(e)
+		e.ConstructedEvent().OnTrigger(func() {
+			s.ledger = e.Ledger
+			s.errHandler = e.ErrorHandler("SybilProtection")
+			logger := e.NewChildLogger("PerformanceTracker")
+			latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
+			latestCommittedEpoch := s.apiProvider.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
+			s.performanceTracker = performance.NewTracker(e.Storage.RewardsForEpoch, e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.CommitteeCandidates, e.Storage.ValidatorPerformances, latestCommittedEpoch, e, s.errHandler, logger)
+			s.lastCommittedSlot = latestCommittedSlot
 
-			e.ConstructedEvent().OnTrigger(func() {
-				o.ledger = e.Ledger
-				o.errHandler = e.ErrorHandler("SybilProtection")
-				logger := e.NewChildLogger("PerformanceTracker")
-				latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
-				latestCommittedEpoch := o.apiProvider.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
-				o.performanceTracker = performance.NewTracker(e.Storage.RewardsForEpoch, e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.CommitteeCandidates, e.Storage.ValidatorPerformances, latestCommittedEpoch, e, o.errHandler, logger)
-				o.lastCommittedSlot = latestCommittedSlot
+			if s.optsInitialCommittee != nil {
+				if _, err := s.seatManager.RotateCommittee(0, s.optsInitialCommittee); err != nil {
+					panic(ierrors.Wrap(err, "error while registering initial committee for epoch 0"))
+				}
+			}
 
-				if o.optsInitialCommittee != nil {
-					if _, err := o.seatManager.RotateCommittee(0, o.optsInitialCommittee); err != nil {
-						panic(ierrors.Wrap(err, "error while registering initial committee for epoch 0"))
-					}
+			s.ConstructedEvent().Trigger()
+
+			// When the engine is triggered initialized, snapshot has been read or database has been initialized properly,
+			// so the committee should be available in the performance manager.
+			e.InitializedEvent().OnTrigger(func() {
+				// Mark the committee for the last committed slot as active.
+				currentEpoch := e.CommittedAPI().TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Slot())
+				err := s.seatManager.InitializeCommittee(currentEpoch, e.Clock.Accepted().RelativeTime())
+				if err != nil {
+					panic(ierrors.Wrap(err, "error while initializing committee"))
 				}
 
-				// When the engine is triggered initialized, snapshot has been read or database has been initialized properly,
-				// so the committee should be available in the performance manager.
-				e.InitializedEvent().OnTrigger(func() {
-					// Mark the committee for the last committed slot as active.
-					currentEpoch := e.CommittedAPI().TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Slot())
-					err := o.seatManager.InitializeCommittee(currentEpoch, e.Clock.Accepted().RelativeTime())
-					if err != nil {
-						panic(ierrors.Wrap(err, "error while initializing committee"))
-					}
-
-					o.InitializedEvent().Trigger()
-				})
+				s.InitializedEvent().Trigger()
 			})
 
-			e.Events.SlotGadget.SlotFinalized.Hook(o.slotFinalized)
+			e.Events.SlotGadget.SlotFinalized.Hook(s.slotFinalized)
 
-			e.Events.SybilProtection.LinkTo(o.events)
+			e.Events.SybilProtection.LinkTo(s.events)
 
-			o.ShutdownEvent().OnTrigger(func() {
-				o.StoppedEvent().Trigger()
-			})
+			s.InitializedEvent().Trigger()
+		})
 
-			o.ConstructedEvent().Trigger()
+		return s
+	})
+}
+
+func New(subModule module.Module, engine *engine.Engine, opts ...options.Option[SybilProtection]) *SybilProtection {
+	return options.Apply(&SybilProtection{
+		Module:                  subModule,
+		events:                  sybilprotection.NewEvents(),
+		apiProvider:             engine,
+		optsSeatManagerProvider: topstakers.NewProvider(),
+	}, opts, func(s *SybilProtection) {
+		s.seatManager = s.optsSeatManagerProvider(engine)
+
+		s.ShutdownEvent().OnTrigger(func() {
+			s.StoppedEvent().Trigger()
 		})
 	})
 }

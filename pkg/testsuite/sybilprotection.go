@@ -2,7 +2,6 @@ package testsuite
 
 import (
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
@@ -89,7 +88,9 @@ func (t *TestSuite) AssertSybilProtectionRegisteredValidators(epoch iotago.Epoch
 			candidateIDs := lo.Map(candidates, func(candidate *api.ValidatorResponse) string {
 				return candidate.AddressBech32
 			})
-			require.NoError(t.Testing, err)
+			if err != nil {
+				return ierrors.Wrapf(err, "AssertSybilProtectionRegisteredValidators: %s: failed to get registered validators in epoch %d", node.Name, epoch)
+			}
 
 			if !assert.ElementsMatch(t.fakeTesting, expectedAccounts, candidateIDs) {
 				return ierrors.Errorf("AssertSybilProtectionRegisteredValidators: %s: expected %s, got %s", node.Name, expectedAccounts, candidateIDs)
@@ -113,7 +114,9 @@ func (t *TestSuite) AssertSybilProtectionCandidates(epoch iotago.EpochIndex, exp
 			candidateIDs := lo.Map(candidates, func(candidate *accounts.AccountData) iotago.AccountID {
 				return candidate.ID
 			})
-			require.NoError(t.Testing, err)
+			if err != nil {
+				return ierrors.Wrapf(err, "AssertSybilProtectionCandidates: %s: failed to get eligible validators in epoch %d", node.Name, epoch)
+			}
 
 			if !assert.ElementsMatch(t.fakeTesting, expectedAccounts, candidateIDs) {
 				return ierrors.Errorf("AssertSybilProtectionCandidates: %s: expected %s, got %s", node.Name, expectedAccounts, candidateIDs)

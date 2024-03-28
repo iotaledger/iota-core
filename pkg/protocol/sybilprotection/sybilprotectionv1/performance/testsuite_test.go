@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/core/safemath"
+
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
@@ -272,7 +274,10 @@ func (t *TestSuite) delegatorReward(epoch iotago.EpochIndex, profitMargin, poolR
 	if poolRewardWithFixedCost >= fixedCost {
 		poolRewards = poolRewardWithFixedCost - fixedCost
 	}
-	unDecayedEpochRewards := (((profitMarginComplement * poolRewards) >> profitMarginExponent) / poolStake) * delegatedAmount
+
+	result := (profitMarginComplement * poolRewards) >> profitMarginExponent
+	unDecayedEpochRewards, err := safemath.Safe64MulDiv(result, delegatedAmount, poolStake)
+	require.NoError(t.T, err)
 
 	decayProvider := t.api.ManaDecayProvider()
 	decayedEpochRewards, err := decayProvider.DecayManaByEpochs(iotago.Mana(unDecayedEpochRewards), epoch, epoch)

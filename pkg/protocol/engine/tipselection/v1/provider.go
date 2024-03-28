@@ -25,10 +25,8 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 					return e.SybilProtection.SeatManager().OnlineCommittee().Size()
 				}))
 			})
-		})
 
-		e.ShutdownEvent().OnTrigger(func() {
-			t.ShutdownEvent().Trigger()
+			t.InitializedEvent().Trigger()
 		})
 
 		return t

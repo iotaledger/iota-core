@@ -221,21 +221,23 @@ func (t *TestSuite) IssueBlocksAtSlots(prefix string, slots []iotago.SlotIndex, 
 		lastBlockRowIssued = lastRowInSlot
 
 		if waitForSlotsCommitted {
-			if slot > t.API.ProtocolParameters().MinCommittableAge() {
-				if useCommitmentAtMinCommittableAge {
-					// Make sure that all nodes create blocks throughout the slot that commit to the same commitment at slot-minCommittableAge-1.
-					commitmentSlot := slot - t.API.ProtocolParameters().MinCommittableAge()
-					t.AssertCommitmentSlotIndexExists(commitmentSlot, t.ClientsForNodes(nodes...)...)
-					for _, node := range nodes {
-						commitment, err := node.Protocol.Engines.Main.Get().Storage.Commitments().Load(commitmentSlot)
-						require.NoError(t.Testing, err)
+			if useCommitmentAtMinCommittableAge && slot > t.API.ProtocolParameters().MinCommittableAge() {
+				// Make sure that all nodes create blocks throughout the slot that commit to the same commitment at slot-minCommittableAge-1.
+				commitmentSlot := slot - t.API.ProtocolParameters().MinCommittableAge()
+				t.AssertCommitmentSlotIndexExists(commitmentSlot, t.ClientsForNodes(nodes...)...)
+				for _, node := range nodes {
+					commitment, err := node.Protocol.Engines.Main.Get().Storage.Commitments().Load(commitmentSlot)
+					require.NoError(t.Testing, err)
 
-						issuingOptions[node.Name] = []options.Option[mock.BlockHeaderParams]{
-							mock.WithSlotCommitment(commitment.Commitment()),
-						}
+					issuingOptions[node.Name] = []options.Option[mock.BlockHeaderParams]{
+						mock.WithSlotCommitment(commitment.Commitment()),
 					}
 				}
+			} else if slot > t.API.ProtocolParameters().MaxCommittableAge()+1 {
+				commitmentSlot := slot - t.API.ProtocolParameters().MaxCommittableAge() + 1
+				t.AssertCommitmentSlotIndexExists(commitmentSlot, t.ClientsForNodes(nodes...)...)
 			}
+
 			t.AssertBlocksExist(blocksInSlot, true, t.ClientsForNodes(nodes...)...)
 		}
 	}

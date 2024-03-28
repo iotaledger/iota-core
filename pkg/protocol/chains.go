@@ -185,11 +185,11 @@ func attachEngineLogs(instance *engine.Engine) func() {
 		}).Unhook,
 
 		events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-			instance.LogTrace("NotarizationManager.SlotCommitted", "commitment", details.Commitment.ID(), "acceptedBlocks count", details.AcceptedBlocks.Size(), "accepted transactions", len(details.Mutations))
+			instance.LogDebug("NotarizationManager.SlotCommitted", "commitment", details.Commitment.ID(), "acceptedBlocks count", details.AcceptedBlocks.Size(), "accepted transactions", len(details.Mutations))
 		}).Unhook,
 
 		events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
-			instance.LogTrace("NotarizationManager.LatestCommitmentUpdated", "commitment", commitment.ID())
+			instance.LogDebug("NotarizationManager.LatestCommitmentUpdated", "commitment", commitment.ID())
 		}).Unhook,
 
 		events.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
@@ -209,7 +209,7 @@ func attachEngineLogs(instance *engine.Engine) func() {
 		}).Unhook,
 
 		events.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
-			instance.LogTrace("SlotGadget.SlotFinalized", "slot", slot)
+			instance.LogDebug("SlotGadget.SlotFinalized", "slot", slot)
 		}).Unhook,
 
 		events.SeatManager.OnlineCommitteeSeatAdded.Hook(func(seat account.SeatIndex, accountID iotago.AccountID) {

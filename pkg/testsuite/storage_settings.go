@@ -3,8 +3,6 @@ package testsuite
 import (
 	"context"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -56,7 +54,10 @@ func (t *TestSuite) AssertCommitmentSlotIndexExists(slot iotago.SlotIndex, clien
 	for _, client := range clients {
 		t.Eventually(func() error {
 			latestCommitment, err := client.CommitmentByID(context.Background(), iotago.EmptyCommitmentID)
-			require.NoError(t.Testing, err)
+			if err != nil {
+				return ierrors.Errorf("AssertCommitmentSlotIndexExists: error loading latest commitment: %w", err)
+			}
+
 			if latestCommitment.Slot < slot {
 				return ierrors.Errorf("AssertCommitmentSlotIndexExists: commitment with at least %v not found in settings.LatestCommitment()", slot)
 			}
