@@ -175,7 +175,7 @@ func provide(c *dig.Container) error {
 
 func configure() error {
 	deps.Protocol.Network.OnBlockReceived(func(block *model.Block, _ peer.ID) {
-		Component.LogDebugf("BlockReceived: %s", block.ID())
+		Component.LogTracef("BlockReceived: %s", block.ID())
 	})
 	deps.Protocol.Network.OnCommitmentRequestReceived(func(commitmentID iotago.CommitmentID, _ peer.ID) {
 		Component.LogDebugf("SlotCommitmentRequestReceived: %s", commitmentID)

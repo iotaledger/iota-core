@@ -199,7 +199,7 @@ func (m *Manager) isCommittable(slot iotago.SlotIndex, acceptedBlockSlot iotago.
 }
 
 func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, error) {
-	m.LogTrace("Trying to create commitment for slot", "slot", slot)
+	m.LogDebug("Trying to create commitment for slot", "slot", slot)
 	m.commitmentMutex.Lock()
 	defer m.commitmentMutex.Unlock()
 
@@ -260,7 +260,7 @@ func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, er
 		rmc,
 	)
 
-	m.LogTrace("Committing", "commitment", newCommitment, "roots ", roots)
+	m.LogDebug("Committing", "commitment", newCommitment, "roots ", roots)
 
 	newModelCommitment, err := model.CommitmentFromCommitment(newCommitment, apiForSlot, serix.WithValidation())
 	if err != nil {
