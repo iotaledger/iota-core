@@ -1,8 +1,6 @@
 package thresholdblockgadget
 
 import (
-	"fmt"
-
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/ierrors"
