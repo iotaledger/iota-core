@@ -56,18 +56,6 @@ func NewManager(networkManager network.Manager, logger log.Logger) *Manager {
 	return m
 }
 
-// AddPeers adds multiple peers to the list of known peers.
-func (m *Manager) AddPeers(peerAddrs ...multiaddr.Multiaddr) error {
-	var resultErr error
-	for _, peerAddr := range peerAddrs {
-		if err := m.addPeer(peerAddr); err != nil {
-			resultErr = err
-		}
-	}
-
-	return resultErr
-}
-
 // RemovePeer removes a peer from the list of known peers.
 func (m *Manager) RemovePeer(peerID peer.ID) error {
 	m.knownPeersMutex.Lock()
@@ -87,62 +75,38 @@ func (m *Manager) RemovePeer(peerID peer.ID) error {
 
 	m.networkManager.P2PHost().ConnManager().Unprotect(peerID, manualPeerProtectionTag)
 
-	if err := m.networkManager.DropNeighbor(peerID); err != nil && !ierrors.Is(err, network.ErrUnknownPeer) {
+	if err := m.networkManager.DisconnectNeighbor(peerID); err != nil && !ierrors.Is(err, network.ErrUnknownPeer) {
 		return ierrors.Wrapf(err, "failed to drop known peer %s in the gossip layer", peerID.String())
 	}
 
 	return nil
 }
 
-// GetPeersConfig holds optional parameters for the GetPeers method.
-type GetPeersConfig struct {
-	// If true, GetPeers returns peers that have actual connection established in the gossip layer.
-	OnlyConnected bool `json:"onlyConnected"`
-}
-
-// GetPeersOption defines a single option for GetPeers method.
-type GetPeersOption func(conf *GetPeersConfig)
-
-// BuildGetPeersConfig builds GetPeersConfig struct from a list of options.
-func BuildGetPeersConfig(opts []GetPeersOption) *GetPeersConfig {
-	conf := &GetPeersConfig{}
-	for _, o := range opts {
-		o(conf)
-	}
-
-	return conf
-}
-
-// ToOptions translates config struct to a list of corresponding options.
-func (c *GetPeersConfig) ToOptions() (opts []GetPeersOption) {
-	if c.OnlyConnected {
-		opts = append(opts, WithOnlyConnectedPeers())
-	}
-
-	return opts
-}
-
-// WithOnlyConnectedPeers returns a GetPeersOption that sets OnlyConnected field to true.
-func WithOnlyConnectedPeers() GetPeersOption {
-	return func(conf *GetPeersConfig) {
-		conf.OnlyConnected = true
-	}
-}
-
-// GetPeers returns the list of known peers.
-func (m *Manager) GetPeers(opts ...GetPeersOption) []*network.PeerDescriptor {
-	conf := BuildGetPeersConfig(opts)
+func (m *Manager) Peer(peerID peer.ID) (*network.Peer, error) {
 	m.knownPeersMutex.RLock()
 	defer m.knownPeersMutex.RUnlock()
 
-	peers := make([]*network.PeerDescriptor, 0, len(m.knownPeers))
-	for _, kp := range m.knownPeers {
-		connStatus := kp.GetConnStatus()
-		if !conf.OnlyConnected || connStatus == network.ConnStatusConnected {
-			peers = append(peers, &network.PeerDescriptor{
-				Addresses: kp.PeerAddresses,
-			})
+	peer, exists := m.knownPeers[peerID]
+	if !exists {
+		return nil, network.ErrUnknownPeer
+	}
+
+	return peer, nil
+}
+
+// GetPeers returns the list of known peers.
+func (m *Manager) GetPeers(onlyConnected ...bool) []*network.Peer {
+	m.knownPeersMutex.RLock()
+	defer m.knownPeersMutex.RUnlock()
+
+	peers := make([]*network.Peer, 0, len(m.knownPeers))
+	for _, peer := range m.knownPeers {
+		if len(onlyConnected) > 0 && onlyConnected[0] && peer.GetConnStatus() != network.ConnStatusConnected {
+			// skip disconnected peers if onlyConnected is true
+			continue
 		}
+
+		peers = append(peers, peer)
 	}
 
 	return peers
@@ -189,39 +153,41 @@ func (m *Manager) IsPeerKnown(id peer.ID) bool {
 	return exists
 }
 
-func (m *Manager) addPeer(peerAddr multiaddr.Multiaddr) error {
+func (m *Manager) AddPeer(multiAddr multiaddr.Multiaddr) (*network.Peer, error) {
 	if !m.isStarted.Load() {
-		return ierrors.New("manual peering manager hasn't been started yet")
+		return nil, ierrors.New("manual peering manager hasn't been started yet")
 	}
 
 	if m.isStopped {
-		return ierrors.New("manual peering manager was stopped")
+		return nil, ierrors.New("manual peering manager was stopped")
 	}
 
 	m.knownPeersMutex.Lock()
 	defer m.knownPeersMutex.Unlock()
 
-	p, err := network.NewPeerFromMultiAddr(peerAddr)
+	newPeer, err := network.NewPeerFromMultiAddr(multiAddr)
 	if err != nil {
-		return ierrors.WithStack(err)
+		return nil, ierrors.WithStack(err)
 	}
 
-	// Do not add self
-	if p.ID == m.networkManager.P2PHost().ID() {
-		return ierrors.New("not adding self to the list of known peers")
+	// do not add ourselves to the list of known peers
+	if newPeer.ID == m.networkManager.P2PHost().ID() {
+		return nil, ierrors.New("not adding self to the list of known peers")
 	}
 
-	if _, exists := m.knownPeers[p.ID]; exists {
-		return nil
+	if peer, exists := m.knownPeers[newPeer.ID]; exists {
+		return peer, nil
 	}
-	m.logger.LogInfof("Adding new peer to the list of known peers in manual peering %s", p)
-	m.knownPeers[p.ID] = p
+
+	m.logger.LogInfof("Adding new peer to the list of known peers in manual peering %s", newPeer)
+	m.knownPeers[newPeer.ID] = newPeer
+
 	go func() {
-		defer close(p.DoneCh)
-		m.keepPeerConnected(p)
+		defer close(newPeer.DoneCh)
+		m.keepPeerConnected(newPeer)
 	}()
 
-	return nil
+	return newPeer, nil
 }
 
 func (m *Manager) removeAllKnownPeers() error {

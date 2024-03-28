@@ -81,7 +81,7 @@ func BlockMetadataResponseFromBlock(block *blocks.Block) *BlockMetadataResponse 
 		Accepted:           block.IsAccepted(),
 		PreConfirmed:       block.IsPreConfirmed(),
 		Confirmed:          block.IsConfirmed(),
-		Witnesses:          lo.Map(block.Witnesses(), func(seatIndex account.SeatIndex) string { return fmt.Sprintf("%d", seatIndex) }),
+		Witnesses:          lo.Map(block.Witnesses().ToSlice(), func(seatIndex account.SeatIndex) string { return fmt.Sprintf("%d", seatIndex) }),
 		SpenderIDs:         block.SpenderIDs().ToSlice(),
 		PayloadSpenderIDs:  block.PayloadSpenderIDs().ToSlice(),
 		String:             block.String(),

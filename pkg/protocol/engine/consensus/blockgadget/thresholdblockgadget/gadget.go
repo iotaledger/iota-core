@@ -1,8 +1,6 @@
 package thresholdblockgadget
 
 import (
-	"fmt"
-
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -80,10 +78,6 @@ func (g *Gadget) propagate(initialBlockIDs iotago.BlockIDs, evaluateFunc func(bl
 		// find it as a root block.
 		if !exists || block.IsRootBlock() {
 			continue
-		}
-
-		if !block.IsBooked() {
-			panic(fmt.Sprintf("block %s is not booked", blockID))
 		}
 
 		if !evaluateFunc(block) {

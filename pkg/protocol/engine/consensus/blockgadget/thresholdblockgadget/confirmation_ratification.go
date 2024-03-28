@@ -59,7 +59,7 @@ func (g *Gadget) trackConfirmationRatifierWeight(votingBlock *blocks.Block) {
 }
 
 func (g *Gadget) shouldConfirm(block *blocks.Block) bool {
-	blockSeats := len(block.ConfirmationRatifiers())
+	blockSeats := block.ConfirmationRatifiers().Size()
 	totalCommitteeSeats := g.seatManager.SeatCountInSlot(block.ID().Slot())
 
 	return votes.IsThresholdReached(blockSeats, totalCommitteeSeats, g.optsConfirmationThreshold)

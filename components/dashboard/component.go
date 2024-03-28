@@ -176,7 +176,7 @@ func neighborMetrics() []neighbormetric {
 	}
 
 	// gossip plugin might be disabled
-	neighbors := deps.NetworkManager.AllNeighbors()
+	neighbors := deps.NetworkManager.Neighbors()
 	if neighbors == nil {
 		return []neighbormetric{}
 	}

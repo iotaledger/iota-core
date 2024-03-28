@@ -26,11 +26,7 @@ const (
 	ConnStatusConnected ConnectionStatus = "connected"
 )
 
-// PeerDescriptor defines a peer record in the manual peering layer.
-type PeerDescriptor struct {
-	Addresses []multiaddr.Multiaddr `json:"addresses"`
-}
-
+// Peer is a known node in the network.
 type Peer struct {
 	ID            peer.ID
 	PublicKey     ed25519.PublicKey
