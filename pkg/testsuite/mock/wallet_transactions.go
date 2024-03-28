@@ -1209,15 +1209,19 @@ func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Tra
 					}
 				}
 				// register the output by both name and ID
+				var address iotago.Address
+				if addressUC != nil {
+					address = addressUC.Address
+				}
 				w.outputs[fmt.Sprintf("%s:%d", transactionName, outputID.Index())] = &OutputData{
 					ID:      actualOutputID,
 					Output:  clonedOutput,
-					Address: addressUC.Address,
+					Address: address,
 				}
 				w.outputsByID[actualOutputID] = &OutputData{
 					ID:      actualOutputID,
 					Output:  clonedOutput,
-					Address: addressUC.Address,
+					Address: address,
 				}
 
 				break
