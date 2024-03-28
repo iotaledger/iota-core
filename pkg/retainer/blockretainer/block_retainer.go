@@ -67,26 +67,26 @@ func NewProvider() module.Provider[*engine.Engine, retainer.BlockRetainer] {
 		asyncOpt := event.WithWorkerPool(r.workerPool)
 
 		e.ConstructedEvent().OnTrigger(func() {
-			e.Events.Booker.BlockBooked.Hook(func(b *blocks.Block) {
-				if err := r.OnBlockBooked(b); err != nil {
+			e.Events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
+				if err := r.OnBlockBooked(block); err != nil {
 					r.errorHandler(ierrors.Wrap(err, "failed to store on BlockBooked in retainer"))
 				}
 			}, asyncOpt)
 
-			e.Events.BlockGadget.BlockAccepted.Hook(func(b *blocks.Block) {
-				if err := r.OnBlockAccepted(b.ID()); err != nil {
+			e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+				if err := r.OnBlockAccepted(block); err != nil {
 					r.errorHandler(ierrors.Wrap(err, "failed to store on BlockAccepted in retainer"))
 				}
 			}, asyncOpt)
 
-			e.Events.BlockGadget.BlockConfirmed.Hook(func(b *blocks.Block) {
-				if err := r.OnBlockConfirmed(b.ID()); err != nil {
+			e.Events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
+				if err := r.OnBlockConfirmed(block); err != nil {
 					r.errorHandler(ierrors.Wrap(err, "failed to store on BlockConfirmed in retainer"))
 				}
 			}, asyncOpt)
 
-			e.Events.Scheduler.BlockDropped.Hook(func(b *blocks.Block, _ error) {
-				if err := r.OnBlockDropped(b.ID()); err != nil {
+			e.Events.Scheduler.BlockDropped.Hook(func(block *blocks.Block, _ error) {
+				if err := r.OnBlockDropped(block.ID()); err != nil {
 					r.errorHandler(ierrors.Wrap(err, "failed to store on BlockDropped in retainer"))
 				}
 			})
@@ -98,7 +98,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.BlockRetainer] {
 				}
 			}, asyncOpt)
 
-			e.Events.BlockRetainer.BlockRetained.LinkTo(r.events.BlockRetained)
+			e.Events.BlockRetainer.LinkTo(r.events)
 
 			r.InitializedEvent().Trigger()
 		})
@@ -196,12 +196,24 @@ func (r *BlockRetainer) setBlockBooked(blockID iotago.BlockID) error {
 	return r.UpdateBlockMetadata(blockID, api.BlockStatePending)
 }
 
-func (r *BlockRetainer) OnBlockAccepted(blockID iotago.BlockID) error {
-	return r.UpdateBlockMetadata(blockID, api.BlockStateAccepted)
+func (r *BlockRetainer) OnBlockAccepted(block *blocks.Block) error {
+	if err := r.UpdateBlockMetadata(block.ID(), api.BlockStateAccepted); err != nil {
+		return err
+	}
+
+	r.events.BlockAccepted.Trigger(block)
+
+	return nil
 }
 
-func (r *BlockRetainer) OnBlockConfirmed(blockID iotago.BlockID) error {
-	return r.UpdateBlockMetadata(blockID, api.BlockStateConfirmed)
+func (r *BlockRetainer) OnBlockConfirmed(block *blocks.Block) error {
+	if err := r.UpdateBlockMetadata(block.ID(), api.BlockStateConfirmed); err != nil {
+		return err
+	}
+
+	r.events.BlockConfirmed.Trigger(block)
+
+	return nil
 }
 
 func (r *BlockRetainer) OnBlockDropped(blockID iotago.BlockID) error {

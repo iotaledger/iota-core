@@ -40,6 +40,7 @@ type TestFramework struct {
 	api      iotago.API
 	test     *testing.T
 
+	testBlocks   map[string]*blocks.Block
 	testBlockIDs map[string]iotago.BlockID
 
 	lastCommittedSlot iotago.SlotIndex
@@ -52,6 +53,7 @@ func NewTestFramework(t *testing.T) *TestFramework {
 	tf := &TestFramework{
 		stores:            make(map[iotago.SlotIndex]*slotstore.BlockMetadataStore),
 		lastCommittedSlot: iotago.SlotIndex(0),
+		testBlocks:        make(map[string]*blocks.Block),
 		testBlockIDs:      make(map[string]iotago.BlockID),
 		api: iotago.V3API(
 			iotago.NewV3SnapshotProtocolParameters(
@@ -94,6 +96,16 @@ func (tf *TestFramework) finalizeSlot(slot iotago.SlotIndex) {
 	tf.lastFinalizedSlot = slot
 }
 
+func (tf *TestFramework) getBlock(alias string) *blocks.Block {
+	if block, exists := tf.testBlocks[alias]; exists {
+		return block
+	}
+
+	require.Errorf(tf.test, nil, "model block not found in the test framework")
+
+	return nil
+}
+
 func (tf *TestFramework) getBlockID(alias string) iotago.BlockID {
 	if blkID, exists := tf.testBlockIDs[alias]; exists {
 		return blkID
@@ -112,6 +124,7 @@ func (tf *TestFramework) createBlock(alias string, slot iotago.SlotIndex) *block
 
 	block := blocks.NewBlock(modelBlock)
 
+	tf.testBlocks[alias] = block
 	tf.testBlockIDs[alias] = block.ID()
 
 	return block
@@ -142,9 +155,9 @@ func (tf *TestFramework) triggerBlockRetainerAction(alias string, act action) er
 	case none:
 		// no action
 	case eventAccepted:
-		err = tf.Instance.OnBlockAccepted(tf.getBlockID(alias))
+		err = tf.Instance.OnBlockAccepted(tf.getBlock(alias))
 	case eventConfirmed:
-		err = tf.Instance.OnBlockConfirmed(tf.getBlockID(alias))
+		err = tf.Instance.OnBlockConfirmed(tf.getBlock(alias))
 	case eventDropped:
 		err = tf.Instance.OnBlockDropped(tf.getBlockID(alias))
 	default:
