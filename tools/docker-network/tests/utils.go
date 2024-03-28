@@ -366,6 +366,19 @@ func getDelegationStartEpoch(api iotago.API, commitmentSlot iotago.SlotIndex) io
 	return pastBoundedEpoch + 2
 }
 
+func getDelegationEndEpoch(api iotago.API, slot, latestCommitmentSlot iotago.SlotIndex) iotago.EpochIndex {
+	futureBoundedSlotIndex := latestCommitmentSlot + api.ProtocolParameters().MinCommittableAge()
+	futureBoundedEpochIndex := api.TimeProvider().EpochFromSlot(futureBoundedSlotIndex)
+
+	registrationSlot := api.TimeProvider().EpochEnd(api.TimeProvider().EpochFromSlot(slot)) - api.ProtocolParameters().EpochNearingThreshold()
+
+	if futureBoundedSlotIndex <= registrationSlot {
+		return futureBoundedEpochIndex
+	}
+
+	return futureBoundedEpochIndex + 1
+}
+
 func isStatusCode(err error, status int) bool {
 	if err == nil {
 		return false
