@@ -130,6 +130,7 @@ func (w *Wallet) CreateDelegationFromInput(transactionName string, input *Output
 		WithInputs(input),
 		WithOutputs(outputStates...),
 		WithAllotAllManaToAccount(w.CurrentSlot(), w.BlockIssuer.AccountData.ID),
+		WithTaggedDataPayload(&iotago.TaggedData{Tag: []byte("delegation")}),
 	)
 
 	return signedTransaction
@@ -420,6 +421,7 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string
 		WithInputs(inputs...),
 		WithOutputs(accountOutput),
 		WithAllotAllManaToAccount(w.CurrentSlot(), implicitAccountID),
+		WithTaggedDataPayload(&iotago.TaggedData{Tag: []byte("account")}),
 	)
 
 	return signedTransaction
@@ -1080,6 +1082,7 @@ func (w *Wallet) CreateNFTFromInput(transactionName string, input *OutputData, o
 		WithInputs(input),
 		WithOutputs(nftOutput),
 		WithAllotAllManaToAccount(w.CurrentSlot(), w.BlockIssuer.AccountData.ID),
+		WithTaggedDataPayload(&iotago.TaggedData{Tag: []byte("nft")}),
 	)
 }
 
@@ -1207,12 +1210,14 @@ func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Tra
 				}
 				// register the output by both name and ID
 				w.outputs[fmt.Sprintf("%s:%d", transactionName, outputID.Index())] = &OutputData{
-					ID:     actualOutputID,
-					Output: clonedOutput,
+					ID:      actualOutputID,
+					Output:  clonedOutput,
+					Address: addressUC.Address,
 				}
 				w.outputsByID[actualOutputID] = &OutputData{
-					ID:     actualOutputID,
-					Output: clonedOutput,
+					ID:      actualOutputID,
+					Output:  clonedOutput,
+					Address: addressUC.Address,
 				}
 
 				break

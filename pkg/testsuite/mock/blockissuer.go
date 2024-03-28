@@ -208,10 +208,6 @@ func (i *BlockIssuer) IssueValidationBlock(ctx context.Context, alias string, no
 func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, opts ...options.Option[BasicBlockParams]) (*blocks.Block, error) {
 	blockParams := options.Apply(&BasicBlockParams{BlockHeader: &BlockHeaderParams{}}, opts)
 
-	if blockParams.BlockHeader.IssuingTime == nil {
-		issuingTime := time.Now().UTC()
-		blockParams.BlockHeader.IssuingTime = &issuingTime
-	}
 	blockIssuanceInfo := i.latestBlockIssuanceResponse(ctx)
 
 	if blockParams.BlockHeader.References == nil {
@@ -226,7 +222,6 @@ func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, opts .
 
 	blockBuilder.SlotCommitmentID(blockParams.BlockHeader.SlotCommitment.MustID())
 	blockBuilder.LatestFinalizedSlot(*blockParams.BlockHeader.LatestFinalizedSlot)
-	blockBuilder.IssuingTime(*blockParams.BlockHeader.IssuingTime)
 	strongParents, exists := blockParams.BlockHeader.References[iotago.StrongParentType]
 	require.True(i.Testing, exists && len(strongParents) > 0, "block should have strong parents (exists: %t, parents: %s)", exists, strongParents)
 	blockBuilder.StrongParents(strongParents)
@@ -243,6 +238,13 @@ func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, opts .
 
 	// use the rmc corresponding to the commitment used in the block
 	blockBuilder.CalculateAndSetMaxBurnedMana(blockIssuanceInfo.LatestCommitment.ReferenceManaCost)
+
+	// set the issuing time last to ensure the timestamp is greater than that of the parents selected.
+	if blockParams.BlockHeader.IssuingTime == nil {
+		issuingTime := time.Now().UTC()
+		blockParams.BlockHeader.IssuingTime = &issuingTime
+	}
+	blockBuilder.IssuingTime(*blockParams.BlockHeader.IssuingTime)
 
 	priv, _ := i.keyManager.KeyPair(i.AccountData.AddressIndex)
 	blockBuilder.Sign(i.AccountData.ID, priv)

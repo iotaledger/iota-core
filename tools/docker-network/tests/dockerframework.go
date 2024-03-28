@@ -434,27 +434,28 @@ func (d *DockerTestFramework) CreateBasicOutputBlock(wallet *mock.Wallet) (*iota
 	fundsOutputData := d.RequestFaucetFunds(ctx, wallet, iotago.AddressEd25519)
 
 	signedTx := wallet.CreateBasicOutputFromInput(fundsOutputData)
-	block := lo.PanicOnErr(d.defaultWallet.CreateBasicBlock(ctx, "", mock.WithPayload(signedTx))).ProtocolBlock()
+	block, err := wallet.CreateBasicBlock(ctx, "", mock.WithPayload(signedTx))
+	require.NoError(d.Testing, err)
 
-	return block, signedTx, fundsOutputData
+	return block.ProtocolBlock(), signedTx, fundsOutputData
 }
 
 // CreateDelegationBlockFromInput consumes the given basic output, then build a block of a transaction that includes a delegation output, in order to delegate the given validator.
-func (d *DockerTestFramework) CreateDelegationBlockFromInput(issuerID iotago.AccountID, accountAdddress *iotago.AccountAddress, input *mock.OutputData) (iotago.DelegationID, iotago.OutputID, *iotago.Block) {
+func (d *DockerTestFramework) CreateDelegationBlockFromInput(wallet *mock.Wallet, accountAdddress *iotago.AccountAddress, input *mock.OutputData) (iotago.DelegationID, iotago.OutputID, *iotago.Block) {
 	ctx := context.TODO()
-	clt := d.defaultWallet.Client
+	clt := wallet.Client
 
-	signedTx := d.defaultWallet.CreateDelegationFromInput(
+	signedTx := wallet.CreateDelegationFromInput(
 		"",
 		input,
 		mock.WithDelegatedValidatorAddress(accountAdddress),
-		mock.WithDelegationStartEpoch(getDelegationStartEpoch(clt.LatestAPI(), d.defaultWallet.GetNewBlockIssuanceResponse().LatestCommitment.Slot)),
+		mock.WithDelegationStartEpoch(getDelegationStartEpoch(clt.LatestAPI(), wallet.GetNewBlockIssuanceResponse().LatestCommitment.Slot)),
 	)
 	outputID := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0)
 
 	return iotago.DelegationIDFromOutputID(outputID),
 		outputID,
-		lo.PanicOnErr(d.defaultWallet.CreateAndSubmitBasicBlock(ctx, "", mock.WithPayload(signedTx))).ProtocolBlock()
+		lo.PanicOnErr(wallet.CreateBasicBlock(ctx, "", mock.WithPayload(signedTx))).ProtocolBlock()
 }
 
 // CreateFoundryBlockFromInput consumes the given basic output, then build a block of a transaction that includes a foundry output with the given mintedAmount and maxSupply.
@@ -467,7 +468,7 @@ func (d *DockerTestFramework) CreateFoundryBlockFromInput(wallet *mock.Wallet, i
 	//nolint:forcetypeassert
 	return signedTx.Transaction.Outputs[1].(*iotago.FoundryOutput).MustFoundryID(),
 		iotago.OutputIDFromTransactionIDAndIndex(txID, 1),
-		lo.PanicOnErr(d.defaultWallet.CreateAndSubmitBasicBlock(context.Background(), "", mock.WithPayload(signedTx))).ProtocolBlock()
+		lo.PanicOnErr(wallet.CreateBasicBlock(context.Background(), "", mock.WithPayload(signedTx))).ProtocolBlock()
 }
 
 // CreateNFTBlockFromInput consumes the given basic output, then build a block of a transaction that includes a NFT output with the given NFT output options.
@@ -477,7 +478,7 @@ func (d *DockerTestFramework) CreateNFTBlockFromInput(wallet *mock.Wallet, input
 
 	return iotago.NFTIDFromOutputID(outputID),
 		outputID,
-		lo.PanicOnErr(d.defaultWallet.CreateAndSubmitBasicBlock(context.Background(), "", mock.WithPayload(signedTx))).ProtocolBlock()
+		lo.PanicOnErr(wallet.CreateBasicBlock(context.Background(), "", mock.WithPayload(signedTx))).ProtocolBlock()
 }
 
 // CreateFoundryTransitionBlockFromInput consumes the given foundry output, then build block by increasing the minted amount by 1.
@@ -489,37 +490,6 @@ func (d *DockerTestFramework) CreateFoundryTransitionBlockFromInput(issuerID iot
 	//nolint:forcetypeassert
 	return signedTx.Transaction.Outputs[1].(*iotago.FoundryOutput).MustFoundryID(),
 		iotago.OutputIDFromTransactionIDAndIndex(txID, 1),
-		lo.PanicOnErr(d.defaultWallet.CreateAndSubmitBasicBlock(context.Background(), "", mock.WithPayload(signedTx))).ProtocolBlock()
-}
-
-// CreateAccountBlockFromInput consumes the given output, which should be either an basic output with implicit address, then build block with the given account output options. Note that after the returned transaction is issued, remember to update the account information in the wallet with AddAccount().
-func (d *DockerTestFramework) CreateAccountBlockFromInput(wallet *mock.Wallet, inputID iotago.OutputID) (*mock.AccountData, iotago.OutputID, *iotago.Block) {
-	input := wallet.Output(inputID)
-
-	// check if the given input is an BasicOutput with implicit address
-	implicitOutput, ok := input.Output.(*iotago.BasicOutput)
-	require.True(d.Testing, ok)
-	require.Equal(d.Testing, iotago.AddressImplicitAccountCreation, implicitOutput.UnlockConditionSet().Address().Address.Type())
-	accAddress := iotago.AccountAddressFromOutputID(inputID)
-
-	signedTx := wallet.TransitionImplicitAccountToAccountOutput(
-		"",
-		[]*mock.OutputData{input},
-	)
-	txID, err := signedTx.Transaction.ID()
-	require.NoError(d.Testing, err)
-
-	accountOutput := signedTx.Transaction.Outputs[0].(*iotago.AccountOutput)
-	fullAccount := &mock.AccountData{
-		ID:           accountOutput.AccountID,
-		Address:      accAddress,
-		AddressIndex: wallet.Output(inputID).AddressIndex,
-		Output:       accountOutput,
-		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(txID, 0),
-	}
-
-	return fullAccount,
-		iotago.OutputIDFromTransactionIDAndIndex(txID, 0),
 		lo.PanicOnErr(d.defaultWallet.CreateAndSubmitBasicBlock(context.Background(), "", mock.WithPayload(signedTx))).ProtocolBlock()
 }
 
@@ -597,7 +567,7 @@ func (d *DockerTestFramework) DelegateToValidator(fromWallet *mock.Wallet, accou
 		mock.WithDelegationStartEpoch(getDelegationStartEpoch(fromWallet.Client.LatestAPI(), fromWallet.GetNewBlockIssuanceResponse().LatestCommitment.Slot)),
 	)
 
-	d.defaultWallet.CreateAndSubmitBasicBlock(ctx, "", mock.WithPayload(signedTx))
+	fromWallet.CreateAndSubmitBasicBlock(ctx, "", mock.WithPayload(signedTx))
 	d.AwaitTransactionPayloadAccepted(ctx, signedTx.Transaction.MustID())
 
 	delegationOutput, ok := signedTx.Transaction.Outputs[0].(*iotago.DelegationOutput)
