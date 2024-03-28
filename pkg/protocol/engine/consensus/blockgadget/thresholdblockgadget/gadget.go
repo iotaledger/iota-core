@@ -36,17 +36,21 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 	return module.Provide(func(e *engine.Engine) blockgadget.Gadget {
 		g := New(e.NewSubModule("ThresholdBlockGadget"), e.BlockCache, e.SybilProtection.SeatManager(), e.ErrorHandler("gadget"), opts...)
 
-		wp := e.Workers.CreatePool("ThresholdBlockGadget", workerpool.WithWorkerCount(1))
-		e.Events.Booker.BlockBooked.Hook(g.TrackWitnessWeight, event.WithWorkerPool(wp))
+		e.ConstructedEvent().OnTrigger(func() {
+			wp := e.Workers.CreatePool("ThresholdBlockGadget", workerpool.WithWorkerCount(1))
+			e.Events.Booker.BlockBooked.Hook(g.TrackWitnessWeight, event.WithWorkerPool(wp))
 
-		e.Events.BlockGadget.LinkTo(g.events)
+			e.Events.BlockGadget.LinkTo(g.events)
+
+			g.InitializedEvent().Trigger()
+		})
 
 		return g
 	})
 }
 
 func New(subModule module.Module, blockCache *blocks.Blocks, seatManager seatmanager.SeatManager, errorHandler func(error), opts ...options.Option[Gadget]) *Gadget {
-	return module.InitSimpleLifecycle(options.Apply(&Gadget{
+	return options.Apply(&Gadget{
 		Module:       subModule,
 		events:       blockgadget.NewEvents(),
 		seatManager:  seatManager,
@@ -56,7 +60,13 @@ func New(subModule module.Module, blockCache *blocks.Blocks, seatManager seatman
 		optsAcceptanceThreshold:               0.67,
 		optsConfirmationThreshold:             0.67,
 		optsConfirmationRatificationThreshold: 2,
-	}, opts))
+	}, opts, func(g *Gadget) {
+		g.ShutdownEvent().OnTrigger(func() {
+			g.StoppedEvent().Trigger()
+		})
+
+		g.ConstructedEvent().Trigger()
+	})
 }
 
 func (g *Gadget) Events() *blockgadget.Events {

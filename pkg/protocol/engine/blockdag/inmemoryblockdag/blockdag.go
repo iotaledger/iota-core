@@ -41,7 +41,7 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 		b := New(e.NewSubModule("BlockDAG"), e.Workers.CreateGroup("BlockDAG"), int(e.Storage.Settings().APIProvider().CommittedAPI().ProtocolParameters().MaxCommittableAge())*2, e.EvictionState, e.BlockCache, e.ErrorHandler("blockdag"), opts...)
 
 		e.ConstructedEvent().OnTrigger(func() {
-			b.Init(e.SyncManager.LatestCommitment)
+			b.latestCommitmentFunc = e.SyncManager.LatestCommitment
 
 			wp := b.workers.CreatePool("BlockDAG.Append", workerpool.WithWorkerCount(2))
 
@@ -59,6 +59,8 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 			}, event.WithWorkerPool(wp))
 
 			e.Events.BlockDAG.LinkTo(b.events)
+
+			b.InitializedEvent().Trigger()
 		})
 
 		return b
@@ -80,12 +82,6 @@ func New(subModule module.Module, workers *workerpool.Group, unsolidCommitmentBu
 
 		b.ConstructedEvent().Trigger()
 	})
-}
-
-func (b *BlockDAG) Init(latestCommitmentFunc func() *model.Commitment) {
-	b.latestCommitmentFunc = latestCommitmentFunc
-
-	b.InitializedEvent().Trigger()
 }
 
 // Append is used to append new Blocks to the BlockDAG. It is the main function of the BlockDAG that triggers Events.

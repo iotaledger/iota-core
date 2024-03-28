@@ -48,6 +48,8 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 			})
 
 			e.Events.Booker.LinkTo(b.events)
+
+			b.InitializedEvent().Trigger()
 		})
 
 		return b

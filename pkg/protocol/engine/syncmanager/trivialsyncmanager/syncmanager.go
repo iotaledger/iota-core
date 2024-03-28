@@ -84,45 +84,49 @@ func NewProvider(opts ...options.Option[SyncManager]) module.Provider[*engine.En
 		s := New(e.NewSubModule("SyncManager"), e, e.Storage.Settings().LatestCommitment(), e.Storage.Settings().LatestFinalizedSlot(), opts...)
 		asyncOpt := event.WithWorkerPool(e.Workers.CreatePool("SyncManager", workerpool.WithWorkerCount(1)))
 
-		e.Events.BlockGadget.BlockAccepted.Hook(func(b *blocks.Block) {
-			if s.updateLastAcceptedBlock(b.ID()) {
-				s.triggerUpdate()
-			}
-		}, asyncOpt)
+		e.ConstructedEvent().OnTrigger(func() {
+			e.Events.BlockGadget.BlockAccepted.Hook(func(b *blocks.Block) {
+				if s.updateLastAcceptedBlock(b.ID()) {
+					s.triggerUpdate()
+				}
+			}, asyncOpt)
 
-		e.Events.BlockGadget.BlockConfirmed.Hook(func(b *blocks.Block) {
-			if s.updateLastConfirmedBlock(b.ID()) {
-				s.triggerUpdate()
-			}
-		}, asyncOpt)
+			e.Events.BlockGadget.BlockConfirmed.Hook(func(b *blocks.Block) {
+				if s.updateLastConfirmedBlock(b.ID()) {
+					s.triggerUpdate()
+				}
+			}, asyncOpt)
 
-		e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
-			var bootstrapChanged bool
-			if !s.IsBootstrapped() {
-				bootstrapChanged = s.updateBootstrappedStatus()
-			}
+			e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
+				var bootstrapChanged bool
+				if !s.IsBootstrapped() {
+					bootstrapChanged = s.updateBootstrappedStatus()
+				}
 
-			syncChanged := s.updateSyncStatus()
-			commitmentChanged := s.updateLatestCommitment(commitment)
+				syncChanged := s.updateSyncStatus()
+				commitmentChanged := s.updateLatestCommitment(commitment)
 
-			if bootstrapChanged || syncChanged || commitmentChanged {
-				s.triggerUpdate()
-			}
-		}, asyncOpt)
+				if bootstrapChanged || syncChanged || commitmentChanged {
+					s.triggerUpdate()
+				}
+			}, asyncOpt)
 
-		e.Events.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
-			if s.updateFinalizedSlot(slot) {
-				s.triggerUpdate()
-			}
-		}, asyncOpt)
+			e.Events.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
+				if s.updateFinalizedSlot(slot) {
+					s.triggerUpdate()
+				}
+			}, asyncOpt)
 
-		e.Storage.Pruned.Hook(func(epoch iotago.EpochIndex) {
-			if s.updatePrunedEpoch(epoch, true) {
-				s.triggerUpdate()
-			}
-		}, asyncOpt)
+			e.Storage.Pruned.Hook(func(epoch iotago.EpochIndex) {
+				if s.updatePrunedEpoch(epoch, true) {
+					s.triggerUpdate()
+				}
+			}, asyncOpt)
 
-		e.Events.SyncManager.LinkTo(s.events)
+			e.Events.SyncManager.LinkTo(s.events)
+
+			s.InitializedEvent().Trigger()
+		})
 
 		return s
 	})
@@ -131,7 +135,7 @@ func NewProvider(opts ...options.Option[SyncManager]) module.Provider[*engine.En
 func New(subModule module.Module, e *engine.Engine, latestCommitment *model.Commitment, finalizedSlot iotago.SlotIndex, opts ...options.Option[SyncManager]) *SyncManager {
 	ctxUpdateSyncStatusTicker, ctxCancelUpdateSyncStatusTicker := context.WithCancel(context.Background())
 
-	return module.InitSimpleLifecycle(options.Apply(&SyncManager{
+	return options.Apply(&SyncManager{
 		Module: subModule,
 		events: syncmanager.NewEvents(),
 		engine: e,
@@ -164,14 +168,18 @@ func New(subModule module.Module, e *engine.Engine, latestCommitment *model.Comm
 				return time.Since(e.Clock.Accepted().RelativeTime()) < s.optsBootstrappedThreshold && e.Notarization.IsBootstrapped()
 			}
 		}
-	}), func(syncManager *SyncManager) {
-		// stop the ticker when the engine is shutting down
-		ctxCancelUpdateSyncStatusTicker()
 
-		// wait for the ticker to gracefully shut down
-		syncManager.isSyncedTicker.WaitForGracefulShutdown()
+		s.ShutdownEvent().OnTrigger(func() {
+			// stop the ticker when the engine is shutting down
+			ctxCancelUpdateSyncStatusTicker()
 
-		syncManager.Module.StoppedEvent().Trigger()
+			// wait for the ticker to gracefully shut down
+			s.isSyncedTicker.WaitForGracefulShutdown()
+
+			s.StoppedEvent().Trigger()
+		})
+
+		s.ConstructedEvent().Trigger()
 	})
 }
 

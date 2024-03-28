@@ -7,6 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
@@ -36,72 +37,71 @@ type BlockRetainer struct {
 	module.Module
 }
 
-func New(module module.Module, workersGroup *workerpool.Group, retainerStoreFunc StoreFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *BlockRetainer {
-	b := &BlockRetainer{
-		Module:            module,
+func New(subModule module.Module, workersGroup *workerpool.Group, retainerStoreFunc StoreFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *BlockRetainer {
+	return options.Apply(&BlockRetainer{
+		Module:            subModule,
 		events:            retainer.NewBlockRetainerEvents(),
-		workerPool:        workersGroup.CreatePool("Retainer", workerpool.WithWorkerCount(1)),
+		workerPool:        workersGroup.CreatePool("BlockRetainer", workerpool.WithWorkerCount(1)),
 		store:             retainerStoreFunc,
 		cache:             newCache(),
 		finalizedSlotFunc: finalizedSlotFunc,
 		errorHandler:      errorHandler,
-	}
+	}, nil, func(r *BlockRetainer) {
+		r.ShutdownEvent().OnTrigger(r.shutdown)
 
-	b.ShutdownEvent().OnTrigger(func() {
-		b.StoppedEvent().Trigger()
+		r.ConstructedEvent().Trigger()
 	})
-
-	b.ConstructedEvent().Trigger()
-
-	return b
 }
 
 // NewProvider creates a new BlockRetainer provider.
 func NewProvider() module.Provider[*engine.Engine, retainer.BlockRetainer] {
 	return module.Provide(func(e *engine.Engine) retainer.BlockRetainer {
-		r := New(e.NewSubModule("BlockRetainer"), e.Workers.CreateGroup("Retainer"),
+		r := New(e.NewSubModule("BlockRetainer"),
+			e.Workers.CreateGroup("BlockRetainer"),
 			e.Storage.BlockMetadata,
 			func() iotago.SlotIndex {
 				return e.SyncManager.LatestFinalizedSlot()
 			},
-			e.ErrorHandler("retainer"))
+			e.ErrorHandler("blockRetainer"))
 
 		asyncOpt := event.WithWorkerPool(r.workerPool)
 
-		e.Events.Booker.BlockBooked.Hook(func(b *blocks.Block) {
-			if err := r.OnBlockBooked(b); err != nil {
-				r.errorHandler(ierrors.Wrap(err, "failed to store on BlockBooked in retainer"))
-			}
-		}, asyncOpt)
+		e.ConstructedEvent().OnTrigger(func() {
+			e.Events.Booker.BlockBooked.Hook(func(b *blocks.Block) {
+				if err := r.OnBlockBooked(b); err != nil {
+					r.errorHandler(ierrors.Wrap(err, "failed to store on BlockBooked in retainer"))
+				}
+			}, asyncOpt)
 
-		e.Events.BlockGadget.BlockAccepted.Hook(func(b *blocks.Block) {
-			if err := r.OnBlockAccepted(b.ID()); err != nil {
-				r.errorHandler(ierrors.Wrap(err, "failed to store on BlockAccepted in retainer"))
-			}
-		}, asyncOpt)
+			e.Events.BlockGadget.BlockAccepted.Hook(func(b *blocks.Block) {
+				if err := r.OnBlockAccepted(b.ID()); err != nil {
+					r.errorHandler(ierrors.Wrap(err, "failed to store on BlockAccepted in retainer"))
+				}
+			}, asyncOpt)
 
-		e.Events.BlockGadget.BlockConfirmed.Hook(func(b *blocks.Block) {
-			if err := r.OnBlockConfirmed(b.ID()); err != nil {
-				r.errorHandler(ierrors.Wrap(err, "failed to store on BlockConfirmed in retainer"))
-			}
-		}, asyncOpt)
+			e.Events.BlockGadget.BlockConfirmed.Hook(func(b *blocks.Block) {
+				if err := r.OnBlockConfirmed(b.ID()); err != nil {
+					r.errorHandler(ierrors.Wrap(err, "failed to store on BlockConfirmed in retainer"))
+				}
+			}, asyncOpt)
 
-		e.Events.Scheduler.BlockDropped.Hook(func(b *blocks.Block, _ error) {
-			if err := r.OnBlockDropped(b.ID()); err != nil {
-				r.errorHandler(ierrors.Wrap(err, "failed to store on BlockDropped in retainer"))
-			}
+			e.Events.Scheduler.BlockDropped.Hook(func(b *blocks.Block, _ error) {
+				if err := r.OnBlockDropped(b.ID()); err != nil {
+					r.errorHandler(ierrors.Wrap(err, "failed to store on BlockDropped in retainer"))
+				}
+			})
+
+			// this event is fired when a new commitment is detected
+			e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
+				if err := r.CommitSlot(commitment.Slot()); err != nil {
+					panic(err)
+				}
+			}, asyncOpt)
+
+			e.Events.BlockRetainer.BlockRetained.LinkTo(r.events.BlockRetained)
+
+			r.InitializedEvent().Trigger()
 		})
-
-		// this event is fired when a new commitment is detected
-		e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
-			if err := r.CommitSlot(commitment.Slot()); err != nil {
-				panic(err)
-			}
-		}, asyncOpt)
-
-		e.Events.BlockRetainer.BlockRetained.LinkTo(r.events.BlockRetained)
-
-		r.InitializedEvent().Trigger()
 
 		return r
 	})
@@ -115,8 +115,11 @@ func (r *BlockRetainer) Reset() {
 	r.cache.uncommittedBlockMetadata.Clear()
 }
 
-func (r *BlockRetainer) Shutdown() {
+// Shutdown shuts down the BlockRetainer.
+func (r *BlockRetainer) shutdown() {
 	r.workerPool.Shutdown()
+
+	r.StoppedEvent().Trigger()
 }
 
 func (r *BlockRetainer) BlockMetadata(blockID iotago.BlockID) (*api.BlockMetadataResponse, error) {

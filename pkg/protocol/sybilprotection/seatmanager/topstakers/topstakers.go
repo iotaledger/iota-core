@@ -39,47 +39,52 @@ type SeatManager struct {
 // NewProvider returns a new sybil protection provider that uses the ProofOfStake module.
 func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.Engine, seatmanager.SeatManager] {
 	return module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
-		return options.Apply(
-			&SeatManager{
-				Module:         e.NewSubModule("SeatManager"),
-				apiProvider:    e,
-				events:         seatmanager.NewEvents(),
-				committeeStore: e.Storage.Committee(),
-			}, opts, func(s *SeatManager) {
-				activityTracker := activitytrackerv1.NewActivityTracker(e)
-				s.activityTracker = activityTracker
-				s.events.OnlineCommitteeSeatAdded.LinkTo(activityTracker.Events.OnlineCommitteeSeatAdded)
-				s.events.OnlineCommitteeSeatRemoved.LinkTo(activityTracker.Events.OnlineCommitteeSeatRemoved)
+		s := New(e.NewSubModule("SeatManager"), e, opts...)
 
-				e.Events.SeatManager.LinkTo(s.events)
+		e.ConstructedEvent().OnTrigger(func() {
+			// We need to mark validators as active upon solidity of blocks as otherwise we would not be able to
+			// recover if no node was part of the online committee anymore.
+			e.Events.PostSolidFilter.BlockAllowed.Hook(func(block *blocks.Block) {
+				// Only track identities that are part of the committee.
+				committee, exists := s.CommitteeInSlot(block.ID().Slot())
+				if !exists {
+					panic(ierrors.Errorf("committee not selected for slot %d, but received block in that slot", block.ID().Slot()))
+				}
 
-				e.ConstructedEvent().OnTrigger(func() {
-					// We need to mark validators as active upon solidity of blocks as otherwise we would not be able to
-					// recover if no node was part of the online committee anymore.
-					e.Events.PostSolidFilter.BlockAllowed.Hook(func(block *blocks.Block) {
-						// Only track identities that are part of the committee.
-						committee, exists := s.CommitteeInSlot(block.ID().Slot())
-						if !exists {
-							panic(ierrors.Errorf("committee not selected for slot %d, but received block in that slot", block.ID().Slot()))
-						}
+				seat, exists := committee.GetSeat(block.ProtocolBlock().Header.IssuerID)
+				if exists {
+					s.activityTracker.MarkSeatActive(seat, block.ProtocolBlock().Header.IssuerID, block.IssuingTime())
+				}
 
-						seat, exists := committee.GetSeat(block.ProtocolBlock().Header.IssuerID)
-						if exists {
-							s.activityTracker.MarkSeatActive(seat, block.ProtocolBlock().Header.IssuerID, block.IssuingTime())
-						}
-
-						s.events.BlockProcessed.Trigger(block)
-					})
-
-					s.ShutdownEvent().OnTrigger(func() {
-						s.StoppedEvent().Trigger()
-					})
-
-					s.InitializedEvent().Trigger()
-				})
-
-				s.ConstructedEvent().Trigger()
+				s.events.BlockProcessed.Trigger(block)
 			})
+
+			e.Events.SeatManager.LinkTo(s.events)
+
+			s.InitializedEvent().Trigger()
+		})
+
+		return s
+	})
+}
+
+func New(subModule module.Module, engine *engine.Engine, opts ...options.Option[SeatManager]) *SeatManager {
+	return options.Apply(&SeatManager{
+		Module:         subModule,
+		apiProvider:    engine,
+		events:         seatmanager.NewEvents(),
+		committeeStore: engine.Storage.Committee(),
+	}, opts, func(s *SeatManager) {
+		activityTracker := activitytrackerv1.NewActivityTracker(engine)
+		s.activityTracker = activityTracker
+		s.events.OnlineCommitteeSeatAdded.LinkTo(activityTracker.Events.OnlineCommitteeSeatAdded)
+		s.events.OnlineCommitteeSeatRemoved.LinkTo(activityTracker.Events.OnlineCommitteeSeatRemoved)
+
+		s.ShutdownEvent().OnTrigger(func() {
+			s.StoppedEvent().Trigger()
+		})
+
+		s.ConstructedEvent().Trigger()
 	})
 }
 

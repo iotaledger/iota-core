@@ -68,16 +68,22 @@ type TipSelection struct {
 }
 
 // New is the constructor for the TipSelection.
-func New(module module.Module, opts ...options.Option[TipSelection]) *TipSelection {
+func New(subModule module.Module, opts ...options.Option[TipSelection]) *TipSelection {
 	return options.Apply(&TipSelection{
-		Module:                                module,
+		Module:                                subModule,
 		livenessThresholdQueue:                timed.NewPriorityQueue[tipmanager.TipMetadata](true),
 		acceptanceTime:                        reactive.NewVariable[time.Time](monotonicallyIncreasing),
 		optMaxStrongParents:                   8,
 		optMaxLikedInsteadReferences:          8,
 		optMaxLikedInsteadReferencesPerParent: 4,
 		optMaxWeakReferences:                  8,
-	}, opts)
+	}, opts, func(t *TipSelection) {
+		t.ShutdownEvent().OnTrigger(func() {
+			t.StoppedEvent().Trigger()
+		})
+
+		t.ConstructedEvent().Trigger()
+	})
 }
 
 // Construct fills in the dependencies of the TipSelection and triggers the constructed and initialized events of the
