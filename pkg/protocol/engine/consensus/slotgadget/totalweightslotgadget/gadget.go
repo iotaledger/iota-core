@@ -42,13 +42,15 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 		e.ConstructedEvent().OnTrigger(func() {
 			g.seatManager = e.SybilProtection.SeatManager()
 
-			e.Events.BlockGadget.BlockConfirmed.Hook(g.trackVotes)
-
 			g.storeLastFinalizedSlotFunc = func(slot iotago.SlotIndex) {
 				if err := e.Storage.Settings().SetLatestFinalizedSlot(slot); err != nil {
 					g.errorHandler(ierrors.Wrap(err, "failed to set latest finalized slot"))
 				}
 			}
+
+			g.ConstructedEvent().Trigger()
+
+			e.Events.BlockGadget.BlockConfirmed.Hook(g.trackVotes)
 
 			e.InitializedEvent().OnTrigger(func() {
 				// Can't use setter here as it has a side effect.
@@ -79,8 +81,6 @@ func New(subModule module.Module, engine *engine.Engine, opts ...options.Option[
 		g.ShutdownEvent().OnTrigger(func() {
 			g.StoppedEvent().Trigger()
 		})
-
-		g.ConstructedEvent().Trigger()
 	})
 }
 

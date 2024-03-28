@@ -63,6 +63,8 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 				}
 			}
 
+			s.ConstructedEvent().Trigger()
+
 			// When the engine is triggered initialized, snapshot has been read or database has been initialized properly,
 			// so the committee should be available in the performance manager.
 			e.InitializedEvent().OnTrigger(func() {
@@ -99,8 +101,6 @@ func New(subModule module.Module, engine *engine.Engine, opts ...options.Option[
 		s.ShutdownEvent().OnTrigger(func() {
 			s.StoppedEvent().Trigger()
 		})
-
-		s.ConstructedEvent().Trigger()
 	})
 }
 
