@@ -53,7 +53,7 @@ func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
 }
 
 func (g *Gadget) shouldAccept(block *blocks.Block) bool {
-	blockSeats := len(block.AcceptanceRatifiers())
+	blockSeats := block.AcceptanceRatifiers().Size()
 	onlineCommitteeTotalSeats := g.seatManager.OnlineCommittee().Size()
 
 	return votes.IsThresholdReached(blockSeats, onlineCommitteeTotalSeats, g.optsAcceptanceThreshold)
