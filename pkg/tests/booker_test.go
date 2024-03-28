@@ -855,7 +855,7 @@ func Test_BlockWithInvalidTransactionGetsBooked(t *testing.T) {
 	var block1Slot iotago.SlotIndex = ts.API.ProtocolParameters().GenesisSlot() + 1
 	ts.SetCurrentSlot(block1Slot)
 
-	tx1 := ts.DefaultWallet().CreateNFTFromInput("TX1", "Genesis:0",
+	tx1 := ts.DefaultWallet().CreateNFTFromInput("TX1", ts.DefaultWallet().OutputData("Genesis:0"),
 		func(nftBuilder *builder.NFTOutputBuilder) {
 			// Set an issuer ID that is not unlocked in the TX which will cause the TX to be invalid.
 			nftBuilder.ImmutableIssuer(&iotago.Ed25519Address{})

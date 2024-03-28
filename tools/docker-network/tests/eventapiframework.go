@@ -23,7 +23,7 @@ type EventAPIDockerTestFramework struct {
 	Testing *testing.T
 
 	dockerFramework *DockerTestFramework
-	DefaultClient   *nodeclient.Client
+	DefaultClient   mock.Client
 
 	finishChan chan struct{}
 
@@ -35,7 +35,7 @@ func NewEventAPIDockerTestFramework(t *testing.T, dockerFramework *DockerTestFra
 	return &EventAPIDockerTestFramework{
 		Testing:         t,
 		dockerFramework: dockerFramework,
-		DefaultClient:   dockerFramework.wallet.DefaultClient(),
+		DefaultClient:   dockerFramework.defaultWallet.Client,
 		finishChan:      make(chan struct{}),
 		optsWaitFor:     3 * time.Minute,
 		optsTick:        5 * time.Second,
@@ -52,7 +52,7 @@ func (e *EventAPIDockerTestFramework) ConnectEventAPIClient(ctx context.Context)
 }
 
 // SubmitDataBlockStream submits a stream of data blocks to the network for the given duration.
-func (e *EventAPIDockerTestFramework) SubmitDataBlockStream(account *mock.AccountData, duration time.Duration) {
+func (e *EventAPIDockerTestFramework) SubmitDataBlockStream(wallet *mock.Wallet, duration time.Duration) {
 	timer := time.NewTimer(duration)
 	defer timer.Stop()
 
@@ -63,7 +63,7 @@ func (e *EventAPIDockerTestFramework) SubmitDataBlockStream(account *mock.Accoun
 		select {
 		case <-ticker.C:
 			for i := 0; i < 10; i++ {
-				blk := e.dockerFramework.CreateTaggedDataBlock(account.ID, []byte("tag"))
+				blk := e.dockerFramework.CreateTaggedDataBlock(wallet, []byte("tag"))
 				e.dockerFramework.SubmitBlock(context.Background(), blk)
 			}
 		case <-timer.C:

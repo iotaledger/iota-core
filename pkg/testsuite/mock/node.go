@@ -101,7 +101,7 @@ func NewNode(t *testing.T, parentLogger log.Logger, net *Network, partition stri
 
 	var validator *BlockIssuer
 	if isValidator {
-		validator = NewBlockIssuer(t, name, keyManager, nil, 0, accountID, isValidator)
+		validator = NewBlockIssuer(t, name, keyManager, nil, NewAccountDataFromAccountID(accountID), isValidator)
 	} else {
 		validator = nil
 	}
@@ -148,7 +148,7 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 
 	n.Client = NewTestSuiteClient(n)
 	if n.isValidator {
-		n.Validator = NewBlockIssuer(n.Testing, n.Name, n.KeyManager, n.Client, 0, accountID, n.isValidator)
+		n.Validator = NewBlockIssuer(n.Testing, n.Name, n.KeyManager, n.Client, NewAccountDataFromAccountID(accountID), n.isValidator)
 	}
 	n.hookEvents()
 	n.hookEngineEvents(failOnBlockFiltered)

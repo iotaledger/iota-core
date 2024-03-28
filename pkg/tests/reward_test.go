@@ -75,7 +75,7 @@ func Test_Delegation_DestroyOutputWithoutRewards(t *testing.T) {
 	ts.SetCurrentSlot(block1Slot)
 	tx1 := ts.DefaultWallet().CreateDelegationFromInput(
 		"TX1",
-		"Genesis:0",
+		ts.DefaultWallet().OutputData("Genesis:0"),
 		mock.WithDelegatedValidatorAddress(accountAddress),
 		mock.WithDelegationStartEpoch(1),
 	)
@@ -103,7 +103,7 @@ func Test_Delegation_DelayedClaimingDestroyOutputWithoutRewards(t *testing.T) {
 	ts.SetCurrentSlot(block1_2Slot)
 	tx1 := ts.DefaultWallet().CreateDelegationFromInput(
 		"TX1",
-		"Genesis:0",
+		ts.DefaultWallet().OutputData("Genesis:0"),
 		mock.WithDelegatedValidatorAddress(accountAddress),
 		mock.WithDelegationStartEpoch(1),
 	)
@@ -227,7 +227,7 @@ func Test_RewardInputCannotPointToNFTOutput(t *testing.T) {
 	var block1Slot iotago.SlotIndex = 1
 	ts.SetCurrentSlot(block1Slot)
 
-	tx1 := ts.DefaultWallet().CreateNFTFromInput("TX1", "Genesis:0")
+	tx1 := ts.DefaultWallet().CreateNFTFromInput("TX1", ts.DefaultWallet().OutputData("Genesis:0"))
 	block1 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1))
 
 	latestParents := ts.CommitUntilSlot(block1Slot, block1.ID())
@@ -301,7 +301,7 @@ func Test_Account_StakeAmountCalculation(t *testing.T) {
 	blockIssuanceResp := ts.DefaultWallet().GetNewBlockIssuanceResponse()
 	tx2 := ts.DefaultWallet().CreateDelegationFromInput(
 		"TX2",
-		"TX1:1",
+		ts.DefaultWallet().OutputData("TX1:1"),
 		mock.WithDelegationAmount(deleg1),
 		mock.WithDelegatedAmount(deleg1),
 		mock.WithDelegatedValidatorAddress(&accountAddress),
@@ -326,7 +326,7 @@ func Test_Account_StakeAmountCalculation(t *testing.T) {
 	// Create another delegation.
 	tx4 := ts.DefaultWallet().CreateDelegationFromInput(
 		"TX4",
-		"TX2:1",
+		ts.DefaultWallet().OutputData("TX2:1"),
 		mock.WithDelegationAmount(deleg2),
 		mock.WithDelegatedAmount(deleg2),
 		mock.WithDelegatedValidatorAddress(&accountAddress),
@@ -343,7 +343,7 @@ func Test_Account_StakeAmountCalculation(t *testing.T) {
 	blockIssuanceResp = ts.DefaultWallet().GetNewBlockIssuanceResponse()
 	tx5 := ts.DefaultWallet().CreateDelegationFromInput(
 		"TX5",
-		"TX4:1",
+		ts.DefaultWallet().OutputData("TX4:1"),
 		mock.WithDelegationAmount(deleg3),
 		mock.WithDelegatedAmount(deleg3),
 		mock.WithDelegatedValidatorAddress(&accountAddress),
@@ -365,7 +365,7 @@ func Test_Account_StakeAmountCalculation(t *testing.T) {
 	blockIssuanceResp = ts.DefaultWallet().GetNewBlockIssuanceResponse()
 	tx7 := ts.DefaultWallet().CreateDelegationFromInput(
 		"TX7",
-		"TX5:1",
+		ts.DefaultWallet().OutputData("TX5:1"),
 		mock.WithDelegationAmount(deleg4),
 		mock.WithDelegatedAmount(deleg4),
 		mock.WithDelegatedValidatorAddress(&accountAddress),

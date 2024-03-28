@@ -462,7 +462,7 @@ func (t *TestSuite) DefaultWallet() *mock.Wallet {
 }
 
 func (t *TestSuite) AddWallet(name string, node *mock.Node, accountID iotago.AccountID, keyManager ...*wallet.KeyManager) *mock.Wallet {
-	newWallet := mock.NewWallet(t.Testing, name, &mock.TestSuiteClient{Node: node}, keyManager...)
+	newWallet := mock.NewWallet(t.Testing, name, &mock.TestSuiteClient{Node: node}, &mock.TestSuiteWalletClock{}, keyManager...)
 	newWallet.SetBlockIssuer(&mock.AccountData{ID: accountID})
 	t.wallets.Set(name, newWallet)
 	newWallet.SetCurrentSlot(t.currentSlot)

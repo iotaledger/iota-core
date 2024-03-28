@@ -320,9 +320,9 @@ func basicInNativeOut(t *testing.T, nNative int) (float64, []float64) {
 			for i := 0; i < nNative-1; i++ {
 				addressIndexes = append(addressIndexes, uint32(i))
 			}
-			tx1 := ts.DefaultWallet().CreateFoundryAndNativeTokensFromInput(
+			tx1 := ts.DefaultWallet().CreateFoundryAndNativeTokensOnOutputsFromInput(
 				"tx1",
-				"Genesis:0",
+				ts.DefaultWallet().OutputData("Genesis:0"),
 				"Genesis:2",
 				addressIndexes...,
 			)
@@ -353,9 +353,9 @@ func nativeInNativeOut(t *testing.T) (float64, []float64) {
 	fn := func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			ts, node := initializeTestSuite(b, t, blockScheduled)
-			tx1 := ts.DefaultWallet().CreateFoundryAndNativeTokensFromInput(
+			tx1 := ts.DefaultWallet().CreateFoundryAndNativeTokensOnOutputsFromInput(
 				"tx1",
-				"Genesis:0",
+				ts.DefaultWallet().OutputData("Genesis:0"),
 				"Genesis:2",
 			)
 			commitment := node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
@@ -365,10 +365,12 @@ func nativeInNativeOut(t *testing.T) (float64, []float64) {
 			node.Protocol.IssueBlock(modelBlock)
 			<-blockScheduled
 
+			foundryInput := ts.DefaultWallet().OutputData("tx1:0")
+			accountInput := ts.DefaultWallet().OutputData("tx1:1")
 			tx2 := ts.DefaultWallet().TransitionFoundry(
 				"tx2",
-				"tx1:0",
-				"tx1:1",
+				foundryInput,
+				accountInput,
 			)
 			commitment = node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
 			block2 := lo.PanicOnErr(ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithSlotCommitment(commitment)))
@@ -412,9 +414,11 @@ func allotments(t *testing.T, numAllotments int) (float64, []float64) {
 				accountOutput := ts.AccountOutput(fmt.Sprintf("Genesis:%d", i+3)).Output.(*iotago.AccountOutput)
 				accountIDs = append(accountIDs, accountOutput.AccountID)
 			}
+			basicOutputData := ts.DefaultWallet().OutputData("Genesis:0")
 			tx1 := ts.DefaultWallet().AllotManaFromBasicOutput(
 				"tx1",
-				"Genesis:0",
+				basicOutputData,
+				basicOutputData.Output.StoredMana(),
 				accountIDs...,
 			)
 			commitment := node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()

@@ -17,11 +17,11 @@ func (t *TestSuite) AssertBlock(block *blocks.Block, client mock.Client) *iotago
 		var err error
 		loadedBlock, err = client.BlockByBlockID(context.Background(), block.ID())
 		if err != nil {
-			return ierrors.Wrapf(err, "AssertBlock: %s: block %s does not exist", client.Name(), block.ID())
+			return ierrors.Wrapf(err, "AssertBlock: block %s does not exist", block.ID())
 		}
 
 		if block.ID() != loadedBlock.MustID() {
-			return ierrors.Errorf("AssertBlock: %s: expected %s, got %s", client.Name(), block.ID(), loadedBlock.MustID())
+			return ierrors.Errorf("AssertBlock: expected %s, got %s", block.ID(), loadedBlock.MustID())
 		}
 
 		return nil
@@ -43,7 +43,7 @@ func (t *TestSuite) AssertBlocksExist(blocks []*blocks.Block, expectedExist bool
 				t.Eventually(func() error {
 					_, err := client.BlockByBlockID(context.Background(), block.ID())
 					if err == nil {
-						return ierrors.Errorf("AssertBlocksExist: %s: block %s exists but should not", client.Name(), block)
+						return ierrors.Errorf("AssertBlocksExist: block %s exists but should not", block)
 					}
 
 					return nil

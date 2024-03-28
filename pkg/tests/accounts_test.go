@@ -268,7 +268,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	block2Slot := ts.CurrentSlot()
 	tx2 := ts.DefaultWallet().CreateDelegationFromInput(
 		"TX2",
-		"TX1:1",
+		ts.DefaultWallet().OutputData("TX1:1"),
 		mock.WithDelegatedValidatorAddress(&accountAddress),
 		mock.WithDelegationStartEpoch(1),
 	)
@@ -414,9 +414,10 @@ func Test_ImplicitAccounts(t *testing.T) {
 	fullAccountBlockIssuerKey := tpkg.RandBlockIssuerKey()
 
 	block2Slot := ts.CurrentSlot()
+	implicitAccountData := newUserWallet.OutputData("TX1:0")
 	tx2 := newUserWallet.TransitionImplicitAccountToAccountOutput(
 		"TX2",
-		[]string{"TX1:0"},
+		[]*mock.OutputData{implicitAccountData},
 		mock.WithBlockIssuerFeature(
 			iotago.BlockIssuerKeys{fullAccountBlockIssuerKey},
 			iotago.MaxSlotIndex,
