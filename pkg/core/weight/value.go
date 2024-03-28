@@ -13,6 +13,9 @@ type Value struct {
 	// validatorsWeight is the second tier which tracks weight in a non-cumulative manner (BFT style).
 	validatorsWeight int64
 
+	// attestorsWeight is the third tier which tracks weight in a non-cumulative manner (BFT style).
+	attestorsWeight int64
+
 	// acceptanceState is the final tier which determines the decision of the spender.
 	acceptanceState acceptance.State
 }
@@ -51,6 +54,18 @@ func (v Value) ValidatorsWeight() int64 {
 // SetValidatorsWeight sets the  weight of the validators and returns the new Value.
 func (v Value) SetValidatorsWeight(weight int64) Value {
 	v.validatorsWeight = weight
+
+	return v
+}
+
+// AttestorsWeight returns the weight of the validators.
+func (v Value) AttestorsWeight() int64 {
+	return v.attestorsWeight
+}
+
+// SetAttestorsWeight sets the  weight of the attestors and returns the new Value.
+func (v Value) SetAttestorsWeight(weight int64) Value {
+	v.attestorsWeight = weight
 
 	return v
 }

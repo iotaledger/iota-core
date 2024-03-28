@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
@@ -314,10 +315,10 @@ func TestLossOfAcceptanceWithoutRestart(t *testing.T) {
 	node2 := ts.AddNode("node2")
 
 	ts.Run(true, nil)
-
+	node2.Protocol.SetLogLevel(log.LevelTrace)
 	// Issue up to slot 10, committing slot 8.
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 3, "Genesis", ts.Nodes(), true, true)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 4, "Genesis", ts.Nodes(), true, true)
 
 		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("10.0"), true, ts.Nodes()...)
 		ts.AssertEqualStoredCommitmentAtIndex(8, ts.Nodes()...)
@@ -340,7 +341,7 @@ func TestLossOfAcceptanceWithoutRestart(t *testing.T) {
 
 	// Need to issue to slot 22 so that all other nodes can warp sync up to slot 19 and then commit slot 20 themselves.
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{21, 22}, 2, "block0", mock.Nodes(node0), true, false)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{21, 22}, 4, "block0", mock.Nodes(node0), true, false)
 
 		ts.AssertEqualStoredCommitmentAtIndex(20, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(20, ts.Nodes()...)
@@ -350,9 +351,9 @@ func TestLossOfAcceptanceWithoutRestart(t *testing.T) {
 	{
 		// Since already issued, but not accepted blocks in slot 9 and 10 are be orphaned, we need to make sure that
 		// the already issued transactions in the testsuite  are not used again.
-		ts.SetAutomaticTransactionIssuingCounters(node2.Partition, 28)
+		ts.SetAutomaticTransactionIssuingCounters(node2.Partition, 37)
 
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{23, 24, 25}, 3, "22.1", ts.Nodes(), true, false)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{23, 24, 25}, 4, "22.3", ts.Nodes(), true, false)
 
 		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("25.0"), true, ts.Nodes()...)
 		ts.AssertEqualStoredCommitmentAtIndex(23, ts.Nodes()...)
@@ -366,7 +367,7 @@ func TestLossOfAcceptanceWithoutRestart(t *testing.T) {
 	ts.AssertStorageCommitmentTransactions(9, expectedTransactions(ts.BlocksWithPrefix("9")), ts.Nodes()...)
 
 	ts.AssertStorageCommitmentBlocks(10, map[iotago.CommitmentID]iotago.BlockIDs{
-		lo.PanicOnErr(node1.Protocol.Engines.Main.Get().Storage.Commitments().Load(7)).ID(): ts.BlockIDsWithPrefix("10.0"), // only the first blocks row in slot 10 was accepted
+		lo.PanicOnErr(node1.Protocol.Engines.Main.Get().Storage.Commitments().Load(7)).ID(): append(ts.BlockIDsWithPrefix("10.0"), ts.BlockIDsWithPrefix("10.1")...), // only the first blocks row in slot 10 was accepted
 	}, ts.Nodes()...)
 	ts.AssertStorageCommitmentTransactions(10, expectedTransactions(ts.BlocksWithPrefix("10.0")), ts.Nodes()...)
 

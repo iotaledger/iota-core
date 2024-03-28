@@ -117,7 +117,9 @@ func CreateSpendWithoutMembers(t *testing.T, tf *Framework) {
 		require.NoError(t, tf.CastVotes("nodeID1", 1, "spender1"))
 		require.NoError(t, tf.CastVotes("nodeID2", 1, "spender1"))
 		require.NoError(t, tf.CastVotes("nodeID3", 1, "spender1"))
-
+		require.NoError(t, tf.CastVotes("nodeID1", 2, "spender1"))
+		require.NoError(t, tf.CastVotes("nodeID2", 2, "spender1"))
+		require.NoError(t, tf.CastVotes("nodeID3", 2, "spender1"))
 		tf.Assert.LikedInstead([]string{"spender1"})
 		tf.Assert.Accepted("spender1")
 	}
@@ -188,6 +190,9 @@ func SpendAcceptance(t *testing.T, tf *Framework) {
 	require.NoError(t, tf.CastVotes("nodeID2", 1, "spender4"))
 	require.NoError(t, tf.CastVotes("nodeID3", 1, "spender4"))
 
+	require.NoError(t, tf.CastVotes("nodeID1", 2, "spender4"))
+	require.NoError(t, tf.CastVotes("nodeID2", 2, "spender4"))
+	require.NoError(t, tf.CastVotes("nodeID3", 2, "spender4"))
 	tf.Assert.LikedInstead([]string{"spender1"})
 	tf.Assert.LikedInstead([]string{"spender2"}, "spender1")
 	tf.Assert.LikedInstead([]string{"spender3"}, "spender4")
@@ -224,6 +229,10 @@ func CastVotes(t *testing.T, tf *Framework) {
 	require.NoError(t, tf.CastVotes("nodeID1", 1, "spender2"))
 	require.NoError(t, tf.CastVotes("nodeID2", 1, "spender2"))
 	require.NoError(t, tf.CastVotes("nodeID3", 1, "spender2"))
+	require.NoError(t, tf.CastVotes("nodeID4", 2, "spender2"))
+	require.NoError(t, tf.CastVotes("nodeID2", 2, "spender2"))
+	require.NoError(t, tf.CastVotes("nodeID3", 2, "spender2"))
+
 	tf.Assert.LikedInstead([]string{"spender1"}, "spender2")
 
 	tf.Assert.Accepted("spender2")
@@ -317,6 +326,9 @@ func CastVotesAcceptance(t *testing.T, tf *Framework) {
 	require.NoError(t, tf.CastVotes("nodeID1", 1, "spender3"))
 	require.NoError(t, tf.CastVotes("nodeID2", 1, "spender3"))
 	require.NoError(t, tf.CastVotes("nodeID3", 1, "spender3"))
+	require.NoError(t, tf.CastVotes("nodeID4", 2, "spender3"))
+	require.NoError(t, tf.CastVotes("nodeID2", 2, "spender3"))
+	require.NoError(t, tf.CastVotes("nodeID3", 2, "spender3"))
 	tf.Assert.LikedInstead([]string{"spender1"})
 	tf.Assert.Accepted("spender1")
 	tf.Assert.Rejected("spender2")
@@ -410,6 +422,9 @@ func EvictAcceptedSpender(t *testing.T, tf *Framework) {
 	require.NoError(t, tf.CastVotes("nodeID1", 1, "spender2"))
 	require.NoError(t, tf.CastVotes("nodeID2", 1, "spender2"))
 	require.NoError(t, tf.CastVotes("nodeID3", 1, "spender2"))
+	require.NoError(t, tf.CastVotes("nodeID1", 2, "spender2"))
+	require.NoError(t, tf.CastVotes("nodeID2", 2, "spender2"))
+	require.NoError(t, tf.CastVotes("nodeID3", 2, "spender2"))
 	tf.Assert.LikedInstead([]string{"spender1"}, "spender2")
 
 	tf.Assert.Accepted("spender2")
@@ -478,6 +493,9 @@ func EvictRejectedSpender(t *testing.T, tf *Framework) {
 	require.NoError(t, tf.CastVotes("nodeID1", 1, "spender2"))
 	require.NoError(t, tf.CastVotes("nodeID2", 1, "spender2"))
 	require.NoError(t, tf.CastVotes("nodeID3", 1, "spender2"))
+	require.NoError(t, tf.CastVotes("nodeID1", 2, "spender2"))
+	require.NoError(t, tf.CastVotes("nodeID2", 2, "spender2"))
+	require.NoError(t, tf.CastVotes("nodeID3", 2, "spender2"))
 	tf.Assert.LikedInstead([]string{"spender1"}, "spender2")
 
 	tf.Assert.Rejected("spender1")

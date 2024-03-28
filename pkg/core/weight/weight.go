@@ -17,6 +17,9 @@ type Weight struct {
 	// Voters is the set of voters contributing to the weight
 	Voters ds.Set[account.SeatIndex]
 
+	// Attestors is the set of attestors contributing to the weight.
+	Attestors ds.Set[account.SeatIndex]
+
 	// value is the current weight Value.
 	value Value
 
@@ -27,8 +30,9 @@ type Weight struct {
 // New creates a new Weight instance.
 func New() *Weight {
 	w := &Weight{
-		Voters:   ds.NewSet[account.SeatIndex](),
-		OnUpdate: event.New1[Value](),
+		Voters:    ds.NewSet[account.SeatIndex](),
+		Attestors: ds.NewSet[account.SeatIndex](),
+		OnUpdate:  event.New1[Value](),
 	}
 
 	return w
@@ -103,6 +107,41 @@ func (w *Weight) DeleteVoter(seat account.SeatIndex) *Weight {
 	return w
 }
 
+// AddAttestor adds the given voter to the list of Attestors, updates the weight and returns the Weight (for chaining).
+func (w *Weight) AddAttestor(seat account.SeatIndex) *Weight {
+	if added := w.Attestors.Add(seat); added {
+		if newValue, valueUpdated := w.updateAttestorsWeight(); valueUpdated {
+			w.OnUpdate.Trigger(newValue)
+		}
+	}
+
+	return w
+}
+
+// DeleteAttestor removes the given voter from the list of Attestors, updates the weight and returns the Weight (for chaining).
+func (w *Weight) DeleteAttestor(seat account.SeatIndex) *Weight {
+	if deleted := w.Attestors.Delete(seat); deleted {
+		if newValue, valueUpdated := w.updateAttestorsWeight(); valueUpdated {
+			w.OnUpdate.Trigger(newValue)
+		}
+	}
+
+	return w
+}
+
+// ResetAttestors removes all voters from the list of Attestors, updates the weight and returns the Weight (for chaining).
+func (w *Weight) ResetAttestors() *Weight {
+	if w.Attestors.Size() >= 1 {
+		w.Attestors.Clear()
+
+		if newValue, valueUpdated := w.updateAttestorsWeight(); valueUpdated {
+			w.OnUpdate.Trigger(newValue)
+		}
+	}
+
+	return w
+}
+
 func (w *Weight) updateValidatorsWeight() (Value, bool) {
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
@@ -110,6 +149,20 @@ func (w *Weight) updateValidatorsWeight() (Value, bool) {
 	newValidatorWeight := int64(w.Voters.Size())
 	if w.value.ValidatorsWeight() != newValidatorWeight {
 		w.value = w.value.SetValidatorsWeight(newValidatorWeight)
+
+		return w.value, true
+	}
+
+	return w.value, false
+}
+
+func (w *Weight) updateAttestorsWeight() (Value, bool) {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+
+	newAttestorsWeight := int64(w.Attestors.Size())
+	if w.value.AttestorsWeight() != newAttestorsWeight {
+		w.value = w.value.SetAttestorsWeight(newAttestorsWeight)
 
 		return w.value, true
 	}

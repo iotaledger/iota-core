@@ -2,6 +2,7 @@ package mempoolv1
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds"
@@ -121,7 +122,7 @@ func (m *MemPool[VoteRank]) AttachSignedTransaction(signedTransaction mempool.Si
 
 		if isNewTransaction {
 			m.transactionAttached.Trigger(storedSignedTransaction.transactionMetadata)
-
+			fmt.Println("solidify inputs of", storedSignedTransaction.transactionMetadata.ID())
 			m.solidifyInputs(storedSignedTransaction.transactionMetadata)
 		}
 	}
@@ -376,6 +377,7 @@ func (m *MemPool[VoteRank]) storeTransaction(signedTransaction mempool.SignedTra
 
 func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 	for index, inputReference := range transaction.inputReferences {
+		fmt.Println("solidify", inputReference.ReferencedStateID(), "<-", transaction.ID())
 		request, created := m.cachedStateRequests.GetOrCreate(inputReference.ReferencedStateID(), func() *promise.Promise[*StateMetadata] {
 			return m.requestState(inputReference, true)
 		})
@@ -388,7 +390,10 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 			}
 
 			if transaction.markInputSolid() {
+				fmt.Println("inputs solid of", transaction.ID())
 				transaction.executionContext.OnUpdate(func(_ context.Context, executionContext context.Context) {
+					fmt.Println("executing", transaction.ID())
+
 					m.executeTransaction(executionContext, transaction)
 				})
 			}
@@ -406,6 +411,7 @@ func (m *MemPool[VoteRank]) executeTransaction(executionContext context.Context,
 		transaction.setInvalid(err)
 	} else {
 		transaction.setExecuted(outputStates)
+		fmt.Println("booking", transaction.ID())
 
 		m.bookTransaction(transaction)
 	}
