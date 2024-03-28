@@ -78,7 +78,7 @@ func (s *Server) ListenToAcceptedBlocks(_ *inx.NoParams, srv inx.INX_ListenToAcc
 
 	wp := workerpool.New("ListenToAcceptedBlocks", workerpool.WithWorkerCount(workerCount)).Start()
 
-	unhook := deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+	unhook := deps.Protocol.Events.Engine.BlockRetainer.BlockAccepted.Hook(func(block *blocks.Block) {
 		payload, err := inx.WrapBlockMetadata(&api.BlockMetadataResponse{
 			BlockID:    block.ID(),
 			BlockState: api.BlockStateAccepted,
@@ -118,7 +118,7 @@ func (s *Server) ListenToConfirmedBlocks(_ *inx.NoParams, srv inx.INX_ListenToCo
 
 	wp := workerpool.New("ListenToConfirmedBlocks", workerpool.WithWorkerCount(workerCount)).Start()
 
-	unhook := deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
+	unhook := deps.Protocol.Events.Engine.BlockRetainer.BlockConfirmed.Hook(func(block *blocks.Block) {
 		payload, err := inx.WrapBlockMetadata(&api.BlockMetadataResponse{
 			BlockID:    block.ID(),
 			BlockState: api.BlockStateConfirmed,
