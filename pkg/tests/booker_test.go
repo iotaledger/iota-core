@@ -201,6 +201,8 @@ func Test_DoubleSpend(t *testing.T) {
 	{
 		ts.IssueValidationBlockWithHeaderOptions("block6", node2, mock.WithStrongParents(ts.BlockIDs("block3", "block4")...), mock.WithShallowLikeParents(ts.BlockID("block2")))
 		ts.IssueValidationBlockWithHeaderOptions("block7", node1, mock.WithStrongParents(ts.BlockIDs("block6")...))
+		ts.IssueValidationBlockWithHeaderOptions("block8", node2, mock.WithStrongParents(ts.BlockIDs("block7")...))
+		ts.IssueValidationBlockWithHeaderOptions("block9", node1, mock.WithStrongParents(ts.BlockIDs("block8")...))
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block6"): {"tx2"},
@@ -223,7 +225,7 @@ func Test_MultipleAttachments(t *testing.T) {
 
 	blocksConflicts := make(map[*blocks.Block][]string)
 
-	// Create a transaction and issue it from both nodes, so that the conflict is accepted, but no attachment is included yet.
+	// Create a transaction and issue it from both nodes, so that the spend is accepted, but no attachment is included yet.
 	{
 		tx1 := wallet.CreateBasicOutputsEquallyFromInput("tx1", 2, "Genesis:0")
 
@@ -234,17 +236,23 @@ func Test_MultipleAttachments(t *testing.T) {
 		ts.IssueValidationBlockWithHeaderOptions("B.1.1", nodeB, mock.WithStrongParents(ts.BlockID("B.1")))
 
 		nodeA.Wait()
-		ts.IssueValidationBlockWithHeaderOptions("A.2", nodeA, mock.WithStrongParents(ts.BlockID("B.1.1")))
-		ts.IssueValidationBlockWithHeaderOptions("B.2", nodeB, mock.WithStrongParents(ts.BlockID("A.1.1")))
+		ts.IssueValidationBlockWithHeaderOptions("A.2.1", nodeA, mock.WithStrongParents(ts.BlockID("B.1.1")))
+		ts.IssueValidationBlockWithHeaderOptions("B.2.1", nodeB, mock.WithStrongParents(ts.BlockID("A.1.1")))
+
+		// Cast more votes to accept the transaction.
+		ts.IssueValidationBlockWithHeaderOptions("A.2.2", nodeA, mock.WithStrongParents(ts.BlockID("A.1")))
+		ts.IssueValidationBlockWithHeaderOptions("B.2.2", nodeB, mock.WithStrongParents(ts.BlockID("B.1")))
+		ts.IssueValidationBlockWithHeaderOptions("A.3.2", nodeA, mock.WithStrongParents(ts.BlockID("B.2.2")))
+		ts.IssueValidationBlockWithHeaderOptions("B.3.2", nodeB, mock.WithStrongParents(ts.BlockID("A.2.2")))
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.1", "B.1"), true, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.1", "B.1"), false, ts.Nodes()...)
 
 		ts.AssertBlocksInCacheConflicts(lo.MergeMaps(blocksConflicts, map[*blocks.Block][]string{
-			ts.Block("A.1"): {"tx1"},
-			ts.Block("B.1"): {"tx1"},
-			ts.Block("A.2"): {"tx1"},
-			ts.Block("B.2"): {"tx1"},
+			ts.Block("A.1"):   {"tx1"},
+			ts.Block("B.1"):   {"tx1"},
+			ts.Block("A.2.1"): {"tx1"},
+			ts.Block("B.2.1"): {"tx1"},
 		}), ts.Nodes()...)
 		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
 			wallet.Transaction("tx1"): {"tx1"},
@@ -262,13 +270,19 @@ func Test_MultipleAttachments(t *testing.T) {
 		ts.IssueValidationBlockWithHeaderOptions("B.3", nodeB, mock.WithStrongParents(ts.BlockID("A.3.1")))
 		ts.IssueValidationBlockWithHeaderOptions("A.4", nodeA, mock.WithStrongParents(ts.BlockID("B.3")))
 
+		// Issue attestor votes.
+		ts.IssueValidationBlockWithHeaderOptions("B.4", nodeB, mock.WithStrongParents(ts.BlockID("A.3")))
+		ts.IssueValidationBlockWithHeaderOptions("A.5", nodeA, mock.WithStrongParents(ts.BlockID("B.4")))
+
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.3"), true, ts.Nodes()...)
 
-		ts.IssueValidationBlockWithHeaderOptions("B.4", nodeB, mock.WithStrongParents(ts.BlockIDs("B.3", "A.4")...))
-		ts.IssueValidationBlockWithHeaderOptions("A.5", nodeA, mock.WithStrongParents(ts.BlockIDs("B.3", "A.4")...))
+		ts.IssueValidationBlockWithHeaderOptions("B.5", nodeB, mock.WithStrongParents(ts.BlockIDs("B.3", "A.4")...))
+		ts.IssueValidationBlockWithHeaderOptions("A.6", nodeA, mock.WithStrongParents(ts.BlockIDs("B.3", "A.4")...))
+		ts.IssueValidationBlockWithHeaderOptions("B.6", nodeB, mock.WithStrongParents(ts.BlockIDs("B.3", "A.4")...))
+		ts.IssueValidationBlockWithHeaderOptions("A.7", nodeA, mock.WithStrongParents(ts.BlockIDs("B.3", "A.4")...))
 
-		ts.AssertBlocksInCachePreAccepted(ts.Blocks("B.3", "A.4"), true, ts.Nodes()...)
-		ts.AssertBlocksInCachePreAccepted(ts.Blocks("B.4", "A.5"), false, ts.Nodes()...)
+		ts.AssertBlocksInCachePreAccepted(ts.Blocks("B.3", "A.4", "B.4"), true, ts.Nodes()...)
+		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.5", "B.5", "A.6", "B.6", "A.7"), false, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.3"), true, ts.Nodes()...)
 
 		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1", "tx2"), true, ts.Nodes()...)
@@ -278,8 +292,12 @@ func Test_MultipleAttachments(t *testing.T) {
 			ts.Block("A.3"): {"tx2"},
 			ts.Block("B.3"): {"tx2"},
 			ts.Block("A.4"): {"tx2"},
-			ts.Block("A.5"): {},
-			ts.Block("B.4"): {},
+			ts.Block("A.5"): {"tx2"},
+			ts.Block("A.6"): {},
+			ts.Block("B.4"): {"tx2"},
+			ts.Block("B.5"): {"tx2"},
+			ts.Block("A.7"): {},
+			ts.Block("B.6"): {},
 		}), ts.Nodes()...)
 		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
 			wallet.Transaction("tx1"): {"tx1"},
@@ -290,13 +308,13 @@ func Test_MultipleAttachments(t *testing.T) {
 
 	// Issue a block that includes tx1, and make sure that tx2 is accepted as well as a consequence.
 	{
-		ts.IssueValidationBlockWithHeaderOptions("A.6", nodeA, mock.WithStrongParents(ts.BlockIDs("A.2", "B.2")...))
-		ts.IssueValidationBlockWithHeaderOptions("B.5", nodeB, mock.WithStrongParents(ts.BlockIDs("A.2", "B.2")...))
+		ts.IssueValidationBlockWithHeaderOptions("A.6", nodeA, mock.WithStrongParents(ts.BlockIDs("A.2.1", "B.2.1")...))
+		ts.IssueValidationBlockWithHeaderOptions("B.5", nodeB, mock.WithStrongParents(ts.BlockIDs("A.2.1", "B.2.1")...))
 
 		ts.IssueValidationBlockWithHeaderOptions("A.7", nodeA, mock.WithStrongParents(ts.BlockIDs("A.6", "B.5")...))
 		ts.IssueValidationBlockWithHeaderOptions("B.6", nodeB, mock.WithStrongParents(ts.BlockIDs("A.6", "B.5")...))
 
-		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.2", "B.2", "A.6", "B.5"), true, ts.Nodes()...)
+		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.2.1", "B.2.1", "A.6", "B.5"), true, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.1", "B.1"), true, ts.Nodes()...)
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.7", "B.6"), false, ts.Nodes()...)
@@ -396,6 +414,8 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 	{
 		ts.IssueValidationBlockWithHeaderOptions("block2.3", node2, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDs("block2.2")...))
 		ts.IssueValidationBlockWithHeaderOptions("block2.4", node1, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDs("block2.3")...))
+		ts.IssueValidationBlockWithHeaderOptions("block2.5", node2, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDs("block2.4")...))
+		ts.IssueValidationBlockWithHeaderOptions("block2.6", node1, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDs("block2.5")...))
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block2.3"):   {"tx2"},

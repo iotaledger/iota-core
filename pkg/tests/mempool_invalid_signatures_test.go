@@ -62,7 +62,7 @@ func Test_MempoolInvalidSignatures(t *testing.T) {
 	require.NoError(t, err)
 
 	// Accept block2 and block3.
-	ts.IssueBlocksAtSlots("accept-block3", []iotago.SlotIndex{block3.ID().Slot()}, 2, "block3", ts.Nodes(), false, true)
+	ts.IssueBlocksAtSlots("accept-block3", []iotago.SlotIndex{block3.ID().Slot()}, 4, "block3", ts.Nodes(), false, true)
 
 	// Ensure that the valid attachment exists and got accepted,
 	// while the invalid attachment did not override the previous valid attachment.

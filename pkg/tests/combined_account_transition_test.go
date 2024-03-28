@@ -42,6 +42,8 @@ func Test_AccountStateTransition(t *testing.T) {
 		ts.IssueValidationBlockWithHeaderOptions("vblock0", node2, mock.WithStrongParents(ts.BlockID("block0")))
 		ts.IssueValidationBlockWithHeaderOptions("vblock1", node1, mock.WithStrongParents(ts.BlockID("vblock0")))
 		ts.IssueValidationBlockWithHeaderOptions("vblock2", node2, mock.WithStrongParents(ts.BlockID("vblock1")))
+		ts.IssueValidationBlockWithHeaderOptions("vblock3", node1, mock.WithStrongParents(ts.BlockID("vblock2")))
+		ts.IssueValidationBlockWithHeaderOptions("vblock4", node2, mock.WithStrongParents(ts.BlockID("vblock3")))
 
 		ts.AssertTransactionsInCacheAccepted(wallet.Transactions("TX1"), true, node1, node2)
 	}
@@ -200,16 +202,18 @@ func sendFunds(ts *testsuite.TestSuite) {
 
 	// send funds from defaultWallet to secondWallet
 	tx := wallet.SendFundsToWallet("TX5", secondWallet, "TX1:2")
-	ts.IssueBasicBlockWithOptions("block4", wallet, tx)
+	ts.IssueBasicBlockWithOptions("block5", wallet, tx)
 
 	ts.AssertTransactionsExist(wallet.Transactions("TX5"), true, node1)
 	ts.AssertTransactionsInCacheBooked(wallet.Transactions("TX5"), true, node1)
 
 	// Issue some more blocks to make transaction accepted
 	{
-		ts.IssueValidationBlockWithHeaderOptions("vblock9", node2, mock.WithStrongParents(ts.BlockID("block4")))
-		ts.IssueValidationBlockWithHeaderOptions("vblock10", node1, mock.WithStrongParents(ts.BlockID("vblock9")))
-		ts.IssueValidationBlockWithHeaderOptions("vblock11", node2, mock.WithStrongParents(ts.BlockID("vblock10")))
+		ts.IssueValidationBlockWithHeaderOptions("vblock12", node2, mock.WithStrongParents(ts.BlockID("block5")))
+		ts.IssueValidationBlockWithHeaderOptions("vblock13", node1, mock.WithStrongParents(ts.BlockID("vblock12")))
+		ts.IssueValidationBlockWithHeaderOptions("vblock14", node2, mock.WithStrongParents(ts.BlockID("vblock13")))
+		ts.IssueValidationBlockWithHeaderOptions("vblock15", node1, mock.WithStrongParents(ts.BlockID("vblock14")))
+		ts.IssueValidationBlockWithHeaderOptions("vblock16", node2, mock.WithStrongParents(ts.BlockID("vblock15")))
 
 		ts.AssertTransactionsInCacheAccepted(wallet.Transactions("TX5"), true, node1, node2)
 	}
@@ -226,13 +230,15 @@ func allotManaTo(ts *testsuite.TestSuite, to iotago.AccountID) {
 			Mana:      iotago.Mana(1000),
 		}}, "TX1:3")
 	commitment := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
-	ts.IssueBasicBlockWithOptions("block5", wallet, tx6, mock.WithSlotCommitment(commitment))
+	ts.IssueBasicBlockWithOptions("block6", wallet, tx6, mock.WithSlotCommitment(commitment))
 
 	// Issue some more blocks to make transaction accepted
 	{
-		ts.IssueValidationBlockWithHeaderOptions("vblock6", node2, mock.WithStrongParents(ts.BlockID("block5")))
-		ts.IssueValidationBlockWithHeaderOptions("vblock7", node1, mock.WithStrongParents(ts.BlockID("vblock6")))
-		ts.IssueValidationBlockWithHeaderOptions("vblock8", node2, mock.WithStrongParents(ts.BlockID("vblock7")))
+		ts.IssueValidationBlockWithHeaderOptions("vblock7", node2, mock.WithStrongParents(ts.BlockID("block6")))
+		ts.IssueValidationBlockWithHeaderOptions("vblock8", node1, mock.WithStrongParents(ts.BlockID("vblock7")))
+		ts.IssueValidationBlockWithHeaderOptions("vblock9", node2, mock.WithStrongParents(ts.BlockID("vblock8")))
+		ts.IssueValidationBlockWithHeaderOptions("vblock10", node1, mock.WithStrongParents(ts.BlockID("vblock9")))
+		ts.IssueValidationBlockWithHeaderOptions("vblock11", node2, mock.WithStrongParents(ts.BlockID("vblock10")))
 
 		ts.AssertTransactionsInCacheAccepted(wallet.Transactions("TX6"), true, node1, node2)
 	}
@@ -245,16 +251,18 @@ func createNativetoken(ts *testsuite.TestSuite) {
 	node2 := ts.Node("node2")
 
 	tx := wallet.CreateNativeTokenFromInput("TX7", "TX5:0", "TX4:0", 5_000_000, 10_000_000_000)
-	ts.IssueBasicBlockWithOptions("block6", wallet, tx)
+	ts.IssueBasicBlockWithOptions("block17", wallet, tx)
 
 	ts.AssertTransactionsExist(wallet.Transactions("TX7"), true, node1)
 	ts.AssertTransactionsInCacheBooked(wallet.Transactions("TX7"), true, node1)
 
 	// Issue some more blocks to make transaction accepted
 	{
-		ts.IssueValidationBlockWithHeaderOptions("vblock12", node2, mock.WithStrongParents(ts.BlockID("block6")))
-		ts.IssueValidationBlockWithHeaderOptions("vblock13", node1, mock.WithStrongParents(ts.BlockID("vblock12")))
-		ts.IssueValidationBlockWithHeaderOptions("vblock14", node2, mock.WithStrongParents(ts.BlockID("vblock13")))
+		ts.IssueValidationBlockWithHeaderOptions("vblock18", node2, mock.WithStrongParents(ts.BlockID("block17")))
+		ts.IssueValidationBlockWithHeaderOptions("vblock19", node1, mock.WithStrongParents(ts.BlockID("vblock18")))
+		ts.IssueValidationBlockWithHeaderOptions("vblock20", node2, mock.WithStrongParents(ts.BlockID("vblock19")))
+		ts.IssueValidationBlockWithHeaderOptions("vblock21", node1, mock.WithStrongParents(ts.BlockID("vblock20")))
+		ts.IssueValidationBlockWithHeaderOptions("vblock22", node2, mock.WithStrongParents(ts.BlockID("vblock21")))
 
 		ts.AssertTransactionsInCacheAccepted(wallet.Transactions("TX7"), true, node1, node2)
 	}

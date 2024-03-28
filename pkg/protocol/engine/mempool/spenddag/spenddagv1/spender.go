@@ -113,13 +113,13 @@ func NewSpender[SpenderID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRan
 	c.preferredInstead = c
 
 	c.unhookAcceptanceMonitoring = c.Weight.OnUpdate.Hook(func(value weight.Value) {
-		if value.AcceptanceState().IsPending() && value.ValidatorsWeight() >= c.acceptanceThreshold() && value.AttestorsWeight() >= c.acceptanceThreshold() {
+		if threshold := c.acceptanceThreshold(); value.AcceptanceState().IsPending() && value.ValidatorsWeight() >= threshold && value.AttestorsWeight() >= threshold {
 			c.setAcceptanceState(acceptance.Accepted)
 		}
 	}).Unhook
 
 	// in case the initial weight is enough to accept the spend, accept it immediately
-	if threshold := c.acceptanceThreshold(); initialWeight.Value().ValidatorsWeight() >= threshold {
+	if threshold := c.acceptanceThreshold(); initialWeight.AcceptanceState().IsPending() && initialWeight.Value().ValidatorsWeight() >= threshold && initialWeight.Value().AttestorsWeight() >= threshold {
 		c.setAcceptanceState(acceptance.Accepted)
 	}
 
@@ -220,7 +220,7 @@ func (c *Spender[SpenderID, ResourceID, VoteRank]) ApplyVote(vote *vote.Vote[Vot
 	c.LatestVotes.Set(vote.Voter, vote)
 
 	// track attestors when we reach the acceptance threshold
-	if c.Weight.Value().ValidatorsWeight() > c.acceptanceThreshold() {
+	if c.Weight.Value().ValidatorsWeight() >= c.acceptanceThreshold() {
 		if vote.IsLiked() {
 			c.Weight.AddAttestor(vote.Voter)
 		} else {
