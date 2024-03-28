@@ -502,6 +502,37 @@ func (d *DockerTestFramework) CreateFoundryTransitionBlockFromInput(issuerID iot
 		lo.PanicOnErr(d.defaultWallet.CreateAndSubmitBasicBlock(context.Background(), "", mock.WithPayload(signedTx))).ProtocolBlock()
 }
 
+// CreateAccountBlockFromInput consumes the given output, which should be either an basic output with implicit address, then build block with the given account output options. Note that after the returned transaction is issued, remember to update the account information in the wallet with AddAccount().
+func (d *DockerTestFramework) CreateAccountBlock(opts ...options.Option[builder.AccountOutputBuilder]) (*mock.AccountData, *mock.Wallet, *iotago.SignedTransaction, *iotago.Block) {
+	// create an implicit account by requesting faucet funds
+	ctx := context.TODO()
+	newWallet, implicitAccountOutputData := d.CreateImplicitAccount(ctx)
+
+	var implicitBlockIssuerKey iotago.BlockIssuerKey = iotago.Ed25519PublicKeyHashBlockIssuerKeyFromImplicitAccountCreationAddress(newWallet.ImplicitAccountCreationAddress())
+	opts = append(opts, mock.WithBlockIssuerFeature(
+		iotago.NewBlockIssuerKeys(implicitBlockIssuerKey),
+		iotago.MaxSlotIndex,
+	))
+	signedTx := newWallet.TransitionImplicitAccountToAccountOutput("", []*mock.OutputData{implicitAccountOutputData}, opts...)
+
+	// The account transition block should be issued by the implicit account block issuer key.
+	block, err := newWallet.CreateBasicBlock(ctx, "", mock.WithPayload(signedTx))
+	require.NoError(d.Testing, err)
+	accOutputID := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0)
+	accOutput := signedTx.Transaction.Outputs[0].(*iotago.AccountOutput)
+	accAddress := (accOutput.AccountID).ToAddress().(*iotago.AccountAddress)
+
+	accountOutputData := &mock.AccountData{
+		ID:           accOutput.AccountID,
+		Address:      accAddress,
+		Output:       accOutput,
+		OutputID:     accOutputID,
+		AddressIndex: implicitAccountOutputData.AddressIndex,
+	}
+
+	return accountOutputData, newWallet, signedTx, block.ProtocolBlock()
+}
+
 // CreateImplicitAccount requests faucet funds and creates an implicit account. It already wait until the transaction is committed and the created account is useable.
 func (d *DockerTestFramework) CreateImplicitAccount(ctx context.Context) (*mock.Wallet, *mock.OutputData) {
 	newWallet := mock.NewWallet(d.Testing, "", d.defaultWallet.Client, &DockerWalletClock{client: d.defaultWallet.Client})
@@ -527,40 +558,17 @@ func (d *DockerTestFramework) CreateImplicitAccount(ctx context.Context) (*mock.
 
 // CreateAccount creates an new account from implicit one to full one, it already wait until the transaction is committed and the created account is useable.
 func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.AccountOutputBuilder]) (*mock.Wallet, *mock.AccountData) {
-	// create an implicit account by requesting faucet funds
 	ctx := context.TODO()
-	newWallet, implicitAccountOutputData := d.CreateImplicitAccount(ctx)
-	clt := newWallet.Client
-
-	var implicitBlockIssuerKey iotago.BlockIssuerKey = iotago.Ed25519PublicKeyHashBlockIssuerKeyFromImplicitAccountCreationAddress(newWallet.ImplicitAccountCreationAddress())
-	opts = append(opts, mock.WithBlockIssuerFeature(
-		iotago.NewBlockIssuerKeys(implicitBlockIssuerKey),
-		iotago.MaxSlotIndex,
-	))
-	signedTx := newWallet.TransitionImplicitAccountToAccountOutput("", []*mock.OutputData{implicitAccountOutputData}, opts...)
-
-	// The account transition block should be issued by the implicit account block issuer key.
-	block, err := newWallet.CreateAndSubmitBasicBlock(ctx, "", mock.WithPayload(signedTx))
-	require.NoError(d.Testing, err)
-
-	// check if the account is committed
-	accOutputID := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0)
-	accOutput := signedTx.Transaction.Outputs[0].(*iotago.AccountOutput)
-	accAddress := (accOutput.AccountID).ToAddress().(*iotago.AccountAddress)
-	d.CheckAccountStatus(ctx, block.ID(), signedTx.Transaction.MustID(), accOutputID, accAddress, true)
+	accountData, newWallet, signedTx, block := d.CreateAccountBlock(opts...)
+	d.SubmitBlock(ctx, block)
+	d.CheckAccountStatus(ctx, block.MustID(), signedTx.Transaction.MustID(), accountData.OutputID, accountData.Address, true)
 
 	// update the wallet with the new account data
-	newWallet.SetBlockIssuer(&mock.AccountData{
-		ID:           accOutput.AccountID,
-		Address:      accAddress,
-		Output:       accOutput,
-		OutputID:     accOutputID,
-		AddressIndex: implicitAccountOutputData.AddressIndex,
-	})
+	newWallet.SetBlockIssuer(accountData)
 
-	fmt.Printf("Account created, Bech addr: %s, in txID: %s, slot: %d\n", accAddress.Bech32(clt.CommittedAPI().ProtocolParameters().Bech32HRP()), signedTx.Transaction.MustID().ToHex(), block.ID().Slot())
+	fmt.Printf("Account created, Bech addr: %s", accountData.Address.Bech32(newWallet.Client.CommittedAPI().ProtocolParameters().Bech32HRP()))
 
-	return newWallet, newWallet.Account(accOutput.AccountID)
+	return newWallet, newWallet.Account(accountData.ID)
 }
 
 // DelegateToValidator requests faucet funds and delegate the UTXO output to the validator.

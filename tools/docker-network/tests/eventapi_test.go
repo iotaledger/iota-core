@@ -10,7 +10,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
@@ -232,19 +231,11 @@ func test_AccountTransactionBlocks(t *testing.T, e *EventAPIDockerTestFramework)
 
 	// implicit account transition
 	{
-		wallet, implicitAccount := e.dockerFramework.CreateImplicitAccount(ctx)
-
-		// prepare fullAccount transaction block to send
-		signedTx := wallet.TransitionImplicitAccountToAccountOutput("", []*mock.OutputData{implicitAccount})
-		// The account transition block should be issued by the implicit account block issuer key.
-		blk, err := wallet.CreateBasicBlock(ctx, "", mock.WithPayload(signedTx))
-		require.NoError(e.Testing, err)
+		accountData, wallet, _, blk := e.dockerFramework.CreateAccountBlock()
 		expectedBlocks := map[string]*iotago.Block{
-			blk.ProtocolBlock().MustID().ToHex(): blk.ProtocolBlock(),
+			blk.MustID().ToHex(): blk,
 		}
-		accountOutputID := iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0)
-		accountOutput := signedTx.Transaction.Outputs[0].(*iotago.AccountOutput)
-		accountAddress := (accountOutput.AccountID).ToAddress().(*iotago.AccountAddress)
+		accountOutputData := wallet.Output(accountData.OutputID)
 
 		assertions := []func(){
 			func() { e.AssertTransactionBlocks(ctx, eventClt, expectedBlocks) },
@@ -252,15 +243,17 @@ func test_AccountTransactionBlocks(t *testing.T, e *EventAPIDockerTestFramework)
 			func() { e.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks) },
 			func() { e.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks) },
 			func() { e.AssertTransactionBlocksByTag(ctx, eventClt, expectedBlocks, []byte("account")) },
-			func() { e.AssertTransactionMetadataByTransactionID(ctx, eventClt, signedTx.Transaction.MustID()) },
-			func() { e.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, signedTx.Transaction.MustID()) },
-			func() { e.AssertAccountOutput(ctx, eventClt, accountOutput.AccountID) },
-			func() { e.AssertOutput(ctx, eventClt, accountOutputID) },
 			func() {
-				e.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAny, accountAddress)
+				e.AssertTransactionMetadataByTransactionID(ctx, eventClt, accountData.OutputID.TransactionID())
+			},
+			func() { e.AssertTransactionMetadataIncludedBlocks(ctx, eventClt, accountData.OutputID.TransactionID()) },
+			func() { e.AssertAccountOutput(ctx, eventClt, accountData.ID) },
+			func() { e.AssertOutput(ctx, eventClt, accountData.OutputID) },
+			func() {
+				e.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAny, accountOutputData.Address)
 			},
 			func() {
-				e.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAddress, accountAddress)
+				e.AssertOutputsWithMetadataByUnlockConditionAndAddress(ctx, eventClt, api.EventAPIUnlockConditionAddress, accountOutputData.Address)
 			},
 		}
 
@@ -270,7 +263,7 @@ func test_AccountTransactionBlocks(t *testing.T, e *EventAPIDockerTestFramework)
 		}
 
 		// wait until all topics starts listening
-		err = e.AwaitEventAPITopics(t, cancel, totalTopics)
+		err := e.AwaitEventAPITopics(t, cancel, totalTopics)
 		require.NoError(t, err)
 
 		// issue blocks
