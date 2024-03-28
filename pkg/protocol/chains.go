@@ -267,8 +267,8 @@ func attachEngineLogs(instance *engine.Engine) func() {
 				instance.LogTrace("MemPool.TransactionInvalid", "tx", transactionMetadata.ID(), "err", err)
 			})
 
-			transactionMetadata.OnOrphanedSlotUpdated(func(slot iotago.SlotIndex) {
-				instance.LogTrace("MemPool.TransactionOrphanedSlotUpdated", "tx", transactionMetadata.ID(), "slot", slot)
+			transactionMetadata.OnOrphanedSlotUpdated(func(prevSlot iotago.SlotIndex, newSlot iotago.SlotIndex) {
+				instance.LogTrace("MemPool.TransactionOrphanedSlotUpdated", "tx", transactionMetadata.ID(), "prevSlot", prevSlot, "newSlot", newSlot)
 			})
 
 			transactionMetadata.OnCommittedSlotUpdated(func(slot iotago.SlotIndex) {

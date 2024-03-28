@@ -235,6 +235,14 @@ func (t *TestSuite) BlockIDsWithPrefix(prefix string) []iotago.BlockID {
 	})
 }
 
+func (t *TestSuite) BlockIDsWithPrefixes(prefixes ...string) []iotago.BlockID {
+	blocksWithPrefix := t.BlocksWithPrefixes(prefixes...)
+
+	return lo.Map(blocksWithPrefix, func(block *blocks.Block) iotago.BlockID {
+		return block.ID()
+	})
+}
+
 func (t *TestSuite) Node(name string) *mock.Node {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()

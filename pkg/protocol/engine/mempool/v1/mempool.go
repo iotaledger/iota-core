@@ -586,8 +586,15 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 		lo.Return1(m.delayedTransactionEviction.GetOrCreate(slot, func() ds.Set[iotago.TransactionID] { return ds.NewSet[iotago.TransactionID]() })).Add(transaction.ID())
 	})
 
-	transaction.OnOrphanedSlotUpdated(func(slot iotago.SlotIndex) {
-		lo.Return1(m.delayedTransactionEviction.GetOrCreate(slot, func() ds.Set[iotago.TransactionID] { return ds.NewSet[iotago.TransactionID]() })).Add(transaction.ID())
+	transaction.OnOrphanedSlotUpdated(func(prevSlot iotago.SlotIndex, newSlot iotago.SlotIndex) {
+		if prevSlot > 0 {
+			if delayedEvictionForSlot, exists := m.delayedTransactionEviction.Get(prevSlot); exists {
+				delayedEvictionForSlot.Delete(transaction.ID())
+			}
+		}
+		if newSlot > 0 {
+			lo.Return1(m.delayedTransactionEviction.GetOrCreate(newSlot, func() ds.Set[iotago.TransactionID] { return ds.NewSet[iotago.TransactionID]() })).Add(transaction.ID())
+		}
 	})
 }
 
@@ -602,10 +609,19 @@ func (m *MemPool[VoteRank]) setupOutputState(stateMetadata *StateMetadata) {
 		})).Set(stateMetadata.state.StateID(), stateMetadata)
 	})
 
-	stateMetadata.OnOrphanedSlotUpdated(func(slot iotago.SlotIndex) {
-		lo.Return1(m.delayedOutputStateEviction.GetOrCreate(slot, func() *shrinkingmap.ShrinkingMap[iotago.Identifier, *StateMetadata] {
-			return shrinkingmap.New[iotago.Identifier, *StateMetadata]()
-		})).Set(stateMetadata.state.StateID(), stateMetadata)
+	stateMetadata.OnOrphanedSlotUpdated(func(prevSlot iotago.SlotIndex, newSlot iotago.SlotIndex) {
+		// If the orphanage slot is updated, remove the state from previous delayed eviction and put it in a new one, if different from 0.
+		if prevSlot > 0 {
+			if delayedEvictionForSlot, exists := m.delayedOutputStateEviction.Get(prevSlot); exists {
+				delayedEvictionForSlot.Delete(stateMetadata.state.StateID())
+			}
+		}
+
+		if newSlot > 0 {
+			lo.Return1(m.delayedOutputStateEviction.GetOrCreate(newSlot, func() *shrinkingmap.ShrinkingMap[iotago.Identifier, *StateMetadata] {
+				return shrinkingmap.New[iotago.Identifier, *StateMetadata]()
+			})).Set(stateMetadata.state.StateID(), stateMetadata)
+		}
 	})
 }
 

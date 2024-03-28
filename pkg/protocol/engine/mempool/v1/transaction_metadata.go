@@ -236,9 +236,9 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 	t.parentSpenderIDs.InheritFrom(input.spenderIDs)
 
 	input.OnRejected(func() { t.rejected.Trigger() })
-	input.OnOrphanedSlotUpdated(func(slot iotago.SlotIndex) {
-		t.orphanedSlot.Set(slot)
-	})
+
+	t.orphanedSlot.InheritFrom(input.orphanedSlot)
+
 	input.OnAccepted(func() {
 		if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
 			if wereAllInputsAccepted := t.allInputsAccepted.Set(true); !wereAllInputsAccepted {
@@ -318,6 +318,14 @@ func (t *TransactionMetadata) OnEarliestIncludedAttachmentUpdated(callback func(
 func (t *TransactionMetadata) addValidAttachment(blockID iotago.BlockID) (added bool) {
 	t.attachmentsMutex.Lock()
 	defer t.attachmentsMutex.Unlock()
+
+	// If the transaction has been orphaned while it was pending, reset the orphaned slot.
+	// The new attachment of a transaction makes the transaction not orphaned anymore, so that it can become accepted.
+	// If the transaction has been rejected and is orphaned, then it should stay orphaned despite new attachment coming in.
+	// The Booker should mark the new attachment of such transaction as invalid.
+	if t.validAttachments.IsEmpty() && lo.Return2(t.OrphanedSlot()) && t.IsPending() {
+		t.allValidAttachmentsEvicted.Set(0)
+	}
 
 	return lo.Return2(t.validAttachments.GetOrCreate(blockID, func() bool {
 		return false
