@@ -612,6 +612,18 @@ func (d *DockerTestFramework) ClaimRewardsForDelegator(ctx context.Context, acco
 	return iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0)
 }
 
+func (d *DockerTestFramework) DelayedClaimingTransition(ctx context.Context, account *mock.AccountData, delegationOutputID iotago.OutputID) (iotago.OutputID, iotago.EpochIndex) {
+	clt := d.wallet.DefaultClient()
+	issuerResp, congestionResp := d.PrepareBlockIssuance(ctx, clt, account.Address)
+	signedTx := d.wallet.DelayedClaimingTransition(delegationOutputID, account.ID, issuerResp)
+
+	d.SubmitPayload(ctx, signedTx, account.ID, congestionResp, issuerResp)
+	d.AwaitTransactionPayloadAccepted(ctx, signedTx.Transaction.MustID())
+
+	return iotago.OutputIDFromTransactionIDAndIndex(signedTx.Transaction.MustID(), 0),
+		signedTx.Transaction.Outputs[0].(*iotago.DelegationOutput).EndEpoch
+}
+
 // DelegateToValidator requests faucet funds and delegate the UTXO output to the validator.
 func (d *DockerTestFramework) DelegateToValidator(fromID iotago.AccountID, accountAddress *iotago.AccountAddress) (iotago.OutputID, *iotago.DelegationOutput) {
 	from := d.wallet.Account(fromID)
