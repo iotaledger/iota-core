@@ -54,7 +54,8 @@ func WithWalletBlockIssuanceCredits(blockIssuanceCredits iotago.BlockIssuanceCre
 }
 
 type TestSuite struct {
-	Testing     *testing.T
+	Testing *testing.T
+	// we use the fake testing so that actual tests don't fail if an assertion fails
 	fakeTesting *testing.T
 	network     *mock.Network
 

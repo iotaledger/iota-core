@@ -249,7 +249,7 @@ func TestSpendParallel(t *testing.T) {
 	parallelPendingTasks.WaitIsZero()
 
 	lo.ForEach(lo.Keys(parallelSpenders), func(SpendAlias string) {
-		assert.EqualValuesf(t, sequentialSpenders[SpendAlias].PreferredInstead().ID, parallelSpenders[SpendAlias].PreferredInstead().ID, "parallel Spend %s prefers %s, but sequential Spend prefers %s", SpendAlias, parallelSpenders[SpendAlias].PreferredInstead().ID, sequentialSpenders[SpendAlias].PreferredInstead().ID)
+		require.EqualValuesf(t, sequentialSpenders[SpendAlias].PreferredInstead().ID, parallelSpenders[SpendAlias].PreferredInstead().ID, "parallel Spend %s prefers %s, but sequential Spend prefers %s", SpendAlias, parallelSpenders[SpendAlias].PreferredInstead().ID, sequentialSpenders[SpendAlias].PreferredInstead().ID)
 	})
 
 	assertCorrectOrder(t, lo.Values(sequentialSpenders)...)

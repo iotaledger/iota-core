@@ -32,7 +32,9 @@ func (t *TestSuite) AssertAttestationsForSlot(slot iotago.SlotIndex, blocks []*b
 			//nolint:revive
 			err = attestationTree.Stream(func(key iotago.AccountID, att *iotago.Attestation) error {
 				blockID, err := att.BlockID()
-				require.NoError(t.Testing, err)
+				if err != nil {
+					return ierrors.Wrapf(err, "failed to stream attestationTree: %s, slot: %d", node.Name, slot)
+				}
 				storedAttestations = append(storedAttestations, blockID)
 
 				return nil
