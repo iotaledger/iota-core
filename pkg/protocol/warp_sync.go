@@ -38,7 +38,7 @@ func newWarpSync(protocol *Protocol) *WarpSync {
 	c := &WarpSync{
 		Logger:     protocol.NewChildLogger("WarpSync"),
 		protocol:   protocol,
-		workerPool: protocol.Workers.CreatePool("WarpSync", workerpool.WithWorkerCount(1)),
+		workerPool: protocol.Workers.CreatePool("WarpSync", workerpool.WithWorkerCount(4)),
 		ticker:     eventticker.New[iotago.SlotIndex, iotago.CommitmentID](protocol.Options.WarpSyncRequesterOptions...),
 	}
 
