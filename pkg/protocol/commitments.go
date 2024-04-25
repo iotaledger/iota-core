@@ -148,11 +148,10 @@ func (c *Commitments) publishRootCommitment(mainChain *Chain, mainEngine *engine
 			return
 		}
 
-		publishedCommitment.InitializedEvent().Trigger()
-
 		publishedCommitment.IsRoot.Set(true)
 		if published {
 			publishedCommitment.Chain.Set(mainChain)
+			publishedCommitment.InitializedEvent().Trigger()
 		}
 
 		// Update the forking point of a chain only if the root is empty or root belongs to the main chain or the published commitment is on the main chain.
@@ -196,15 +195,16 @@ func (c *Commitments) publishEngineCommitments(chain *Chain, engine *engine.Engi
 				return
 			}
 
+			// mark it as produced by ourselves and force it to be on the right chain (in case our chain produced a
+			// different commitment than the one we erroneously expected it to be - we always trust our engine most).
+			publishedCommitment.forceChain(chain)
+
 			if published {
 				publishedCommitment.InitializedEvent().Trigger()
 			}
 
-			// mark it as produced by ourselves and force it to be on the right chain (in case our chain produced a
-			// different commitment than the one we erroneously expected it to be - we always trust our engine most).
 			publishedCommitment.AttestedWeight.Set(publishedCommitment.Weight.Get())
 			publishedCommitment.IsVerified.Set(true)
-			publishedCommitment.forceChain(chain)
 		}
 	})
 }
@@ -281,9 +281,7 @@ func (c *Commitments) initCommitment(commitment *Commitment, slotEvicted reactiv
 	// solidify the parent of the commitment
 	if root := c.Root.Get(); root != nil && commitment.Slot() > root.Slot() {
 		c.cachedRequest(commitment.PreviousCommitmentID(), true).OnSuccess(func(parent *Commitment) {
-			parent.InitializedEvent().OnTrigger(func() {
-				parent.IsEvicted.OnTrigger(commitment.Parent.ToggleValue(parent))
-			})
+			parent.IsEvicted.OnTrigger(commitment.Parent.ToggleValue(parent))
 		})
 	}
 

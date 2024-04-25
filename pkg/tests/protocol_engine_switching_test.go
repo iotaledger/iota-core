@@ -14,6 +14,7 @@ import (
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -1075,6 +1076,10 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 	}
 
 	ts.Run(false, nodesOptions)
+
+	for _, node := range nodes {
+		node.Protocol.SetLogLevel(log.LevelTrace)
+	}
 
 	expectedCommittee := []iotago.AccountID{nodes[0].Validator.AccountData.ID, nodes[1].Validator.AccountData.ID, nodes[2].Validator.AccountData.ID}
 
