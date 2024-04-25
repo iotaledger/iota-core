@@ -14,6 +14,8 @@ type BlockRetainerEvents struct {
 	BlockAccepted *event.Event1[*blocks.Block]
 	// BlockConfirmed is triggered when a block is stored in the retainer caused by a block confirmed event.
 	BlockConfirmed *event.Event1[*blocks.Block]
+	// BlockDropped is triggered when a block is dropped.
+	BlockDropped *event.Event1[*blocks.Block]
 
 	event.Group[BlockRetainerEvents, *BlockRetainerEvents]
 }
@@ -24,6 +26,7 @@ var NewBlockRetainerEvents = event.CreateGroupConstructor(func() (newEvents *Blo
 		BlockRetained:  event.New1[*blocks.Block](),
 		BlockAccepted:  event.New1[*blocks.Block](),
 		BlockConfirmed: event.New1[*blocks.Block](),
+		BlockDropped:   event.New1[*blocks.Block](),
 	}
 })
 

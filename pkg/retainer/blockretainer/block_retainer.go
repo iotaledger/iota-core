@@ -86,7 +86,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.BlockRetainer] {
 			}, asyncOpt)
 
 			e.Events.Scheduler.BlockDropped.Hook(func(block *blocks.Block, _ error) {
-				if err := r.OnBlockDropped(block.ID()); err != nil {
+				if err := r.OnBlockDropped(block); err != nil {
 					r.errorHandler(ierrors.Wrap(err, "failed to store on BlockDropped in retainer"))
 				}
 			})
@@ -216,8 +216,14 @@ func (r *BlockRetainer) OnBlockConfirmed(block *blocks.Block) error {
 	return nil
 }
 
-func (r *BlockRetainer) OnBlockDropped(blockID iotago.BlockID) error {
-	return r.UpdateBlockMetadata(blockID, api.BlockStateDropped)
+func (r *BlockRetainer) OnBlockDropped(block *blocks.Block) error {
+	if err := r.UpdateBlockMetadata(block.ID(), api.BlockStateDropped); err != nil {
+		return err
+	}
+
+	r.events.BlockDropped.Trigger(block)
+
+	return nil
 }
 
 func (r *BlockRetainer) UpdateBlockMetadata(blockID iotago.BlockID, state api.BlockState) error {

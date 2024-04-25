@@ -686,7 +686,10 @@ func (d *DockerTestFramework) AllotManaTo(fromWallet *mock.Wallet, to *mock.Acco
 	toCongestionResp, err = clt.Congestion(ctx, to.Address, 0)
 	require.NoError(d.Testing, err)
 	newBIC := toCongestionResp.BlockIssuanceCredits
-	require.Equal(d.Testing, oldBIC+iotago.BlockIssuanceCredits(manaToAllot), newBIC)
+
+	decayedOldBIC, err := clt.LatestAPI().ManaDecayProvider().DecayManaBySlots(iotago.Mana(oldBIC), preAllotmentCommitmentID.Slot(), block.ID().Slot())
+	expectedBIC := iotago.BlockIssuanceCredits(decayedOldBIC + manaToAllot)
+	require.Equal(d.Testing, expectedBIC, newBIC)
 }
 
 // CreateNativeToken request faucet funds then use it to create native token for the account, and returns the updated Account.

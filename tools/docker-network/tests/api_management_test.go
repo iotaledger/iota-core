@@ -214,7 +214,7 @@ func Test_ManagementAPI_Pruning(t *testing.T) {
 		info, err := nodeClientV1.Info(getContextWithTimeout(5 * time.Second))
 		require.NoError(t, err)
 
-		currentEpoch := nodeClientV1.CommittedAPI().TimeProvider().EpochFromSlot(info.Status.LatestCommitmentID.Slot())
+		currentEpoch := nodeClientV1.CommittedAPI().TimeProvider().EpochFromSlot(info.Status.LatestFinalizedSlot)
 
 		// await the start slot of the next epoch
 		d.AwaitFinalization(nodeClientV1.CommittedAPI().TimeProvider().EpochStart(currentEpoch + 1))

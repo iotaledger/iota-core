@@ -7,6 +7,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/contextutils"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -47,7 +48,7 @@ func (s *Server) ListenToBlocks(_ *inx.NoParams, srv inx.INX_ListenToBlocksServe
 
 	wp := workerpool.New("ListenToBlocks", workerpool.WithWorkerCount(workerCount)).Start()
 
-	unhook := deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(block *blocks.Block) {
+	unhook := deps.Protocol.Events.Engine.BlockRetainer.BlockRetained.Hook(func(block *blocks.Block) {
 		payload := inx.NewBlockWithBytes(block.ID(), block.ModelBlock().Data())
 
 		if ctx.Err() != nil {
@@ -73,22 +74,13 @@ func (s *Server) ListenToBlocks(_ *inx.NoParams, srv inx.INX_ListenToBlocksServe
 	return ctx.Err()
 }
 
-func (s *Server) ListenToAcceptedBlocks(_ *inx.NoParams, srv inx.INX_ListenToAcceptedBlocksServer) error {
+func (s *Server) ListenToBlockMetadata(_ *inx.NoParams, srv inx.INX_ListenToBlockMetadataServer) error {
 	ctx, cancel := context.WithCancel(Component.Daemon().ContextStopped())
 
-	wp := workerpool.New("ListenToAcceptedBlocks", workerpool.WithWorkerCount(workerCount)).Start()
+	wp := workerpool.New("ListenToBlockMetadata", workerpool.WithWorkerCount(workerCount)).Start()
 
-	unhook := deps.Protocol.Events.Engine.BlockRetainer.BlockAccepted.Hook(func(block *blocks.Block) {
-		payload, err := inx.WrapBlockMetadata(&api.BlockMetadataResponse{
-			BlockID:    block.ID(),
-			BlockState: api.BlockStateAccepted,
-		})
-		if err != nil {
-			Component.LogErrorf("get block metadata error: %v", err)
-			cancel()
-
-			return
-		}
+	sendBlockMetadata := func(blockMetadata *api.BlockMetadataResponse) {
+		payload := inx.WrapBlockMetadata(blockMetadata)
 
 		if ctx.Err() != nil {
 			// context is done, so we don't need to send the payload
@@ -99,47 +91,34 @@ func (s *Server) ListenToAcceptedBlocks(_ *inx.NoParams, srv inx.INX_ListenToAcc
 			Component.LogErrorf("send error: %v", err)
 			cancel()
 		}
-	}, event.WithWorkerPool(wp)).Unhook
+	}
 
-	<-ctx.Done()
-	unhook()
-
-	// We need to wait until all tasks are done, otherwise we might call
-	// "SendMsg" and "CloseSend" in parallel on the grpc stream, which is
-	// not safe according to the grpc docs.
-	wp.Shutdown()
-	wp.ShutdownComplete.Wait()
-
-	return ctx.Err()
-}
-
-func (s *Server) ListenToConfirmedBlocks(_ *inx.NoParams, srv inx.INX_ListenToConfirmedBlocksServer) error {
-	ctx, cancel := context.WithCancel(Component.Daemon().ContextStopped())
-
-	wp := workerpool.New("ListenToConfirmedBlocks", workerpool.WithWorkerCount(workerCount)).Start()
-
-	unhook := deps.Protocol.Events.Engine.BlockRetainer.BlockConfirmed.Hook(func(block *blocks.Block) {
-		payload, err := inx.WrapBlockMetadata(&api.BlockMetadataResponse{
-			BlockID:    block.ID(),
-			BlockState: api.BlockStateConfirmed,
-		})
-		if err != nil {
-			Component.LogErrorf("get block metadata error: %v", err)
-			cancel()
-
-			return
-		}
-
-		if ctx.Err() != nil {
-			// context is done, so we don't need to send the payload
-			return
-		}
-
-		if err := srv.Send(payload); err != nil {
-			Component.LogErrorf("send error: %v", err)
-			cancel()
-		}
-	}, event.WithWorkerPool(wp)).Unhook
+	unhook := lo.Batch(
+		deps.Protocol.Events.Engine.BlockRetainer.BlockRetained.Hook(func(block *blocks.Block) {
+			sendBlockMetadata(&api.BlockMetadataResponse{
+				BlockID:    block.ID(),
+				BlockState: api.BlockStatePending,
+			})
+		}, event.WithWorkerPool(wp)).Unhook,
+		deps.Protocol.Events.Engine.BlockRetainer.BlockAccepted.Hook(func(block *blocks.Block) {
+			sendBlockMetadata(&api.BlockMetadataResponse{
+				BlockID:    block.ID(),
+				BlockState: api.BlockStateAccepted,
+			})
+		}, event.WithWorkerPool(wp)).Unhook,
+		deps.Protocol.Events.Engine.BlockRetainer.BlockConfirmed.Hook(func(block *blocks.Block) {
+			sendBlockMetadata(&api.BlockMetadataResponse{
+				BlockID:    block.ID(),
+				BlockState: api.BlockStateConfirmed,
+			})
+		}, event.WithWorkerPool(wp)).Unhook,
+		deps.Protocol.Events.Engine.BlockRetainer.BlockDropped.Hook(func(block *blocks.Block) {
+			sendBlockMetadata(&api.BlockMetadataResponse{
+				BlockID:    block.ID(),
+				BlockState: api.BlockStateDropped,
+			})
+		}, event.WithWorkerPool(wp)).Unhook,
+	)
 
 	<-ctx.Done()
 	unhook()
@@ -207,5 +186,5 @@ func getINXBlockMetadata(blockID iotago.BlockID) (*inx.BlockMetadata, error) {
 		return nil, ierrors.Wrap(err, "failed to get BlockMetadata")
 	}
 
-	return inx.WrapBlockMetadata(blockMetadata)
+	return inx.WrapBlockMetadata(blockMetadata), nil
 }

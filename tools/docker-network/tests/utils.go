@@ -119,10 +119,12 @@ func (d *DockerTestFramework) AssertCommittee(expectedEpoch iotago.EpochIndex, e
 	expectedSlotStart := testAPI.TimeProvider().EpochStart(expectedEpoch)
 	require.Greater(d.Testing, expectedSlotStart, status.LatestAcceptedBlockSlot)
 
-	slotToWait := expectedSlotStart - status.LatestAcceptedBlockSlot
-	secToWait := time.Duration(slotToWait) * time.Duration(testAPI.ProtocolParameters().SlotDurationInSeconds()) * time.Second
-	fmt.Println("Wait for ", secToWait, "until expected epoch: ", expectedEpoch)
-	time.Sleep(secToWait)
+	if status.LatestAcceptedBlockSlot < expectedSlotStart {
+		slotToWait := expectedSlotStart - status.LatestAcceptedBlockSlot
+		secToWait := time.Duration(slotToWait) * time.Duration(testAPI.ProtocolParameters().SlotDurationInSeconds()) * time.Second
+		fmt.Println("Wait for ", secToWait, "until expected epoch: ", expectedEpoch)
+		time.Sleep(secToWait)
+	}
 
 	d.Eventually(func() error {
 		for _, node := range d.Nodes() {

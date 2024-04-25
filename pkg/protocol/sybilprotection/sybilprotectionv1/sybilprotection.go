@@ -160,7 +160,7 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot iotag
 		// If the committed slot is `maxCommittableAge` away from the end of the epoch, then register (reuse)
 		// a committee for the next epoch if it hasn't been selected yet.
 		if slot+maxCommittableAge == currentEpochEndSlot {
-			if _, committeeExists := o.seatManager.CommitteeInEpoch(nextEpoch); !committeeExists {
+			if committee, committeeExists := o.seatManager.CommitteeInEpoch(nextEpoch); !committeeExists {
 				// If the committee for the epoch wasn't set before due to finalization of a slot,
 				// we promote the current committee to also serve in the next epoch.
 				committeeAccounts, err := o.reuseCommittee(currentEpoch, nextEpoch)
@@ -169,6 +169,9 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot iotag
 				}
 
 				o.events.CommitteeSelected.Trigger(committeeAccounts, nextEpoch)
+				o.LogDebug("reusing committee", "nextEpoch", nextEpoch, "committeeIDs", committeeAccounts.IDs())
+			} else {
+				o.LogDebug("not reusing committee", "nextEpoch", nextEpoch, "committeeIDs", committee.IDs())
 			}
 		}
 
@@ -230,7 +233,11 @@ func (o *SybilProtection) committeeRoot(targetCommitteeEpoch iotago.EpochIndex) 
 		iotago.AccountIDFromBytes,
 	)
 
-	for _, accountID := range committee.IDs() {
+	committeeIDs := committee.IDs()
+
+	o.LogDebug("generating committee root", "committeeIDs", committeeIDs, "epoch", targetCommitteeEpoch)
+
+	for _, accountID := range committeeIDs {
 		if err = committeeTree.Add(accountID); err != nil {
 			return iotago.Identifier{}, ierrors.Wrapf(err, "failed to add account %s to committee tree", accountID)
 		}
@@ -411,12 +418,16 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) (*account.Se
 		return nil, ierrors.Wrapf(err, "failed to retrieve candidates for epoch %d", nextEpoch)
 	}
 
+	o.LogDebug("selecting new committee", "candidates", candidates.ToSlice(), "slot", slot)
+
 	// If there's no candidate, reuse the current committee.
 	if candidates.Size() == 0 {
 		committee, err := o.reuseCommittee(currentEpoch, nextEpoch)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to reuse committee (due to no candidates) for epoch %d", nextEpoch)
 		}
+
+		o.LogDebug("candidates empty, reusing committee", "candidates", committee.IDs(), "slot", slot)
 
 		return committee, nil
 	}
@@ -444,6 +455,8 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) (*account.Se
 	}
 
 	o.performanceTracker.ClearCandidates()
+
+	o.LogDebug("rotating committee", "candidates", newCommittee.IDs(), "slot", slot)
 
 	return newCommittee, nil
 }

@@ -159,7 +159,7 @@ func (tf *TestFramework) triggerBlockRetainerAction(alias string, act action) er
 	case eventConfirmed:
 		err = tf.Instance.OnBlockConfirmed(tf.getBlock(alias))
 	case eventDropped:
-		err = tf.Instance.OnBlockDropped(tf.getBlockID(alias))
+		err = tf.Instance.OnBlockDropped(tf.getBlock(alias))
 	default:
 		err = ierrors.Errorf("unknown action %d", act)
 	}
