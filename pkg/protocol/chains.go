@@ -213,11 +213,11 @@ func attachEngineLogs(instance *engine.Engine) func() {
 		}).Unhook,
 
 		events.SeatManager.OnlineCommitteeSeatAdded.Hook(func(seat account.SeatIndex, accountID iotago.AccountID) {
-			instance.LogInfo("SybilProtection.OnlineCommitteeSeatAdded", "seat", seat, "accountID", accountID)
+			instance.LogInfo("SeatManager.OnlineCommitteeSeatAdded", "seat", seat, "accountID", accountID)
 		}).Unhook,
 
 		events.SeatManager.OnlineCommitteeSeatRemoved.Hook(func(seat account.SeatIndex) {
-			instance.LogInfo("SybilProtection.OnlineCommitteeSeatRemoved", "seat", seat)
+			instance.LogInfo("SeatManager.OnlineCommitteeSeatRemoved", "seat", seat)
 		}).Unhook,
 
 		events.SybilProtection.CommitteeSelected.Hook(func(committee *account.SeatedAccounts, epoch iotago.EpochIndex) {
@@ -323,8 +323,12 @@ func (c *Chains) initChainSwitching() (shutdown func()) {
 
 	return lo.BatchReverse(
 		c.HeaviestClaimedCandidate.WithNonEmptyValue(func(heaviestClaimedCandidate *Chain) (shutdown func()) {
-			return heaviestClaimedCandidate.IsSolid.WithNonEmptyValue(func(_ bool) (teardown func()) {
-				return heaviestClaimedCandidate.RequestAttestations.ToggleValue(true)
+			return heaviestClaimedCandidate.ForkingPoint.WithNonEmptyValue(func(forkingPoint *Commitment) (teardown func()) {
+				return forkingPoint.Parent.WithNonEmptyValue(func(parentOfForkingPoint *Commitment) (teardown func()) {
+					return parentOfForkingPoint.IsVerified.WithNonEmptyValue(func(_ bool) (teardown func()) {
+						return heaviestClaimedCandidate.RequestAttestations.ToggleValue(true)
+					})
+				})
 			})
 		}),
 
@@ -347,19 +351,21 @@ func (c *Chains) initChainSwitching() (shutdown func()) {
 
 func (c *Chains) trackHeaviestCandidates(chain *Chain) (teardown func()) {
 	return chain.LatestCommitment.OnUpdate(func(_ *Commitment, latestCommitment *Commitment) {
-		targetSlot := latestCommitment.ID().Index()
+		latestCommitment.IsSolid.OnTrigger(func() {
+			targetSlot := latestCommitment.ID().Index()
 
-		if evictionEvent := c.protocol.EvictionEvent(targetSlot); !evictionEvent.WasTriggered() {
-			c.HeaviestClaimedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
+			if evictionEvent := c.protocol.EvictionEvent(targetSlot); !evictionEvent.WasTriggered() {
+				c.HeaviestClaimedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
 
-			latestCommitment.IsAttested.OnTrigger(func() {
-				c.HeaviestAttestedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
-			})
+				latestCommitment.IsAttested.OnTrigger(func() {
+					c.HeaviestAttestedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
+				})
 
-			latestCommitment.IsVerified.OnTrigger(func() {
-				c.HeaviestVerifiedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
-			})
-		}
+				latestCommitment.IsVerified.OnTrigger(func() {
+					c.HeaviestVerifiedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
+				})
+			}
+		})
 	})
 }
 

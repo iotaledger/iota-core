@@ -148,6 +148,8 @@ func (c *Commitments) publishRootCommitment(mainChain *Chain, mainEngine *engine
 			return
 		}
 
+		publishedCommitment.InitializedEvent().Trigger()
+
 		publishedCommitment.IsRoot.Set(true)
 		if published {
 			publishedCommitment.Chain.Set(mainChain)
@@ -187,11 +189,15 @@ func (c *Commitments) publishEngineCommitments(chain *Chain, engine *engine.Engi
 			}
 
 			// publish the commitment
-			publishedCommitment, _, err := c.publishCommitment(commitment)
+			publishedCommitment, published, err := c.publishCommitment(commitment)
 			if err != nil {
 				c.LogError("failed to publish commitment from engine", "engine", engine.LogName(), "commitment", commitment, "err", err)
 
 				return
+			}
+
+			if published {
+				publishedCommitment.InitializedEvent().Trigger()
 			}
 
 			// mark it as produced by ourselves and force it to be on the right chain (in case our chain produced a
@@ -275,7 +281,9 @@ func (c *Commitments) initCommitment(commitment *Commitment, slotEvicted reactiv
 	// solidify the parent of the commitment
 	if root := c.Root.Get(); root != nil && commitment.Slot() > root.Slot() {
 		c.cachedRequest(commitment.PreviousCommitmentID(), true).OnSuccess(func(parent *Commitment) {
-			parent.IsEvicted.OnTrigger(commitment.Parent.ToggleValue(parent))
+			parent.InitializedEvent().OnTrigger(func() {
+				parent.IsEvicted.OnTrigger(commitment.Parent.ToggleValue(parent))
+			})
 		})
 	}
 
@@ -349,6 +357,8 @@ func (c *Commitments) processResponse(commitment *model.Commitment, from peer.ID
 		if publishedCommitment, published, err := c.protocol.Commitments.publishCommitment(commitment); err != nil {
 			c.LogError("failed to process commitment", "fromPeer", from, "err", err)
 		} else if published {
+			publishedCommitment.InitializedEvent().Trigger()
+
 			c.LogTrace("received response", "commitment", publishedCommitment.LogName(), "fromPeer", from)
 		}
 	})

@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
+	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -91,8 +92,7 @@ type Commitment struct {
 	// commitments contains a reference to the Commitments instance that this Commitment belongs to.
 	commitments *Commitments
 
-	// Logger embeds a logger that can be used to log messages emitted by this Commitment.
-	log.Logger
+	module.Module
 }
 
 // NewCommitment creates a new Commitment from the given model.Commitment.
@@ -121,14 +121,24 @@ func newCommitment(commitments *Commitments, model *model.Commitment) *Commitmen
 		ReplayDroppedBlocks:             reactive.NewVariable[bool](),
 		IsEvicted:                       reactive.NewEvent(),
 		commitments:                     commitments,
+		Module:                          module.New(commitments.NewChildLogger(fmt.Sprintf("Slot%d.", model.Slot()), true)),
 	}
 
-	shutdown := lo.BatchReverse(
-		c.initLogger(),
-		c.initDerivedProperties(),
-	)
+	c.InitializedEvent().OnTrigger(func() {
+		shutdownLogger := c.initLogger()
+		shutdownProperties := c.initDerivedProperties()
 
-	c.IsEvicted.OnTrigger(shutdown)
+		c.ShutdownEvent().OnTrigger(func() {
+			shutdownProperties()
+			shutdownLogger()
+
+			c.StoppedEvent().Trigger()
+		})
+
+		c.IsEvicted.OnTrigger(func() {
+			c.ShutdownEvent().Trigger()
+		})
+	})
 
 	return c
 }
@@ -210,8 +220,6 @@ func (c *Commitment) Less(other *Commitment) bool {
 
 // initLogger initializes the Logger of this Commitment.
 func (c *Commitment) initLogger() (shutdown func()) {
-	c.Logger = c.commitments.NewChildLogger(fmt.Sprintf("Slot%d.", c.Slot()), true)
-
 	return lo.BatchReverse(
 		c.Parent.LogUpdates(c, log.LevelTrace, "Parent", (*Commitment).LogName),
 		c.MainChild.LogUpdates(c, log.LevelTrace, "MainChild", (*Commitment).LogName),
@@ -231,8 +239,6 @@ func (c *Commitment) initLogger() (shutdown func()) {
 		c.IsVerified.LogUpdates(c, log.LevelTrace, "IsVerified"),
 		c.ReplayDroppedBlocks.LogUpdates(c, log.LevelTrace, "ReplayDroppedBlocks"),
 		c.IsEvicted.LogUpdates(c, log.LevelTrace, "IsEvicted"),
-
-		c.Logger.Shutdown,
 	)
 }
 
